@@ -1,195 +1,149 @@
 # Inventory and Order Management System (IOMS)
 
-A complete, production-ready web application for managing inventory and sales, built with Native PHP and MySQL.
+A complete, production-ready web application for managing inventory and sales, built with Native PHP and MySQL. The system offers a streamlined interface for tracking products, processing orders, and visualizing sales data.
+
+---
 
 ## 🚀 Features
 
-- **Secure Authentication** - Staff login system with password hashing
-- **Dashboard** - Visual overview with key metrics (products, orders, sales, stock)
-- **Product Management** - Full CRUD operations with image upload support
-- **Order Processing** - Create orders with multiple items and automatic stock updates
-- **Modern UI** - Responsive design with gradients, animations, and glassmorphism effects
-- **Real-time Search** - Filter products dynamically
-- **Stock Validation** - Prevents orders exceeding available inventory
+* **Secure Authentication**: Robust staff login system utilizing password hashing for enhanced security.
+* **Interactive Dashboard**: Provides a visual overview with key metrics including total products, orders, sales volume, and stock levels.
+* **Comprehensive Product Management**: Full CRUD (Create, Read, Update, Delete) operations, including support for product image uploads.
+* **Efficient Order Processing**: Create orders containing multiple items with automatic stock level adjustments upon completion.
+* **Modern User Interface**: A responsive design featuring gradients, smooth animations, and glassmorphism effects for a premium feel.
+* **Real-time Search**: Dynamic filtering capability to instantly locate products within the inventory.
+* **Stock Validation Logic**: Intelligent system that prevents order creation if quantities exceed available inventory.
+
+---
+
+## 🎨 Tech Stack
+
+* **Backend**: Native PHP (No frameworks used, demonstrating core PHP capabilities).
+* **Database**: MySQL with prepared statements for security and performance.
+* **Frontend**: HTML5, CSS3, and Vanilla JavaScript for a lightweight and fast user experience.
+* **Security Measures**:
+    * Password hashing using `bcrypt`.
+    * Prepared statements to prevent SQL injection.
+    * XSS protection via `htmlspecialchars()`.
+    * Secure session management.
+
+---
 
 ## 📁 Project Structure
 
-```
-/New folder (5)
-  ├── /assets
-  │     ├── style.css       - Modern styling with gradients & animations
-  │     └── script.js       - UI interactions & AJAX functionality
-  ├── /includes
-  │     ├── db.php          - MySQL connection handler
-  │     └── functions.php   - Reusable PHP functions
-  ├── /database
-  │     └── schema.sql      - Database schema (4 tables)
-  ├── /uploads              - Product images storage
-  ├── index.php             - Dashboard
-  ├── login.php             - Authentication
-  ├── products.php          - Product CRUD
-  ├── orders.php            - Order management
-  └── get_order_details.php - AJAX endpoint
+```text
+/ioms
+├── /assets
+│   ├── style.css           # Modern styling with gradients & animations
+│   └── script.js           # UI interactions & AJAX functionality
+├── /includes
+│   ├── db.php              # MySQL connection handler configuration
+│   └── functions.php       # Reusable helper PHP functions
+├── /database
+│   └── schema.sql          # Database schema definition (4 tables)
+├── /uploads                # Directory for storing product images
+├── index.php               # Dashboard / Home page
+├── login.php               # User Authentication page
+├── products.php            # Product management (CRUD) page
+├── orders.php              # Order processing and management page
+└── get_order_details.php   # AJAX endpoint for fetching order data
 ```
 
 ## 🗄️ Database Schema
 
-The system uses exactly 4 tables:
+The system relies on a strictly normalized database consisting of 4 tables:
 
-1. **Staff** - User authentication (id, username, password, full_name, created_at)
-2. **Product** - Inventory items (id, name, description, price, stock, image_path, timestamps)
-3. **Order** - Order headers (id, order_date, total_amount, staff_id, created_at)
-4. **OrderDetail** - Order line items (id, order_id, product_id, quantity, unit_price, subtotal)
+* **Staff**: Manages user authentication details (`id`, `username`, `password`, `full_name`, `created_at`).
+* **Product**: Stores inventory item information (`id`, `name`, `description`, `price`, `stock`, `image_path`, `timestamps`).
+* **Order**: Records general order information (`id`, `order_date`, `total_amount`, `staff_id`, `created_at`).
+* **OrderDetail**: Links products to orders with specific quantities (`id`, `order_id`, `product_id`, `quantity`, `unit_price`, `subtotal`).
 
-## ⚙️ Installation
+## ⚙️ Installation Guide
 
 ### Prerequisites
-- PHP 7.4 or higher
-- MySQL 5.7 or higher
-- Apache/Nginx web server
-- XAMPP/WAMP (recommended for local development)
+* PHP 7.4 or higher.
+* MySQL 5.7 or higher.
+* Web Server (Apache/Nginx).
+* XAMPP or WAMP (Recommended for local development).
 
 ### Step 1: Clone/Copy Files
-Copy all project files to your web server directory:
-- XAMPP: `C:\xampp\htdocs\ioms`
-- WAMP: `C:\wamp64\www\ioms`
+Place the project files into your web server's root directory:
+* **XAMPP**: `C:\xampp\htdocs\ioms`
+* **WAMP**: `C:\wamp64\www\ioms`
 
-### Step 2: Create Database
-1. Open phpMyAdmin (http://localhost/phpmyadmin)
-2. Import the database schema:
-   - Click "Import" tab
-   - Choose `database/schema.sql`
-   - Click "Go"
+### Step 2: Database Setup
+1. Open **phpMyAdmin** (usually at `http://localhost/phpmyadmin`).
+2. Navigate to the **"Import"** tab.
+3. Select the `database/schema.sql` file from the project folder.
+4. Click **"Go"** to execute.
+   * This creates the `ioms_db` database, tables, and populates them with sample data.
 
-This will create:
-- Database: `ioms_db`
-- 4 tables with sample data
-- Default admin user
-
-### Step 3: Configure Database Connection
-Edit `includes/db.php` if needed:
+### Step 3: Configure Connection
+Open `includes/db.php` and update the credentials if necessary:
 ```php
-$host = 'localhost';     // Usually localhost
-$username = 'root';      // Your MySQL username
-$password = '';          // Your MySQL password
-$database = 'ioms_db';   // Database name
+$host = 'localhost';
+$username = 'root';      // Default XAMPP/WAMP username
+$password = '';          // Default XAMPP/WAMP password (leave empty)
+$database = 'ioms_db';
 ```
 
 ### Step 4: Create Uploads Directory
-Create the `uploads` folder for product images:
-```bash
-mkdir uploads
-chmod 777 uploads  # On Linux/Mac
-```
+Ensure a folder named `uploads` exists in the root directory for images.
+* **Windows**: Create the folder and ensure write permissions are enabled.
+* **Linux/Mac**: Run `mkdir uploads` and `chmod 777 uploads`.
 
-On Windows, ensure the folder has write permissions.
-
-### Step 5: Access the System
-Open your browser and navigate to:
-```
-http://localhost/ioms/login.php
-```
+### Step 5: Launch
+Open your browser and go to: `http://localhost/ioms/login.php`
 
 ## 🔐 Default Credentials
 
-**Username:** admin  
-**Password:** admin123
+Use the following account to log in as an administrator:
+* **Username**: `admin`
+* **Password**: `admin123`
 
 Additional test accounts:
-- john / admin123
-- sarah / admin123
+* `john` / `admin123`
+* `sarah` / `admin123`
 
 ## 📖 Usage Guide
 
-### Dashboard
-- View key metrics: Total Products, Orders, Sales, Stock
-- Quick access to Products and Orders sections
+### 📊 Dashboard
+* Provides an immediate snapshot of business performance.
+* Displays cards for **Total Products**, **Total Orders**, **Total Sales**, and **Current Stock**.
 
-### Product Management
-1. Click "Products" in navigation
-2. **Add Product:** Click "+ Add Product" button
-   - Fill in name, description, price, stock
-   - Optionally upload an image
-3. **Edit Product:** Click "Edit" button on any product
-4. **Delete Product:** Click "Delete" with confirmation
-5. **Search:** Use search box to filter products
+### 📦 Product Management
+* Navigate to the **Products** page.
+* **Add**: Use the "+ Add Product" button to input details and upload an image.
+* **Edit/Delete**: Use the action buttons next to each product in the list.
+* **Search**: Use the real-time search bar to filter the product list instantly.
 
-### Order Management
-1. Click "Orders" in navigation
-2. **Create Order:** Click "+ Create Order"
-   - Select product from dropdown
-   - Enter quantity
-   - Click "+ Add Another Product" for multiple items
-   - View real-time total calculation
-   - Click "Create Order"
-3. **View Details:** Click "View Details" on any order
-4. Stock automatically updates when order is created
-
-## 🎨 Tech Stack
-
-- **Backend:** Native PHP (no frameworks)
-- **Database:** MySQL with prepared statements
-- **Frontend:** HTML5, CSS3, Vanilla JavaScript
-- **Security:** 
-  - Password hashing with bcrypt
-  - Prepared statements (SQL injection prevention)
-  - XSS protection with `htmlspecialchars()`
-  - Session management
+### 🛒 Order Management
+* Navigate to the **Orders** page.
+* **Create Order**:
+    1. Click "+ Create Order".
+    2. Select a product and enter the quantity.
+    3. Use "Add Another Product" for bulk orders.
+    4. The total is calculated automatically.
+    5. Submit to save the order and update stock.
+* **View Details**: Inspect specific items within any past order.
 
 ## 🛡️ Security Features
-
-- Passwords hashed using `password_hash()` with bcrypt
-- All database queries use prepared statements
-- Input sanitization on all user inputs
-- Session-based authentication
-- CSRF protection through session validation
+* **Password Hashing**: Utilizes `password_hash()` with bcrypt algorithms.
+* **SQL Injection Prevention**: All database queries use prepared statements.
+* **XSS Protection**: Inputs are sanitized using `htmlspecialchars()`.
+* **CSRF Protection**: Implemented via session validation.
 
 ## 🔧 Troubleshooting
 
-### Issue: "Connection failed"
-- Check MySQL service is running
-- Verify database credentials in `includes/db.php`
-- Ensure `ioms_db` database exists
-
-### Issue: "Failed to upload image"
-- Ensure `uploads/` folder exists
-- Check folder has write permissions
-- Verify file type is jpg, jpeg, png, or gif
-
-### Issue: "Session errors"
-- Clear browser cookies
-- Check PHP session configuration
-- Ensure `session_start()` is called
-
-## 📝 Sample Data
-
-The system comes with:
-- 3 staff members (admin, john, sarah)
-- 10 sample products (tech accessories)
-- 3 sample orders with order details
-
-## 🌐 Browser Compatibility
-
-- Chrome (recommended)
-- Firefox
-- Edge
-- Safari
-- Opera
-
-## 📱 Responsive Design
-
-The UI is fully responsive and works on:
-- Desktop (1200px+)
-- Tablet (768px - 1199px)
-- Mobile (< 768px)
+| Issue | Solution |
+|-------|----------|
+| **Connection Failed** | Verify MySQL is running and credentials in `db.php` are correct. |
+| **Image Upload Failed** | Check if `uploads/` folder exists and has write permissions. Ensure file is an image. |
+| **Session Errors** | Clear browser cookies and ensure `session_start()` is active in PHP config. |
 
 ## 📄 License
 
 This project is open-source and available for educational and commercial use.
-
-## 🆘 Support
-
-For issues or questions, refer to the code comments or review the `functions.php` file for available helper functions.
 
 ---
 
