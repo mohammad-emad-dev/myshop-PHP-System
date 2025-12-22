@@ -1,0 +1,26 @@
+# IOMS Project Files
+
+## Development Files (ignore these)
+.DS_Store
+Thumbs.db
+*.log
+
+## IDE / Editor
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+## Uploaded files (keep folder, ignore contents for version control)
+uploads/*
+!uploads/.gitkeep
+
+## Environment files
+.env
+config.local.php
+
+## Temporary files
+*.tmp
+*.bak
+*.swp
+*~
