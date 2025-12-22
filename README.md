@@ -48,9 +48,15 @@ A complete, production-ready web application for managing inventory and sales, b
 ├── orders.php              # Order processing and management page
 └── get_order_details.php   # AJAX endpoint for fetching order data
 ```
-| Dashboard | POS Terminal |
+## 📸 Screenshots
+
+| Dashboard | Login Page |
 |:---:|:---:|
-| ![Dashboard](screenshots/Dashboard.png) | ![POS](screenshots/orders.png) |
+| ![Dashboard](screenshots/Dashboard.png) | ![Login](screenshots/login.png) |
+
+| Products Management | POS Terminal |
+|:---:|:---:|
+| ![Products](screenshots/Products.png) | ![POS](screenshots/orders.png) |
 
 ## 🗄️ Database Schema
 
