@@ -139,7 +139,10 @@ require_once '../includes/layouts/header.php';
                     <div class="card-body">
                         <div class="row mb-3">
                             <div class="col-md-4">
-                                <input type="text" id="searchProduct" placeholder="Search products..." class="form-control">
+                                <div class="input-group shadow-sm rounded-3 overflow-hidden border">
+                                    <span class="input-group-text bg-white border-0"><i class="fas fa-search text-muted"></i></span>
+                                    <input type="text" id="searchProduct" placeholder="Search products by name, category..." class="form-control border-0 px-2" style="box-shadow: none; font-size: 0.9rem;">
+                                </div>
                             </div>
                         </div>
                         <div class="table-responsive">
@@ -225,10 +228,10 @@ require_once '../includes/layouts/header.php';
     <!-- Add Product Modal -->
     <div class="modal fade" id="addProductModal" tabindex="-1" aria-labelledby="addProductModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="addProductModalLabel">Add New Product</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            <div class="modal-content border-0 rounded-4">
+                <div class="modal-header py-3">
+                    <h5 class="modal-title fw-bold" id="addProductModalLabel" style="font-family: var(--font-heading); color: var(--slate-900);"><i class="fas fa-plus me-2 text-primary"></i>Add New Product</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <form method="POST" enctype="multipart/form-data">
                     <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(generate_csrf_token()); ?>">
@@ -270,8 +273,8 @@ require_once '../includes/layouts/header.php';
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-primary">Add Product</button>
+                        <button type="button" class="btn btn-secondary rounded-3" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary rounded-3 px-4">Add Product</button>
                     </div>
                 </form>
             </div>
@@ -281,10 +284,10 @@ require_once '../includes/layouts/header.php';
     <!-- Edit Product Modal -->
     <div class="modal fade" id="editProductModal" tabindex="-1" aria-labelledby="editProductModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="editProductModalLabel">Edit Product</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            <div class="modal-content border-0 rounded-4">
+                <div class="modal-header py-3">
+                    <h5 class="modal-title fw-bold" id="editProductModalLabel" style="font-family: var(--font-heading); color: var(--slate-900);"><i class="fas fa-edit me-2 text-primary"></i>Edit Product Details</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <form method="POST" enctype="multipart/form-data">
                     <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(generate_csrf_token()); ?>">
@@ -328,8 +331,8 @@ require_once '../includes/layouts/header.php';
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-primary">Update Product</button>
+                        <button type="button" class="btn btn-secondary rounded-3" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary rounded-3 px-4">Save Changes</button>
                     </div>
                 </form>
             </div>

@@ -111,7 +111,10 @@ require_once '../includes/layouts/header.php';
                     <div class="card-body">
                         <div class="row mb-3">
                             <div class="col-md-4">
-                                <input type="text" id="searchCustomer" placeholder="Search customers..." class="form-control">
+                                <div class="input-group shadow-sm rounded-3 overflow-hidden border">
+                                    <span class="input-group-text bg-white border-0"><i class="fas fa-search text-muted"></i></span>
+                                    <input type="text" id="searchCustomer" placeholder="Search customers by name, phone..." class="form-control border-0 px-2" style="box-shadow: none; font-size: 0.9rem;">
+                                </div>
                             </div>
                         </div>
                         <div class="table-responsive">
@@ -182,8 +185,8 @@ require_once '../includes/layouts/header.php';
 <div class="modal fade" id="addCustomerModal" tabindex="-1" aria-labelledby="addCustomerModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 rounded-4">
-            <div class="modal-header bg-primary text-white border-0 py-3">
-                <h5 class="modal-title fw-bold" id="addCustomerModalLabel"><i class="fas fa-user-plus me-2"></i>Add Customer</h5>
+            <div class="modal-header py-3">
+                <h5 class="modal-title fw-bold" id="addCustomerModalLabel" style="font-family: var(--font-heading); color: var(--slate-900);"><i class="fas fa-user-plus me-2 text-primary"></i>Add Customer</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form action="customers.php" method="POST">
@@ -207,7 +210,7 @@ require_once '../includes/layouts/header.php';
                         <textarea class="form-control rounded-3" id="add_address" name="address" rows="3" placeholder="Billing or shipping address details..."></textarea>
                     </div>
                 </div>
-                <div class="modal-footer border-0 bg-light rounded-bottom-4">
+                <div class="modal-footer">
                     <button type="button" class="btn btn-secondary rounded-3" data-bs-dismiss="modal">Cancel</button>
                     <button type="submit" class="btn btn-primary rounded-3 px-4">Save Customer</button>
                 </div>
@@ -220,8 +223,8 @@ require_once '../includes/layouts/header.php';
 <div class="modal fade" id="editCustomerModal" tabindex="-1" aria-labelledby="editCustomerModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 rounded-4">
-            <div class="modal-header bg-primary text-white border-0 py-3">
-                <h5 class="modal-title fw-bold" id="editCustomerModalLabel"><i class="fas fa-user-edit me-2"></i>Edit Customer Details</h5>
+            <div class="modal-header py-3">
+                <h5 class="modal-title fw-bold" id="editCustomerModalLabel" style="font-family: var(--font-heading); color: var(--slate-900);"><i class="fas fa-user-edit me-2 text-primary"></i>Edit Customer Details</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form action="customers.php" method="POST">
@@ -246,7 +249,7 @@ require_once '../includes/layouts/header.php';
                         <textarea class="form-control rounded-3" id="edit_address" name="address" rows="3"></textarea>
                     </div>
                 </div>
-                <div class="modal-footer border-0 bg-light rounded-bottom-4">
+                <div class="modal-footer">
                     <button type="button" class="btn btn-secondary rounded-3" data-bs-dismiss="modal">Cancel</button>
                     <button type="submit" class="btn btn-primary rounded-3 px-4">Save Changes</button>
                 </div>

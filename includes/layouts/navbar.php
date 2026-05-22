@@ -1,9 +1,9 @@
 <!-- Page Content Wrapper -->
 <div id="page-content-wrapper">
-    <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm py-4 px-4">
+    <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm py-3 px-4">
         <div class="d-flex align-items-center">
             <i class="fas fa-align-left primary-text fs-4 me-3" id="menu-toggle"></i>
-            <h2 class="fs-2 m-0 text-dark"><?php echo isset($header_title) ? htmlspecialchars($header_title) : 'Dashboard'; ?></h2>
+            <h2 class="fs-3 m-0 text-dark"><?php echo isset($header_title) ? htmlspecialchars($header_title) : 'Dashboard'; ?></h2>
         </div>
 
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
@@ -33,7 +33,7 @@
                             </span>
                         <?php endif; ?>
                     </a>
-                    <ul class="dropdown-menu dropdown-menu-end shadow border-0 py-2 rounded-3" aria-labelledby="notificationDropdown" style="width: 320px; max-height: 400px; overflow-y: auto;">
+                    <ul class="dropdown-menu dropdown-menu-end py-2" aria-labelledby="notificationDropdown" style="width: 320px; max-height: 400px; overflow-y: auto;">
                         <li class="px-3 py-2 border-bottom d-flex justify-content-between align-items-center">
                             <span class="fw-bold text-secondary">Notifications</span>
                             <?php if ($low_stock_count > 0): ?>
@@ -55,7 +55,7 @@
                                         </div>
                                         <div class="flex-grow-1 min-width-0">
                                             <h6 class="mb-0 text-truncate text-dark fw-bold fs-7"><?php echo htmlspecialchars($low_prod['name']); ?></h6>
-                                            <small class="text-danger fw-bold">Stock: <?php echo $low_prod['stock']; ?> / Threshold: <?php echo $low_prod['alert_threshold']; ?></small>
+                                            <small class="text-danger fw-bold fs-8">Stock: <?php echo $low_prod['stock']; ?> / Threshold: <?php echo $low_prod['alert_threshold']; ?></small>
                                         </div>
                                     </a>
                                 </li>
@@ -73,20 +73,20 @@
                 </li>
 
                 <li class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle text-secondary fw-bold" href="#" id="navbarDropdown"
+                    <a class="nav-link dropdown-toggle text-secondary fw-bold d-flex align-items-center" href="#" id="navbarDropdown"
                         role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                        <i class="fas fa-user-circle me-2"></i><?php echo htmlspecialchars($_SESSION['full_name'] ?? 'User'); ?>
+                        <i class="fas fa-user-circle fs-4 me-2"></i><?php echo htmlspecialchars($_SESSION['full_name'] ?? 'User'); ?>
                     </a>
-                    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdown">
-                        <li class="dropdown-header border-bottom pb-2 mb-1">
-                            <span class="text-muted small d-block">Signed in as</span>
-                            <span class="badge bg-primary text-white text-uppercase mt-1"><?php echo htmlspecialchars($_SESSION['role'] ?? 'cashier'); ?></span>
+                    <ul class="dropdown-menu dropdown-menu-end py-2" aria-labelledby="navbarDropdown">
+                        <li class="dropdown-header border-bottom pb-2 mb-1 px-3">
+                            <span class="text-muted small d-block mb-1">Signed in as</span>
+                            <span class="badge primary-bg primary-text text-uppercase px-2.5 py-1 rounded-pill" style="font-size: 0.7rem; font-weight: 700; letter-spacing: 0.5px;"><?php echo htmlspecialchars($_SESSION['role'] ?? 'cashier'); ?></span>
                         </li>
-                        <li><a class="dropdown-item" href="settings.php"><i class="fas fa-cog me-2"></i>Settings</a></li>
+                        <li><a class="dropdown-item px-3" href="settings.php"><i class="fas fa-cog me-2"></i>Settings</a></li>
                         <li>
-                            <hr class="dropdown-divider">
+                            <hr class="dropdown-divider my-1">
                         </li>
-                        <li><a class="dropdown-item text-danger" href="login.php?logout=1&csrf_token=<?php echo htmlspecialchars($_SESSION['csrf_token'] ?? ''); ?>"><i class="fas fa-power-off me-2"></i>Logout</a></li>
+                        <li><a class="dropdown-item text-danger px-3" href="login.php?logout=1&csrf_token=<?php echo htmlspecialchars($_SESSION['csrf_token'] ?? ''); ?>"><i class="fas fa-power-off me-2"></i>Logout</a></li>
                     </ul>
                 </li>
             </ul>

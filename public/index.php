@@ -23,55 +23,65 @@ require_once '../includes/layouts/header.php';
     <?php require_once '../includes/layouts/sidebar.php'; ?>
     <?php require_once '../includes/layouts/navbar.php'; ?>
 
-    <div class="container-fluid px-4 py-5">
+    <div class="container-fluid px-4 py-4">
         <div class="row g-3 my-2">
             <div class="col-xl col-md-4 col-sm-6">
-                <div class="p-3 bg-white shadow-sm d-flex justify-content-around align-items-center rounded dashboard-card border-left-primary h-100">
+                <div class="p-4 bg-white shadow-sm d-flex justify-content-between align-items-center rounded-3 dashboard-card border-left-primary h-100">
                     <div>
-                        <h3 class="fs-2"><?php echo number_format($stats['total_products']); ?></h3>
-                        <p class="fs-5 text-muted mb-0">Products</p>
+                        <h3 class="fs-2 mb-1" style="font-family: var(--font-heading); font-weight: 800; color: var(--slate-900);"><?php echo number_format($stats['total_products']); ?></h3>
+                        <p class="fs-6 text-muted mb-0 fw-medium">Products</p>
                     </div>
-                    <i class="fas fa-boxes fs-1 primary-text border rounded-full secondary-bg p-3"></i>
+                    <div class="rounded-full primary-bg p-3 d-flex align-items-center justify-content-center" style="width: 52px; height: 52px;">
+                        <i class="fas fa-boxes fs-4 primary-text"></i>
+                    </div>
                 </div>
             </div>
 
             <div class="col-xl col-md-4 col-sm-6">
-                <div class="p-3 bg-white shadow-sm d-flex justify-content-around align-items-center rounded dashboard-card border-left-success h-100">
+                <div class="p-4 bg-white shadow-sm d-flex justify-content-between align-items-center rounded-3 dashboard-card border-left-success h-100">
                     <div>
-                        <h3 class="fs-2"><?php echo number_format($stats['total_orders']); ?></h3>
-                        <p class="fs-5 text-muted mb-0">Orders</p>
+                        <h3 class="fs-2 mb-1" style="font-family: var(--font-heading); font-weight: 800; color: var(--slate-900);"><?php echo number_format($stats['total_orders']); ?></h3>
+                        <p class="fs-6 text-muted mb-0 fw-medium">Orders</p>
                     </div>
-                    <i class="fas fa-truck fs-1 success-text border rounded-full success-bg p-3"></i>
+                    <div class="rounded-full success-bg p-3 d-flex align-items-center justify-content-center" style="width: 52px; height: 52px;">
+                        <i class="fas fa-truck fs-4 success-text"></i>
+                    </div>
                 </div>
             </div>
 
             <div class="col-xl col-md-4 col-sm-6">
-                <div class="p-3 bg-white shadow-sm d-flex justify-content-around align-items-center rounded dashboard-card border-left-info h-100">
+                <div class="p-4 bg-white shadow-sm d-flex justify-content-between align-items-center rounded-3 dashboard-card border-left-info h-100">
                     <div>
-                        <h3 class="fs-2">$<?php echo number_format($stats['total_sales'], 2); ?></h3>
-                        <p class="fs-5 text-muted mb-0">Sales</p>
+                        <h3 class="fs-2 mb-1" style="font-family: var(--font-heading); font-weight: 800; color: var(--slate-900);">$<?php echo number_format($stats['total_sales'], 2); ?></h3>
+                        <p class="fs-6 text-muted mb-0 fw-medium">Sales</p>
                     </div>
-                    <i class="fas fa-hand-holding-usd fs-1 info-text border rounded-full info-bg p-3"></i>
+                    <div class="rounded-full info-bg p-3 d-flex align-items-center justify-content-center" style="width: 52px; height: 52px;">
+                        <i class="fas fa-hand-holding-usd fs-4 info-text"></i>
+                    </div>
                 </div>
             </div>
 
             <div class="col-xl col-md-6 col-sm-6">
-                <div class="p-3 bg-white shadow-sm d-flex justify-content-around align-items-center rounded dashboard-card border-left-warning h-100">
+                <div class="p-4 bg-white shadow-sm d-flex justify-content-between align-items-center rounded-3 dashboard-card border-left-warning h-100">
                     <div>
-                        <h3 class="fs-2"><?php echo number_format($stats['total_stock']); ?></h3>
-                        <p class="fs-5 text-muted mb-0">Total Stock</p>
+                        <h3 class="fs-2 mb-1" style="font-family: var(--font-heading); font-weight: 800; color: var(--slate-900);"><?php echo number_format($stats['total_stock']); ?></h3>
+                        <p class="fs-6 text-muted mb-0 fw-medium">Total Stock</p>
                     </div>
-                    <i class="fas fa-warehouse fs-1 warning-text border rounded-full warning-bg p-3"></i>
+                    <div class="rounded-full warning-bg p-3 d-flex align-items-center justify-content-center" style="width: 52px; height: 52px;">
+                        <i class="fas fa-warehouse fs-4 warning-text"></i>
+                    </div>
                 </div>
             </div>
 
             <div class="col-xl col-md-6 col-sm-12">
-                <div class="p-3 bg-white shadow-sm d-flex justify-content-around align-items-center rounded dashboard-card border-left-purple h-100">
+                <div class="p-4 bg-white shadow-sm d-flex justify-content-between align-items-center rounded-3 dashboard-card border-left-purple h-100">
                     <div>
-                        <h3 class="fs-2">$<?php echo number_format($inventory_valuation, 2); ?></h3>
-                        <p class="fs-5 text-muted mb-0">Valuation</p>
+                        <h3 class="fs-2 mb-1" style="font-family: var(--font-heading); font-weight: 800; color: var(--slate-900);">$<?php echo number_format($inventory_valuation, 2); ?></h3>
+                        <p class="fs-6 text-muted mb-0 fw-medium">Valuation</p>
                     </div>
-                    <i class="fas fa-coins fs-1 purple-text border rounded-full purple-bg p-3"></i>
+                    <div class="rounded-full purple-bg p-3 d-flex align-items-center justify-content-center" style="width: 52px; height: 52px;">
+                        <i class="fas fa-coins fs-4 purple-text"></i>
+                    </div>
                 </div>
             </div>
         </div>
@@ -123,8 +133,8 @@ require_once '../includes/layouts/header.php';
                                             <?php echo number_format($tp['total_qty']); ?> sold ($<?php echo number_format($tp['total_sales'], 2); ?>)
                                         </span>
                                     </div>
-                                    <div class="progress" style="height: 8px;">
-                                        <div class="progress-bar bg-primary" role="progressbar" style="width: <?php echo $percentage; ?>%" aria-valuenow="<?php echo $percentage; ?>" aria-valuemin="0" aria-valuemax="100"></div>
+                                    <div class="progress rounded-pill" style="height: 6px; background-color: var(--slate-100);">
+                                        <div class="progress-bar rounded-pill" role="progressbar" style="width: <?php echo $percentage; ?>%; background-color: var(--primary) !important;" aria-valuenow="<?php echo $percentage; ?>" aria-valuemin="0" aria-valuemax="100"></div>
                                     </div>
                                 </div>
                             <?php endforeach; ?>
@@ -278,12 +288,12 @@ require_once '../includes/layouts/header.php';
             
             // Create gradients for lines
             const salesGradient = ctx.createLinearGradient(0, 0, 0, 350);
-            salesGradient.addColorStop(0, 'rgba(0, 157, 255, 0.45)');
-            salesGradient.addColorStop(1, 'rgba(0, 157, 255, 0.02)');
+            salesGradient.addColorStop(0, 'rgba(79, 70, 229, 0.35)');
+            salesGradient.addColorStop(1, 'rgba(79, 70, 229, 0.01)');
 
             const purchasesGradient = ctx.createLinearGradient(0, 0, 0, 350);
-            purchasesGradient.addColorStop(0, 'rgba(28, 200, 138, 0.45)');
-            purchasesGradient.addColorStop(1, 'rgba(28, 200, 138, 0.02)');
+            purchasesGradient.addColorStop(0, 'rgba(16, 185, 129, 0.35)');
+            purchasesGradient.addColorStop(1, 'rgba(16, 185, 129, 0.01)');
 
             new Chart(ctx, {
                 type: 'line',
@@ -293,12 +303,12 @@ require_once '../includes/layouts/header.php';
                         {
                             label: 'Sales (Cash Inflow)',
                             data: salesData,
-                            borderColor: '#009dff',
+                            borderColor: '#4f46e5',
                             backgroundColor: salesGradient,
                             fill: true,
                             tension: 0.4,
                             borderWidth: 3,
-                            pointBackgroundColor: '#009dff',
+                            pointBackgroundColor: '#4f46e5',
                             pointBorderColor: '#ffffff',
                             pointBorderWidth: 2,
                             pointRadius: 5,
@@ -307,12 +317,12 @@ require_once '../includes/layouts/header.php';
                         {
                             label: 'Purchases (Cash Outflow)',
                             data: purchasesData,
-                            borderColor: '#1cc88a',
+                            borderColor: '#10b981',
                             backgroundColor: purchasesGradient,
                             fill: true,
                             tension: 0.4,
                             borderWidth: 3,
-                            pointBackgroundColor: '#1cc88a',
+                            pointBackgroundColor: '#10b981',
                             pointBorderColor: '#ffffff',
                             pointBorderWidth: 2,
                             pointRadius: 5,
@@ -408,15 +418,14 @@ require_once '../includes/layouts/header.php';
                 
                 // Color palette for Doughnut segments
                 const colors = [
-                    '#009dff', // primary blue
-                    '#20c997', // teal
-                    '#f6c23e', // warning yellow
-                    '#6f42c1', // purple
-                    '#e74a3b', // danger red
-                    '#36b9cc', // info teal
-                    '#fd7e14', // orange
-                    '#1cc88a', // success green
-                    '#6c757d'  // secondary gray
+                    '#4f46e5', // Indigo primary
+                    '#10b981', // Emerald success
+                    '#06b6d4', // Cyan info
+                    '#8b5cf6', // Violet purple
+                    '#f59e0b', // Amber warning
+                    '#ef4444', // Red danger
+                    '#ec4899', // Pink
+                    '#64748b'  // Slate grey
                 ];
                 
                 new Chart(catCtx, {

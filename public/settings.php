@@ -265,10 +265,10 @@ require_once '../includes/layouts/header.php';
         <!-- Add Staff Modal -->
         <div class="modal fade" id="addStaffModal" tabindex="-1" aria-labelledby="addStaffModalLabel" aria-hidden="true">
             <div class="modal-dialog modal-dialog-centered">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title fw-bold" id="addStaffModalLabel">Add New Staff Member</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <div class="modal-content border-0 rounded-4">
+                    <div class="modal-header py-3">
+                        <h5 class="modal-title fw-bold" id="addStaffModalLabel" style="font-family: var(--font-heading); color: var(--slate-900);"><i class="fas fa-user-plus me-2 text-primary"></i>Add New Staff Member</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <form method="POST">
                         <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(generate_csrf_token()); ?>">
@@ -295,8 +295,8 @@ require_once '../includes/layouts/header.php';
                             </div>
                         </div>
                         <div class="modal-footer">
-                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                            <button type="submit" class="btn btn-primary">Add Member</button>
+                            <button type="button" class="btn btn-secondary rounded-3" data-bs-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-primary rounded-3 px-4">Add Member</button>
                         </div>
                     </form>
                 </div>
@@ -306,10 +306,10 @@ require_once '../includes/layouts/header.php';
         <!-- Edit Staff Modal -->
         <div class="modal fade" id="editStaffModal" tabindex="-1" aria-labelledby="editStaffModalLabel" aria-hidden="true">
             <div class="modal-dialog modal-dialog-centered">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title fw-bold" id="editStaffModalLabel">Edit Staff Member</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <div class="modal-content border-0 rounded-4">
+                    <div class="modal-header py-3">
+                        <h5 class="modal-title fw-bold" id="editStaffModalLabel" style="font-family: var(--font-heading); color: var(--slate-900);"><i class="fas fa-user-edit me-2 text-primary"></i>Edit Staff Member</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <form method="POST">
                         <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(generate_csrf_token()); ?>">
@@ -337,8 +337,8 @@ require_once '../includes/layouts/header.php';
                             </div>
                         </div>
                         <div class="modal-footer">
-                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                            <button type="submit" class="btn btn-primary">Save Changes</button>
+                            <button type="button" class="btn btn-secondary rounded-3" data-bs-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-primary rounded-3 px-4">Save Changes</button>
                         </div>
                     </form>
                 </div>

@@ -111,10 +111,10 @@ require_once '../includes/layouts/header.php';
     <!-- Order Details Modal -->
     <div class="modal fade" id="orderDetailsModal" tabindex="-1" aria-labelledby="orderDetailsModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered modal-lg">
-            <div class="modal-content border-0 shadow-lg rounded-4">
-                <div class="modal-header border-bottom py-3">
-                    <h5 class="modal-title fw-bold" id="orderDetailsModalLabel"><i class="fas fa-file-invoice-dollar me-2 text-primary"></i>Transaction Details</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            <div class="modal-content border-0 rounded-4">
+                <div class="modal-header py-3">
+                    <h5 class="modal-title fw-bold" id="orderDetailsModalLabel" style="font-family: var(--font-heading); color: var(--slate-900);"><i class="fas fa-file-invoice-dollar me-2 text-primary"></i>Transaction Details</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body p-4">
                     <div class="row mb-4 bg-light p-3 rounded-3 g-2">
@@ -164,9 +164,9 @@ require_once '../includes/layouts/header.php';
                         </div>
                     </div>
                 </div>
-                <div class="modal-footer border-top bg-light rounded-bottom-4">
-                    <button type="button" class="btn btn-secondary px-4" data-bs-dismiss="modal">Close</button>
-                    <button type="button" class="btn btn-primary px-4" id="downloadPdfBtn"><i class="fas fa-file-pdf me-1"></i> Download PDF</button>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary rounded-3" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary rounded-3 px-4" id="downloadPdfBtn"><i class="fas fa-file-pdf me-1"></i> Download PDF</button>
                 </div>
             </div>
         </div>
@@ -176,11 +176,11 @@ require_once '../includes/layouts/header.php';
     <!-- Export Report Modal -->
     <div class="modal fade" id="exportReportModal" tabindex="-1" aria-labelledby="exportReportModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-content border-0 rounded-4">
                 <form action="export_report.php" method="GET" target="_blank">
-                    <div class="modal-header border-bottom py-3">
-                        <h5 class="modal-title fw-bold" id="exportReportModalLabel"><i class="fas fa-file-export me-2 text-success"></i>Export Transaction Report</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <div class="modal-header py-3">
+                        <h5 class="modal-title fw-bold" id="exportReportModalLabel" style="font-family: var(--font-heading); color: var(--slate-900);"><i class="fas fa-file-export me-2 text-primary"></i>Export Transaction Report</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body p-4">
                         <div class="mb-3">
@@ -202,9 +202,9 @@ require_once '../includes/layouts/header.php';
                             </div>
                         </div>
                     </div>
-                    <div class="modal-footer border-top bg-light rounded-bottom-4">
-                        <button type="button" class="btn btn-secondary px-4" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-success px-4" onclick="bootstrap.Modal.getInstance(document.getElementById('exportReportModal')).hide();"><i class="fas fa-download me-1"></i> Export CSV</button>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary rounded-3" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-success rounded-3 px-4" onclick="bootstrap.Modal.getInstance(document.getElementById('exportReportModal')).hide();"><i class="fas fa-download me-1"></i> Export CSV</button>
                     </div>
                 </form>
             </div>

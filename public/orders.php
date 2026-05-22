@@ -69,24 +69,7 @@ $extra_css = ['https://cdn.jsdelivr.net/npm/sweetalert2@11.10.0/dist/sweetalert2
 
 require_once '../includes/layouts/header.php';
 ?>
-<style>
-    .pos-container { height: calc(100vh - 80px); overflow: hidden; }
-    .product-grid-container { height: 100%; overflow-y: auto; padding-right: 10px; }
-    .cart-panel { height: 100%; display: flex; flex-direction: column; }
-    .cart-items-container { flex-grow: 1; overflow-y: auto; }
-    .product-card { 
-        cursor: pointer; 
-        transition: transform 0.2s, box-shadow 0.2s; 
-    }
-    .product-card:hover { 
-        transform: translateY(-3px); 
-        box-shadow: 0 .5rem 1rem rgba(0,0,0,.15)!important; 
-    }
-    .product-card.disabled { 
-        opacity: 0.6; cursor: not-allowed; 
-    }
-    .stock-badge { top: 10px; right: 10px; position: absolute; }
-</style>
+<!-- Styles moved to style.css to keep page styling clean and standardized -->
 
 <div class="d-flex" id="wrapper">
     <?php require_once '../includes/layouts/sidebar.php'; ?>
@@ -99,9 +82,9 @@ require_once '../includes/layouts/header.php';
                 <!-- Search Bar -->
                 <div class="row mb-3">
                     <div class="col-12">
-                        <div class="input-group input-group-lg shadow-sm">
+                        <div class="input-group input-group-lg shadow-sm border rounded-3 overflow-hidden">
                             <span class="input-group-text bg-white border-0"><i class="fas fa-search text-muted"></i></span>
-                            <input type="text" id="searchProduct" class="form-control border-0" placeholder="Search products by name..." onkeyup="filterProducts()">
+                            <input type="text" id="searchProduct" class="form-control border-0" placeholder="Search products by name..." onkeyup="filterProducts()" style="box-shadow: none;">
                         </div>
                     </div>
                 </div>
@@ -128,7 +111,7 @@ require_once '../includes/layouts/header.php';
                             $badgeClass = $product['stock'] <= 5 ? 'bg-danger' : 'bg-success';
                             ?>
                             <div class="col-md-4 col-sm-6 product-item" data-name="<?php echo strtolower($product['name']); ?>" data-category-id="<?php echo $product['category_id']; ?>">
-                                <div class="card h-100 border-0 shadow-sm <?php echo $cardClass; ?>" 
+                                <div class="card h-100 border-0 <?php echo $cardClass; ?>" 
                                      <?php if ($hasStock): ?>
                                          onclick='addToCart(<?php echo json_encode($product); ?>)'
                                      <?php endif; ?>>
@@ -138,23 +121,22 @@ require_once '../includes/layouts/header.php';
                                             Stock: <?php echo $product['stock']; ?>
                                         </span>
                                     
-                                        <div class="mb-3">
+                                        <div class="mb-3 overflow-hidden rounded-circle mx-auto shadow-sm" style="width: 80px; height: 80px;">
                                             <?php if ($product['image_path']): ?>
                                                 <img src="<?php echo htmlspecialchars($product['image_path']); ?>" 
-                                                     class="rounded-circle shadow-sm" style="width: 80px; height: 80px; object-fit: cover;">
+                                                     class="img-fluid w-100 h-100" style="object-fit: cover;">
                                             <?php else: ?>
-                                                <div class="rounded-circle bg-light d-flex align-items-center justify-content-center mx-auto shadow-sm text-muted" 
-                                                     style="width: 80px; height: 80px;">
+                                                <div class="w-100 h-100 bg-light d-flex align-items-center justify-content-center text-muted">
                                                     <i class="fas fa-box fa-2x"></i>
                                                 </div>
                                             <?php endif; ?>
                                         </div>
 
-                                        <h5 class="card-title text-dark fw-bold mb-1"><?php echo htmlspecialchars($product['name']); ?></h5>
+                                        <h5 class="card-title text-dark fw-bold mb-1" style="font-size: 1.05rem; font-family: var(--font-heading);"><?php echo htmlspecialchars($product['name']); ?></h5>
                                         <p class="card-text text-primary fs-5 fw-bold mb-0">$<?php echo number_format($product['price'], 2); ?></p>
                                     </div>
                                     <?php if (!$hasStock): ?>
-                                        <div class="card-footer bg-danger text-white text-center py-1">Out of Stock</div>
+                                        <div class="card-footer bg-danger text-white text-center py-1 border-0" style="font-size: 0.8rem; font-weight: bold; border-bottom-left-radius: var(--radius-md); border-bottom-right-radius: var(--radius-md);">Out of Stock</div>
                                     <?php endif; ?>
                                 </div>
                             </div>
@@ -167,8 +149,8 @@ require_once '../includes/layouts/header.php';
             <div class="col-lg-4 h-100">
                 <div class="card shadow-sm border-0 rounded-4 cart-panel">
                     <div class="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center border-bottom">
-                        <h5 class="mb-0 text-secondary fw-bold"><i class="fas fa-shopping-cart me-2"></i>Current Order</h5>
-                        <span class="badge bg-primary rounded-pill" id="cartCount">0 Items</span>
+                        <h5 class="mb-0 text-secondary fw-bold" style="font-family: var(--font-heading);"><i class="fas fa-shopping-cart me-2 text-primary"></i>Current Order</h5>
+                        <span class="badge primary-bg primary-text rounded-pill px-2.5 py-1.5" style="font-size: 0.75rem; font-weight: 700;" id="cartCount">0 Items</span>
                     </div>
                     
                     <div class="card-body border-bottom py-3">
@@ -354,7 +336,7 @@ $extra_js = [
                 <tr class="text-center text-muted" id="emptyCartMsg">
                     <td class="py-5">
                         <i class="fas fa-shopping-basket fa-3x mb-3 text-secondary opacity-50"></i>
-                        <p>Select products from the left to start an order.</p>
+                        <p class="small mb-0">Select products from the left to start an order.</p>
                     </td>
                 </tr>`;
         } else {
@@ -364,22 +346,22 @@ $extra_js = [
                 itemCount += item.qty;
 
                 tbody.innerHTML += `
-                    <tr>
+                    <tr class="cart-item-row">
                         <td>
-                            <div class="fw-bold">${item.name}</div>
+                            <div class="fw-bold text-dark mb-0">${item.name}</div>
                             <small class="text-muted">$${item.price.toFixed(2)}</small>
                         </td>
-                        <td width="120">
-                            <div class="input-group input-group-sm">
-                                <button class="btn btn-outline-secondary" onclick="updateQty(${index}, -1)">-</button>
-                                <input type="text" class="form-control text-center bg-white" value="${item.qty}" readonly>
-                                <button class="btn btn-outline-secondary" onclick="updateQty(${index}, 1)">+</button>
+                        <td width="100">
+                            <div class="d-flex align-items-center justify-content-center">
+                                <button type="button" class="cart-qty-btn" onclick="updateQty(${index}, -1)">-</button>
+                                <input type="text" class="cart-qty-input" value="${item.qty}" readonly>
+                                <button type="button" class="cart-qty-btn" onclick="updateQty(${index}, 1)">+</button>
                             </div>
                         </td>
-                        <td class="text-end fw-bold">$${lineTotal.toFixed(2)}</td>
+                        <td class="text-end fw-bold text-dark">$${lineTotal.toFixed(2)}</td>
                         <td class="text-end" width="40">
-                            <button class="btn btn-sm text-danger" onclick="removeFromCart(${index})">
-                                <i class="fas fa-times"></i>
+                            <button type="button" class="btn btn-sm text-danger p-0" onclick="removeFromCart(${index})">
+                                <i class="fas fa-trash-alt"></i>
                             </button>
                         </td>
                     </tr>
