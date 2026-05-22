@@ -93,16 +93,19 @@
 .border-left-success { border-left: 0.25rem solid #1cc88a !important; }
 .border-left-info { border-left: 0.25rem solid #36b9cc !important; }
 .border-left-warning { border-left: 0.25rem solid #f6c23e !important; }
+.border-left-purple { border-left: 0.25rem solid #6f42c1 !important; }
 
 .success-text { color: #1cc88a; }
 .info-text { color: #36b9cc; }
 .warning-text { color: #f6c23e; }
 .danger-text { color: #e74a3b; }
+.purple-text { color: #6f42c1; }
 
 .success-bg { background-color: #d4edda; }
 .info-bg { background-color: #d1ecf1; }
 .warning-bg { background-color: #fff3cd; }
 .danger-bg { background-color: #f8d7da; }
+.purple-bg { background-color: #e2d9f3; }
 
 /* Login Page Gradient */
 .bg-gradient-primary {

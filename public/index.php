@@ -7,6 +7,9 @@ verify_login();
 
 $stats = get_dashboard_stats($conn);
 $chart_data = get_chart_data($conn);
+$inventory_valuation = get_inventory_valuation($conn);
+$top_selling_products = get_top_selling_products($conn, 5);
+$category_sales = get_category_sales_distribution($conn);
 
 $page_title = 'Dashboard';
 $active_page = 'dashboard';
@@ -22,8 +25,8 @@ require_once '../includes/layouts/header.php';
 
     <div class="container-fluid px-4 py-5">
         <div class="row g-3 my-2">
-            <div class="col-md-3">
-                <div class="p-3 bg-white shadow-sm d-flex justify-content-around align-items-center rounded dashboard-card border-left-primary">
+            <div class="col-xl col-md-4 col-sm-6">
+                <div class="p-3 bg-white shadow-sm d-flex justify-content-around align-items-center rounded dashboard-card border-left-primary h-100">
                     <div>
                         <h3 class="fs-2"><?php echo number_format($stats['total_products']); ?></h3>
                         <p class="fs-5 text-muted mb-0">Products</p>
@@ -32,8 +35,8 @@ require_once '../includes/layouts/header.php';
                 </div>
             </div>
 
-            <div class="col-md-3">
-                <div class="p-3 bg-white shadow-sm d-flex justify-content-around align-items-center rounded dashboard-card border-left-success">
+            <div class="col-xl col-md-4 col-sm-6">
+                <div class="p-3 bg-white shadow-sm d-flex justify-content-around align-items-center rounded dashboard-card border-left-success h-100">
                     <div>
                         <h3 class="fs-2"><?php echo number_format($stats['total_orders']); ?></h3>
                         <p class="fs-5 text-muted mb-0">Orders</p>
@@ -42,8 +45,8 @@ require_once '../includes/layouts/header.php';
                 </div>
             </div>
 
-            <div class="col-md-3">
-                <div class="p-3 bg-white shadow-sm d-flex justify-content-around align-items-center rounded dashboard-card border-left-info">
+            <div class="col-xl col-md-4 col-sm-6">
+                <div class="p-3 bg-white shadow-sm d-flex justify-content-around align-items-center rounded dashboard-card border-left-info h-100">
                     <div>
                         <h3 class="fs-2">$<?php echo number_format($stats['total_sales'], 2); ?></h3>
                         <p class="fs-5 text-muted mb-0">Sales</p>
@@ -52,13 +55,23 @@ require_once '../includes/layouts/header.php';
                 </div>
             </div>
 
-            <div class="col-md-3">
-                <div class="p-3 bg-white shadow-sm d-flex justify-content-around align-items-center rounded dashboard-card border-left-warning">
+            <div class="col-xl col-md-6 col-sm-6">
+                <div class="p-3 bg-white shadow-sm d-flex justify-content-around align-items-center rounded dashboard-card border-left-warning h-100">
                     <div>
                         <h3 class="fs-2"><?php echo number_format($stats['total_stock']); ?></h3>
                         <p class="fs-5 text-muted mb-0">Total Stock</p>
                     </div>
                     <i class="fas fa-warehouse fs-1 warning-text border rounded-full warning-bg p-3"></i>
+                </div>
+            </div>
+
+            <div class="col-xl col-md-6 col-sm-12">
+                <div class="p-3 bg-white shadow-sm d-flex justify-content-around align-items-center rounded dashboard-card border-left-purple h-100">
+                    <div>
+                        <h3 class="fs-2">$<?php echo number_format($inventory_valuation, 2); ?></h3>
+                        <p class="fs-5 text-muted mb-0">Valuation</p>
+                    </div>
+                    <i class="fas fa-coins fs-1 purple-text border rounded-full purple-bg p-3"></i>
                 </div>
             </div>
         </div>
@@ -79,6 +92,70 @@ require_once '../includes/layouts/header.php';
                         <div style="position: relative; height: 350px;">
                             <canvas id="salesChart"></canvas>
                         </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Top Selling Products & Category Sales Distribution -->
+        <div class="row my-4 g-4">
+            <div class="col-lg-7 col-md-12">
+                <div class="card shadow-sm border-0 h-100 rounded-4">
+                    <div class="card-header bg-white border-0 py-3">
+                        <h5 class="mb-0 text-secondary fw-bold">
+                            <i class="fas fa-trophy text-warning me-2"></i>Top Selling Products (Top 5)
+                        </h5>
+                    </div>
+                    <div class="card-body p-4">
+                        <?php if (!empty($top_selling_products)): ?>
+                            <?php 
+                            $max_qty = max(array_column($top_selling_products, 'total_qty'));
+                            foreach ($top_selling_products as $index => $tp): 
+                                $percentage = $max_qty > 0 ? round(($tp['total_qty'] / $max_qty) * 100) : 0;
+                            ?>
+                                <div class="mb-3">
+                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                        <span class="fw-bold text-dark">
+                                            <span class="badge bg-light text-secondary me-2">#<?php echo $index + 1; ?></span>
+                                            <?php echo htmlspecialchars($tp['name']); ?>
+                                        </span>
+                                        <span class="text-muted small fw-bold">
+                                            <?php echo number_format($tp['total_qty']); ?> sold ($<?php echo number_format($tp['total_sales'], 2); ?>)
+                                        </span>
+                                    </div>
+                                    <div class="progress" style="height: 8px;">
+                                        <div class="progress-bar bg-primary" role="progressbar" style="width: <?php echo $percentage; ?>%" aria-valuenow="<?php echo $percentage; ?>" aria-valuemin="0" aria-valuemax="100"></div>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
+                        <?php else: ?>
+                            <div class="text-center py-4 text-muted">
+                                <i class="fas fa-info-circle fs-1 mb-2 text-secondary"></i>
+                                <p class="mb-0">No sales data recorded yet.</p>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-lg-5 col-md-12">
+                <div class="card shadow-sm border-0 h-100 rounded-4">
+                    <div class="card-header bg-white border-0 py-3">
+                        <h5 class="mb-0 text-secondary fw-bold">
+                            <i class="fas fa-chart-pie text-info me-2"></i>Category Sales Distribution
+                        </h5>
+                    </div>
+                    <div class="card-body p-4 d-flex flex-column justify-content-center">
+                        <?php if (!empty($category_sales)): ?>
+                            <div style="position: relative; height: 250px;">
+                                <canvas id="categoryChart"></canvas>
+                            </div>
+                        <?php else: ?>
+                            <div class="text-center py-4 text-muted">
+                                <i class="fas fa-info-circle fs-1 mb-2 text-secondary"></i>
+                                <p class="mb-0">No sales distribution data available.</p>
+                            </div>
+                        <?php endif; ?>
                     </div>
                 </div>
             </div>
@@ -321,6 +398,87 @@ require_once '../includes/layouts/header.php';
                     }
                 }
             });
+
+            // Category Sales Doughnut Chart
+            const categoryData = <?php echo json_encode($category_sales); ?>;
+            if (categoryData && categoryData.length > 0) {
+                const catCtx = document.getElementById('categoryChart').getContext('2d');
+                const catLabels = categoryData.map(item => item.category_name);
+                const catSales = categoryData.map(item => item.total_sales);
+                
+                // Color palette for Doughnut segments
+                const colors = [
+                    '#009dff', // primary blue
+                    '#20c997', // teal
+                    '#f6c23e', // warning yellow
+                    '#6f42c1', // purple
+                    '#e74a3b', // danger red
+                    '#36b9cc', // info teal
+                    '#fd7e14', // orange
+                    '#1cc88a', // success green
+                    '#6c757d'  // secondary gray
+                ];
+                
+                new Chart(catCtx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: catLabels,
+                        datasets: [{
+                            data: catSales,
+                            backgroundColor: colors.slice(0, categoryData.length),
+                            hoverBackgroundColor: colors.slice(0, categoryData.length),
+                            hoverBorderColor: "rgba(255, 255, 255, 1)",
+                            borderWidth: 2
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'right',
+                                labels: {
+                                    usePointStyle: true,
+                                    boxWidth: 8,
+                                    font: {
+                                        family: "'Outfit', 'Inter', sans-serif",
+                                        size: 11,
+                                        weight: '500'
+                                    },
+                                    color: '#6c757d'
+                                }
+                            },
+                            tooltip: {
+                                backgroundColor: 'rgba(26, 26, 46, 0.95)',
+                                titleColor: '#ffffff',
+                                titleFont: {
+                                    family: "'Outfit', 'Inter', sans-serif",
+                                    weight: 'bold'
+                                },
+                                bodyColor: '#ffffff',
+                                bodyFont: {
+                                    family: "'Outfit', 'Inter', sans-serif"
+                                },
+                                padding: 10,
+                                cornerRadius: 6,
+                                callbacks: {
+                                    label: function(context) {
+                                        let label = context.label || '';
+                                        if (label) {
+                                            label += ': ';
+                                        }
+                                        if (context.parsed !== null) {
+                                            label += new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(context.parsed);
+                                        }
+                                        return label;
+                                    }
+                                }
+                            }
+                        },
+                        cutout: '70%'
+                    }
+                });
+            }
         });
     </script>
 

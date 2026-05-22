@@ -54,6 +54,7 @@ require_once '../includes/layouts/header.php';
                                         <th scope="col">Order ID</th>
                                         <th scope="col">Date & Time</th>
                                         <th scope="col">Cashier</th>
+                                        <th scope="col">Party</th>
                                         <th scope="col">Type</th>
                                         <th scope="col" class="text-end">Total Amount</th>
                                         <th scope="col" class="text-center">Actions</th>
@@ -74,6 +75,15 @@ require_once '../includes/layouts/header.php';
                                                 <td><?php echo date('Y-m-d h:i A', strtotime($order['order_date'])); ?></td>
                                                 <td><?php echo htmlspecialchars($order['staff_name']); ?></td>
                                                 <td>
+                                                    <?php 
+                                                    if ($order['order_type'] === 'sale') {
+                                                        echo htmlspecialchars($order['customer_name'] ?? 'Walk-in Customer');
+                                                    } else {
+                                                        echo htmlspecialchars($order['supplier_name'] ?? 'General Supplier');
+                                                    }
+                                                    ?>
+                                                </td>
+                                                <td>
                                                     <?php if ($order['order_type'] === 'sale'): ?>
                                                         <span class="badge bg-primary rounded-pill px-3 py-2"><i class="fas fa-cash-register me-1"></i> Sale</span>
                                                     <?php else: ?>
@@ -82,7 +92,7 @@ require_once '../includes/layouts/header.php';
                                                 </td>
                                                 <td class="text-end fw-bold text-dark">$<?php echo number_format($order['total_amount'], 2); ?></td>
                                                 <td class="text-center">
-                                                    <button class="btn btn-sm btn-outline-primary" onclick="showOrderDetails(<?php echo $order['id']; ?>, '<?php echo date('Y-m-d h:i A', strtotime($order['order_date'])); ?>', <?php echo $order['total_amount']; ?>, '<?php echo htmlspecialchars($order['order_type'], ENT_QUOTES); ?>', '<?php echo htmlspecialchars($order['staff_name'], ENT_QUOTES); ?>')">
+                                                    <button class="btn btn-sm btn-outline-primary" onclick="showOrderDetails(<?php echo $order['id']; ?>)">
                                                         <i class="fas fa-eye me-1"></i> View Details
                                                     </button>
                                                 </td>
@@ -113,6 +123,21 @@ require_once '../includes/layouts/header.php';
                         </div>
                         <div class="col-sm-6 text-sm-end">
                             <strong>Transaction Date:</strong> <span id="modalOrderDate" class="text-muted"></span>
+                        </div>
+                    </div>
+
+                    <!-- Dynamic Customer/Supplier Section -->
+                    <div id="modalPartyDetails" class="mb-4 p-3 rounded-3 border border-light-subtle bg-light bg-opacity-50" style="display: none;">
+                        <h6 class="fw-bold mb-2 text-secondary" id="modalPartyTitle"></h6>
+                        <div class="row g-2 text-dark small">
+                            <div class="col-md-6">
+                                <strong>Name:</strong> <span id="modalPartyName" class="fw-semibold"></span><br>
+                                <strong>Phone:</strong> <span id="modalPartyPhone"></span>
+                            </div>
+                            <div class="col-md-6">
+                                <strong>Email:</strong> <span id="modalPartyEmail"></span><br>
+                                <strong>Address:</strong> <span id="modalPartyAddress" class="text-muted"></span>
+                            </div>
                         </div>
                     </div>
                     
@@ -202,14 +227,18 @@ require_once '../includes/layouts/header.php';
             </div>
 
             <div style="display: flex; justify-content: space-between; margin-bottom: 40px; font-size: 14px; line-height: 1.5;">
-                <div>
+                <div style="flex: 1;">
                     <h4 style="margin: 0 0 10px 0; color: #4a5568; font-size: 12px; text-transform: uppercase; font-weight: bold; letter-spacing: 0.5px;">Billed From:</h4>
                     <strong>MyShop Ltd.</strong><br>
                     123 Business Avenue<br>
                     Suite 400, Tech City<br>
                     support@myshop.com
                 </div>
-                <div style="text-align: right; min-width: 200px;">
+                <div style="flex: 1; padding-left: 20px; border-left: 1px solid #eaeaea; border-right: 1px solid #eaeaea; margin-left: 20px; margin-right: 20px;">
+                    <h4 style="margin: 0 0 10px 0; color: #4a5568; font-size: 12px; text-transform: uppercase; font-weight: bold; letter-spacing: 0.5px;" id="printInvoicePartyTitle">Billed To:</h4>
+                    <span id="printInvoicePartyDetails"></span>
+                </div>
+                <div style="text-align: right; min-width: 200px; flex: 1;">
                     <h4 style="margin: 0 0 10px 0; color: #4a5568; font-size: 12px; text-transform: uppercase; font-weight: bold; letter-spacing: 0.5px;">Transaction Details:</h4>
                     <strong>Date:</strong> <span id="printInvoiceDate"></span><br>
                     <strong>Type:</strong> <span id="printInvoiceType"></span><br>
@@ -257,27 +286,16 @@ require_once '../includes/layouts/header.php';
 <script>
     let activeInvoiceId = null;
 
-    function showOrderDetails(orderId, orderDate, orderTotal, orderType, staffName) {
+    function showOrderDetails(orderId) {
         activeInvoiceId = orderId;
         
         document.getElementById('modalOrderId').innerText = '#' + orderId;
-        document.getElementById('modalOrderDate').innerText = orderDate;
-        document.getElementById('modalOrderTotal').innerText = '$' + parseFloat(orderTotal).toFixed(2);
         
-        // Print templates elements
-        document.getElementById('printInvoiceRef').innerText = 'REF-' + String(orderId).padStart(6, '0');
-        document.getElementById('printInvoiceDate').innerText = orderDate;
-        document.getElementById('printInvoiceType').innerText = orderType === 'sale' ? 'Sale (Cash Inflow)' : 'Purchase (Cash Outflow)';
-        document.getElementById('printInvoiceCashier').innerText = staffName;
-        document.getElementById('printInvoiceSubtotal').innerText = '$' + parseFloat(orderTotal).toFixed(2);
-        document.getElementById('printInvoiceTotal').innerText = '$' + parseFloat(orderTotal).toFixed(2);
-
         const tbody = document.getElementById('modalDetailsTableBody');
         const printTbody = document.getElementById('printInvoiceItems');
         
         tbody.innerHTML = '<tr><td colspan="4" class="text-center py-4"><i class="fas fa-spinner fa-spin fa-2x text-primary"></i><p class="mt-2 text-muted mb-0">Fetching invoice items...</p></td></tr>';
         printTbody.innerHTML = '';
-        
         const detailsModalElement = document.getElementById('orderDetailsModal');
         let detailsModal = bootstrap.Modal.getInstance(detailsModalElement);
         if (!detailsModal) {
@@ -295,11 +313,69 @@ require_once '../includes/layouts/header.php';
             .then(data => {
                 tbody.innerHTML = '';
                 printTbody.innerHTML = '';
-                if (data.length === 0) {
+                
+                const order = data.order;
+                const items = data.items;
+                
+                // Update elements from ajax response
+                document.getElementById('modalOrderDate').innerText = order.order_date;
+                document.getElementById('modalOrderTotal').innerText = '$' + parseFloat(order.total_amount).toFixed(2);
+                
+                document.getElementById('printInvoiceRef').innerText = 'REF-' + String(order.id).padStart(6, '0');
+                document.getElementById('printInvoiceDate').innerText = order.order_date;
+                document.getElementById('printInvoiceType').innerText = order.order_type === 'sale' ? 'Sale (Cash Inflow)' : 'Purchase (Cash Outflow)';
+                document.getElementById('printInvoiceCashier').innerText = order.staff_name;
+                document.getElementById('printInvoiceSubtotal').innerText = '$' + parseFloat(order.total_amount).toFixed(2);
+                document.getElementById('printInvoiceTotal').innerText = '$' + parseFloat(order.total_amount).toFixed(2);
+
+                // Render Party Details in Modal & Print Invoice
+                const partyGroup = document.getElementById('modalPartyDetails');
+                const partyTitle = document.getElementById('modalPartyTitle');
+                const partyName = document.getElementById('modalPartyName');
+                const partyPhone = document.getElementById('modalPartyPhone');
+                const partyEmail = document.getElementById('modalPartyEmail');
+                const partyAddress = document.getElementById('modalPartyAddress');
+                
+                const printPartyTitle = document.getElementById('printInvoicePartyTitle');
+                const printPartyDetails = document.getElementById('printInvoicePartyDetails');
+                
+                if (order.order_type === 'sale') {
+                    partyTitle.innerHTML = '<i class="fas fa-user me-1 text-primary"></i> Customer Details';
+                    partyName.innerText = order.customer_name;
+                    partyPhone.innerText = order.customer_phone || 'N/A';
+                    partyEmail.innerText = order.customer_email || 'N/A';
+                    partyAddress.innerText = order.customer_address || 'N/A';
+                    partyGroup.style.display = 'block';
+                    
+                    printPartyTitle.innerText = 'Billed To:';
+                    printPartyDetails.innerHTML = `
+                        <strong>${order.customer_name}</strong><br>
+                        ${order.customer_phone ? 'Phone: ' + order.customer_phone + '<br>' : ''}
+                        ${order.customer_email ? 'Email: ' + order.customer_email + '<br>' : ''}
+                        ${order.customer_address ? 'Address: ' + order.customer_address : ''}
+                    `;
+                } else {
+                    partyTitle.innerHTML = '<i class="fas fa-truck me-1 text-success"></i> Supplier Details';
+                    partyName.innerText = order.supplier_name;
+                    partyPhone.innerText = order.supplier_phone || 'N/A';
+                    partyEmail.innerText = order.supplier_email || 'N/A';
+                    partyAddress.innerText = order.supplier_address || 'N/A';
+                    partyGroup.style.display = 'block';
+                    
+                    printPartyTitle.innerText = 'Purchased From:';
+                    printPartyDetails.innerHTML = `
+                        <strong>${order.supplier_name}</strong><br>
+                        ${order.supplier_phone ? 'Phone: ' + order.supplier_phone + '<br>' : ''}
+                        ${order.supplier_email ? 'Email: ' + order.supplier_email + '<br>' : ''}
+                        ${order.supplier_address ? 'Address: ' + order.supplier_address : ''}
+                    `;
+                }
+
+                if (items.length === 0) {
                     tbody.innerHTML = '<tr><td colspan="4" class="text-center py-3 text-muted">No items found in this order.</td></tr>';
                     return;
                 }
-                data.forEach(item => {
+                items.forEach(item => {
                     const rowHtml = `
                         <tr>
                             <td class="fw-bold">${item.product_name}</td>

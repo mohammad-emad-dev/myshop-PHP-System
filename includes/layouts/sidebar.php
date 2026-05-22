@@ -27,6 +27,12 @@ $current_page = $active_page ?? 'dashboard';
         <a href="stock_movements.php" class="list-group-item list-group-item-action bg-transparent fw-bold <?php echo $current_page === 'stock_movements' ? 'text-primary active' : 'text-white'; ?>">
             <i class="fas fa-exchange-alt me-2"></i>Stock Ledger
         </a>
+        <a href="customers.php" class="list-group-item list-group-item-action bg-transparent fw-bold <?php echo $current_page === 'customers' ? 'text-primary active' : 'text-white'; ?>">
+            <i class="fas fa-users me-2"></i>Customers
+        </a>
+        <a href="suppliers.php" class="list-group-item list-group-item-action bg-transparent fw-bold <?php echo $current_page === 'suppliers' ? 'text-primary active' : 'text-white'; ?>">
+            <i class="fas fa-truck me-2"></i>Suppliers
+        </a>
         <a href="settings.php" class="list-group-item list-group-item-action bg-transparent fw-bold <?php echo $current_page === 'settings' ? 'text-primary active' : 'text-white'; ?>">
             <i class="fas fa-cog me-2"></i>Settings
         </a>

@@ -43,7 +43,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['complete_order'])) {
             }
 
             if ($valid_order) {
-                $order_id = create_order($conn, $_SESSION['staff_id'], $order_items, $order_type);
+                $customer_id = isset($_POST['customer_id']) ? intval($_POST['customer_id']) : null;
+                $supplier_id = isset($_POST['supplier_id']) ? intval($_POST['supplier_id']) : null;
+
+                $order_id = create_order($conn, $_SESSION['staff_id'], $order_items, $order_type, $customer_id, $supplier_id);
                 if ($order_id) {
                     $success = "Order #$order_id completed successfully!";
                 } else {
@@ -56,6 +59,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['complete_order'])) {
 
 $products = get_products($conn);
 $categories = get_categories($conn);
+$customers = get_customers($conn);
+$suppliers = get_suppliers($conn);
 
 $page_title = 'POS System';
 $active_page = 'orders';
@@ -205,6 +210,27 @@ require_once '../includes/layouts/header.php';
                             <input type="hidden" name="cart_data" id="cartDataInput">
                             <input type="hidden" name="complete_order" value="1">
                             <input type="hidden" name="order_type" id="orderTypeInput" value="sale">
+                            
+                            <!-- Customer Selection Dropdown -->
+                            <div class="mb-3" id="formCustomerGroup">
+                                <label for="customerSelect" class="form-label fw-bold mb-1 text-secondary"><i class="fas fa-user me-1 text-primary"></i> Customer</label>
+                                <select class="form-select rounded-3" name="customer_id" id="customerSelect">
+                                    <?php foreach ($customers as $cust): ?>
+                                        <option value="<?php echo $cust['id']; ?>"><?php echo htmlspecialchars($cust['name'] . ($cust['phone'] ? ' - ' . $cust['phone'] : '')); ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+
+                            <!-- Supplier Selection Dropdown -->
+                            <div class="mb-3" id="formSupplierGroup" style="display: none;">
+                                <label for="supplierSelect" class="form-label fw-bold mb-1 text-secondary"><i class="fas fa-truck me-1 text-success"></i> Supplier</label>
+                                <select class="form-select rounded-3" name="supplier_id" id="supplierSelect">
+                                    <?php foreach ($suppliers as $supp): ?>
+                                        <option value="<?php echo $supp['id']; ?>"><?php echo htmlspecialchars($supp['name'] . ($supp['phone'] ? ' - ' . $supp['phone'] : '')); ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+
                             <button type="button" class="btn btn-success w-100 py-3 fs-5 fw-bold shadow-sm" onclick="submitOrder()">
                                 <i class="fas fa-check-circle me-2"></i>Complete Order
                             </button>
@@ -230,6 +256,15 @@ $extra_js = [
             radio.addEventListener('change', function() {
                 orderType = this.value;
                 document.getElementById('orderTypeInput').value = orderType;
+                
+                // Toggle visible selector groups dynamically
+                if (orderType === 'sale') {
+                    document.getElementById('formCustomerGroup').style.display = 'block';
+                    document.getElementById('formSupplierGroup').style.display = 'none';
+                } else {
+                    document.getElementById('formCustomerGroup').style.display = 'none';
+                    document.getElementById('formSupplierGroup').style.display = 'block';
+                }
                 
                 // Clear cart when transaction type changes to prevent stock validation confusion
                 cart = [];

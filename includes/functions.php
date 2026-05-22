@@ -222,7 +222,7 @@ function delete_product($conn, $id)
     }
 }
 
-function create_order($conn, $staff_id, $items, $order_type = 'sale')
+function create_order($conn, $staff_id, $items, $order_type = 'sale', $customer_id = null, $supplier_id = null)
 {
     $conn->begin_transaction();
     try {
@@ -231,11 +231,20 @@ function create_order($conn, $staff_id, $items, $order_type = 'sale')
             $total += $item['subtotal'];
         }
 
-        $stmt = $conn->prepare("INSERT INTO `Order` (total_amount, staff_id, order_type) VALUES (?, ?, ?)");
+        // Defensive resolution of Customer/Supplier IDs
+        if ($order_type === 'sale') {
+            $supplier_id = null;
+            $customer_id = (!empty($customer_id) && intval($customer_id) > 0) ? intval($customer_id) : 1;
+        } else { // purchase
+            $customer_id = null;
+            $supplier_id = (!empty($supplier_id) && intval($supplier_id) > 0) ? intval($supplier_id) : 1;
+        }
+
+        $stmt = $conn->prepare("INSERT INTO `Order` (total_amount, staff_id, order_type, customer_id, supplier_id) VALUES (?, ?, ?, ?, ?)");
         if (!$stmt) {
             throw new Exception("Failed to prepare order statement");
         }
-        $stmt->bind_param("dis", $total, $staff_id, $order_type);
+        $stmt->bind_param("disii", $total, $staff_id, $order_type, $customer_id, $supplier_id);
         $stmt->execute();
         $order_id = $conn->insert_id;
         $stmt->close();
@@ -282,11 +291,33 @@ function create_order($conn, $staff_id, $items, $order_type = 'sale')
 
 function get_orders($conn)
 {
-    $sql = "SELECT o.*, s.full_name as staff_name 
+    $sql = "SELECT o.*, s.full_name as staff_name, c.name as customer_name, sup.name as supplier_name 
             FROM `Order` o 
             JOIN Staff s ON o.staff_id = s.id 
+            LEFT JOIN Customer c ON o.customer_id = c.id
+            LEFT JOIN Supplier sup ON o.supplier_id = sup.id
             ORDER BY o.order_date DESC";
     return $conn->query($sql)->fetch_all(MYSQLI_ASSOC);
+}
+
+function get_order_by_id($conn, $order_id)
+{
+    $stmt = $conn->prepare("SELECT o.*, s.full_name as staff_name, 
+                                   c.name as customer_name, c.phone as customer_phone, c.email as customer_email, c.address as customer_address,
+                                   sup.name as supplier_name, sup.phone as supplier_phone, sup.email as supplier_email, sup.address as supplier_address
+                            FROM `Order` o 
+                            JOIN Staff s ON o.staff_id = s.id 
+                            LEFT JOIN Customer c ON o.customer_id = c.id
+                            LEFT JOIN Supplier sup ON o.supplier_id = sup.id
+                            WHERE o.id = ?");
+    if (!$stmt) {
+        return null;
+    }
+    $stmt->bind_param("i", $order_id);
+    $stmt->execute();
+    $res = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    return $res;
 }
 
 function get_order_details($conn, $order_id)
@@ -297,7 +328,9 @@ function get_order_details($conn, $order_id)
                            WHERE od.order_id = ?");
     $stmt->bind_param("i", $order_id);
     $stmt->execute();
-    return $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $res = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+    return $res;
 }
 
 function get_dashboard_stats($conn)
@@ -750,4 +783,245 @@ function delete_category($conn, $id)
         error_log("delete_category failed: " . $e->getMessage());
         return false;
     }
+}
+
+/**
+ * Fetch all customers sorted alphabetically by name.
+ */
+function get_customers($conn)
+{
+    $sql = "SELECT * FROM Customer ORDER BY name ASC";
+    $result = $conn->query($sql);
+    return $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
+}
+
+/**
+ * Fetch customer details by ID.
+ */
+function get_customer_by_id($conn, $id)
+{
+    $id = (int)$id;
+    $stmt = $conn->prepare("SELECT * FROM Customer WHERE id = ?");
+    if (!$stmt) {
+        return null;
+    }
+    $stmt->bind_param("i", $id);
+    $stmt->execute();
+    $res = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    return $res;
+}
+
+/**
+ * Creates a new customer record securely.
+ */
+function create_customer($conn, $name, $phone, $email, $address)
+{
+    $name = trim($name);
+    $phone = trim($phone);
+    $email = trim($email);
+    $address = trim($address);
+
+    if (empty($name)) {
+        return false;
+    }
+
+    $stmt = $conn->prepare("INSERT INTO Customer (name, phone, email, address) VALUES (?, ?, ?, ?)");
+    if (!$stmt) {
+        return false;
+    }
+    $stmt->bind_param("ssss", $name, $phone, $email, $address);
+    $res = $stmt->execute();
+    $stmt->close();
+    return $res;
+}
+
+/**
+ * Updates customer details, preventing changes to default Walk-in Customer (ID = 1).
+ */
+function update_customer($conn, $id, $name, $phone, $email, $address)
+{
+    $id = (int)$id;
+    $name = trim($name);
+    $phone = trim($phone);
+    $email = trim($email);
+    $address = trim($address);
+
+    if ($id <= 1 || empty($name)) {
+        return false;
+    }
+
+    $stmt = $conn->prepare("UPDATE Customer SET name = ?, phone = ?, email = ?, address = ? WHERE id = ?");
+    if (!$stmt) {
+        return false;
+    }
+    $stmt->bind_param("ssssi", $name, $phone, $email, $address, $id);
+    $res = $stmt->execute();
+    $stmt->close();
+    return $res;
+}
+
+/**
+ * Deletes a customer, preventing deletion of default Walk-in Customer (ID = 1).
+ */
+function delete_customer($conn, $id)
+{
+    $id = (int)$id;
+    if ($id <= 1) {
+        return false;
+    }
+
+    $stmt = $conn->prepare("DELETE FROM Customer WHERE id = ?");
+    if (!$stmt) {
+        return false;
+    }
+    $stmt->bind_param("i", $id);
+    $res = $stmt->execute();
+    $stmt->close();
+    return $res;
+}
+
+/**
+ * Fetch all suppliers sorted alphabetically by name.
+ */
+function get_suppliers($conn)
+{
+    $sql = "SELECT * FROM Supplier ORDER BY name ASC";
+    $result = $conn->query($sql);
+    return $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
+}
+
+/**
+ * Fetch supplier details by ID.
+ */
+function get_supplier_by_id($conn, $id)
+{
+    $id = (int)$id;
+    $stmt = $conn->prepare("SELECT * FROM Supplier WHERE id = ?");
+    if (!$stmt) {
+        return null;
+    }
+    $stmt->bind_param("i", $id);
+    $stmt->execute();
+    $res = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    return $res;
+}
+
+/**
+ * Creates a new supplier record securely.
+ */
+function create_supplier($conn, $name, $phone, $email, $address)
+{
+    $name = trim($name);
+    $phone = trim($phone);
+    $email = trim($email);
+    $address = trim($address);
+
+    if (empty($name)) {
+        return false;
+    }
+
+    $stmt = $conn->prepare("INSERT INTO Supplier (name, phone, email, address) VALUES (?, ?, ?, ?)");
+    if (!$stmt) {
+        return false;
+    }
+    $stmt->bind_param("ssss", $name, $phone, $email, $address);
+    $res = $stmt->execute();
+    $stmt->close();
+    return $res;
+}
+
+/**
+ * Updates supplier details, preventing changes to default General Supplier (ID = 1).
+ */
+function update_supplier($conn, $id, $name, $phone, $email, $address)
+{
+    $id = (int)$id;
+    $name = trim($name);
+    $phone = trim($phone);
+    $email = trim($email);
+    $address = trim($address);
+
+    if ($id <= 1 || empty($name)) {
+        return false;
+    }
+
+    $stmt = $conn->prepare("UPDATE Supplier SET name = ?, phone = ?, email = ?, address = ? WHERE id = ?");
+    if (!$stmt) {
+        return false;
+    }
+    $stmt->bind_param("ssssi", $name, $phone, $email, $address, $id);
+    $res = $stmt->execute();
+    $stmt->close();
+    return $res;
+}
+
+/**
+ * Deletes a supplier, preventing deletion of default General Supplier (ID = 1).
+ */
+function delete_supplier($conn, $id)
+{
+    $id = (int)$id;
+    if ($id <= 1) {
+        return false;
+    }
+
+    $stmt = $conn->prepare("DELETE FROM Supplier WHERE id = ?");
+    if (!$stmt) {
+        return false;
+    }
+    $stmt->bind_param("i", $id);
+    $res = $stmt->execute();
+    $stmt->close();
+    return $res;
+}
+
+/**
+ * Compute inventory valuation based on current stock levels and unit prices.
+ */
+function get_inventory_valuation($conn)
+{
+    $sql = "SELECT SUM(stock * price) as valuation FROM Product";
+    $result = $conn->query($sql);
+    if ($result) {
+        $row = $result->fetch_assoc();
+        return (float)($row['valuation'] ?? 0.0);
+    }
+    return 0.0;
+}
+
+/**
+ * Fetch top selling products sorted by total quantity sold.
+ */
+function get_top_selling_products($conn, $limit = 5)
+{
+    $limit = (int)$limit;
+    $sql = "SELECT p.name, SUM(od.quantity) as total_qty, SUM(od.subtotal) as total_sales 
+            FROM OrderDetail od 
+            JOIN `Order` o ON od.order_id = o.id 
+            JOIN Product p ON od.product_id = p.id 
+            WHERE o.order_type = 'sale' 
+            GROUP BY od.product_id 
+            ORDER BY total_qty DESC 
+            LIMIT $limit";
+    $result = $conn->query($sql);
+    return $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
+}
+
+/**
+ * Group sales volume distributions based on product categories.
+ */
+function get_category_sales_distribution($conn)
+{
+    $sql = "SELECT COALESCE(c.name, 'Uncategorized') as category_name, SUM(od.subtotal) as total_sales 
+            FROM OrderDetail od 
+            JOIN `Order` o ON od.order_id = o.id 
+            JOIN Product p ON od.product_id = p.id 
+            LEFT JOIN Category c ON p.category_id = c.id 
+            WHERE o.order_type = 'sale' 
+            GROUP BY p.category_id, c.name 
+            ORDER BY total_sales DESC";
+    $result = $conn->query($sql);
+    return $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
 }

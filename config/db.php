@@ -133,5 +133,79 @@ if ($cat_col_check && $cat_col_check->num_rows === 0) {
     }
 }
 
+// Self-healing database migration for Phase 8: Customer table
+$cust_table_check = $conn->query("SHOW TABLES LIKE 'Customer'");
+if ($cust_table_check && $cust_table_check->num_rows === 0) {
+    $create_cust_sql = "CREATE TABLE `Customer` (
+        `id` INT AUTO_INCREMENT PRIMARY KEY,
+        `name` VARCHAR(100) NOT NULL,
+        `phone` VARCHAR(20) NULL,
+        `email` VARCHAR(100) NULL,
+        `address` TEXT NULL,
+        `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci ENGINE=InnoDB";
+    if (!$conn->query($create_cust_sql)) {
+        error_log("Database Migration Failed (Customer table): " . $conn->error);
+    }
+}
+
+// Seed default Walk-in Customer (ID = 1)
+$default_cust_check = $conn->query("SELECT id FROM `Customer` WHERE id = 1 LIMIT 1");
+if ($default_cust_check && $default_cust_check->num_rows === 0) {
+    $insert_default_cust = "INSERT INTO `Customer` (id, name, phone, email, address) VALUES (1, 'Walk-in Customer', '0000000000', 'walkin@myshop.com', 'N/A')";
+    if (!$conn->query($insert_default_cust)) {
+        error_log("Database Migration Failed (Default customer seeding): " . $conn->error);
+    }
+}
+
+// Self-healing database migration for Phase 8: Supplier table
+$supp_table_check = $conn->query("SHOW TABLES LIKE 'Supplier'");
+if ($supp_table_check && $supp_table_check->num_rows === 0) {
+    $create_supp_sql = "CREATE TABLE `Supplier` (
+        `id` INT AUTO_INCREMENT PRIMARY KEY,
+        `name` VARCHAR(100) NOT NULL,
+        `phone` VARCHAR(20) NULL,
+        `email` VARCHAR(100) NULL,
+        `address` TEXT NULL,
+        `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci ENGINE=InnoDB";
+    if (!$conn->query($create_supp_sql)) {
+        error_log("Database Migration Failed (Supplier table): " . $conn->error);
+    }
+}
+
+// Seed default General Supplier (ID = 1)
+$default_supp_check = $conn->query("SELECT id FROM `Supplier` WHERE id = 1 LIMIT 1");
+if ($default_supp_check && $default_supp_check->num_rows === 0) {
+    $insert_default_supp = "INSERT INTO `Supplier` (id, name, phone, email, address) VALUES (1, 'General Supplier', '0000000000', 'supplier@myshop.com', 'N/A')";
+    if (!$conn->query($insert_default_supp)) {
+        error_log("Database Migration Failed (Default supplier seeding): " . $conn->error);
+    }
+}
+
+// Add customer_id column to Order table
+$cust_col_check = $conn->query("SHOW COLUMNS FROM `Order` LIKE 'customer_id'");
+if ($cust_col_check && $cust_col_check->num_rows === 0) {
+    $alter_order_cust = "ALTER TABLE `Order` ADD COLUMN customer_id INT NULL, ADD FOREIGN KEY (customer_id) REFERENCES Customer(id) ON DELETE SET NULL";
+    if ($conn->query($alter_order_cust)) {
+        // Retroactively link existing sales to default customer
+        $conn->query("UPDATE `Order` SET customer_id = 1 WHERE order_type = 'sale' AND customer_id IS NULL");
+    } else {
+        error_log("Database Migration Failed (Order customer_id column): " . $conn->error);
+    }
+}
+
+// Add supplier_id column to Order table
+$supp_col_check = $conn->query("SHOW COLUMNS FROM `Order` LIKE 'supplier_id'");
+if ($supp_col_check && $supp_col_check->num_rows === 0) {
+    $alter_order_supp = "ALTER TABLE `Order` ADD COLUMN supplier_id INT NULL, ADD FOREIGN KEY (supplier_id) REFERENCES Supplier(id) ON DELETE SET NULL";
+    if ($conn->query($alter_order_supp)) {
+        // Retroactively link existing purchases to default supplier
+        $conn->query("UPDATE `Order` SET supplier_id = 1 WHERE order_type = 'purchase' AND supplier_id IS NULL");
+    } else {
+        error_log("Database Migration Failed (Order supplier_id column): " . $conn->error);
+    }
+}
+
 
 
