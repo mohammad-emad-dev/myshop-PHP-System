@@ -9,7 +9,7 @@
     <?php endforeach; ?>
 <?php endif; ?>
 <!-- Custom JS -->
-<script src="assets/script.js"></script>
+<script src="assets/js/script.js"></script>
 <script>
     var el = document.getElementById("wrapper");
     var toggleButton = document.getElementById("menu-toggle");

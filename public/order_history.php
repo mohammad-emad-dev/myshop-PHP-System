@@ -1,7 +1,7 @@
 <?php
-require_once 'includes/functions.php';
+require_once '../includes/functions.php';
 start_secure_session();
-require_once 'includes/db.php';
+require_once '../config/db.php';
 
 verify_login();
 
@@ -20,12 +20,12 @@ $active_page = 'order_history';
 $header_title = 'Order History';
 $extra_js = ['https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js'];
 
-require_once 'includes/header.php';
+require_once '../includes/layouts/header.php';
 ?>
 
 <div class="d-flex" id="wrapper">
-    <?php require_once 'includes/sidebar.php'; ?>
-    <?php require_once 'includes/navbar.php'; ?>
+    <?php require_once '../includes/layouts/sidebar.php'; ?>
+    <?php require_once '../includes/layouts/navbar.php'; ?>
 
     <div class="container-fluid px-4 py-5">
         <div class="row my-2">
@@ -39,9 +39,11 @@ require_once 'includes/header.php';
                                 <a href="order_history.php?type=sale" class="btn btn-outline-primary <?php echo $filter_type === 'sale' ? 'active' : ''; ?>">Sales</a>
                                 <a href="order_history.php?type=purchase" class="btn btn-outline-primary <?php echo $filter_type === 'purchase' ? 'active' : ''; ?>">Purchases</a>
                             </div>
+                            <?php if (is_admin()): ?>
                             <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#exportReportModal">
                                 <i class="fas fa-file-excel me-1"></i> Export CSV
                             </button>
+                            <?php endif; ?>
                         </div>
                     </div>
                     <div class="card-body">
@@ -145,6 +147,7 @@ require_once 'includes/header.php';
         </div>
     </div>
 
+    <?php if (is_admin()): ?>
     <!-- Export Report Modal -->
     <div class="modal fade" id="exportReportModal" tabindex="-1" aria-labelledby="exportReportModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
@@ -182,6 +185,7 @@ require_once 'includes/header.php';
             </div>
         </div>
     </div>
+    <?php endif; ?>
 
     <!-- Hidden Print Container for PDF Generation -->
     <div id="invoicePrintWrapper" style="display: none;">
@@ -355,5 +359,5 @@ require_once 'includes/header.php';
 </script>
 
 <?php
-require_once 'includes/footer.php';
+require_once '../includes/layouts/footer.php';
 ?>

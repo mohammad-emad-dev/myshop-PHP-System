@@ -1,7 +1,7 @@
 <?php
-require_once 'includes/functions.php';
+require_once '../includes/functions.php';
 start_secure_session();
-require_once 'includes/db.php';
+require_once '../config/db.php';
 
 verify_login();
 
@@ -13,12 +13,12 @@ $active_page = 'dashboard';
 $header_title = 'Dashboard';
 $extra_js = ['https://cdn.jsdelivr.net/npm/chart.js'];
 
-require_once 'includes/header.php';
+require_once '../includes/layouts/header.php';
 ?>
 
 <div class="d-flex" id="wrapper">
-    <?php require_once 'includes/sidebar.php'; ?>
-    <?php require_once 'includes/navbar.php'; ?>
+    <?php require_once '../includes/layouts/sidebar.php'; ?>
+    <?php require_once '../includes/layouts/navbar.php'; ?>
 
     <div class="container-fluid px-4 py-5">
         <div class="row g-3 my-2">
@@ -135,9 +135,11 @@ require_once 'includes/header.php';
                                                     <a href="orders.php?purchase_product_id=<?php echo $p['id']; ?>" class="btn btn-sm btn-success rounded-3 fw-bold">
                                                         <i class="fas fa-plus me-1"></i> Restock
                                                     </a>
+                                                    <?php if (is_admin()): ?>
                                                     <a href="products.php?highlight=<?php echo $p['id']; ?>" class="btn btn-sm btn-outline-secondary rounded-3 ms-1 fw-bold">
                                                         <i class="fas fa-edit me-1"></i> Edit Threshold
                                                     </a>
+                                                    <?php endif; ?>
                                                 </td>
                                             </tr>
                                         <?php endforeach; ?>
@@ -323,5 +325,5 @@ require_once 'includes/header.php';
     </script>
 
 <?php
-require_once 'includes/footer.php';
+require_once '../includes/layouts/footer.php';
 ?>

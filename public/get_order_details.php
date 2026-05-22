@@ -1,7 +1,7 @@
 <?php
-require_once 'includes/functions.php';
+require_once '../includes/functions.php';
 start_secure_session();
-require_once 'includes/db.php';
+require_once '../config/db.php';
 
 header('Content-Type: application/json');
 

@@ -1,7 +1,7 @@
 <?php
-require_once 'includes/functions.php';
+require_once '../includes/functions.php';
 start_secure_session();
-require_once 'includes/db.php';
+require_once '../config/db.php';
 
 // Handle Logout
 if (isset($_GET['logout'])) {
@@ -35,7 +35,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $username = sanitize_input($_POST['username']);
         $password = $_POST['password'];
 
-        $stmt = $conn->prepare("SELECT id, password, full_name FROM Staff WHERE username = ?");
+        $stmt = $conn->prepare("SELECT id, password, full_name, role FROM Staff WHERE username = ?");
         if (!$stmt) {
             die("Database Error: " . $conn->error);
         }
@@ -51,6 +51,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 session_regenerate_id(true);
                 $_SESSION['staff_id'] = $user['id'];
                 $_SESSION['full_name'] = $user['full_name'];
+                $_SESSION['role'] = $user['role'];
                 
                 // Refresh CSRF token for the active session
                 unset($_SESSION['csrf_token']);
@@ -77,7 +78,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <!-- Font Awesome -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet">
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="assets/style.css">
+    <link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body class="bg-gradient-primary login-page d-flex align-items-center justify-content-center min-vh-100">
 
@@ -124,6 +125,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     <!-- Bootstrap 5 Bundle JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="assets/script.js"></script>
+    <script src="assets/js/script.js"></script>
 </body>
 </html>

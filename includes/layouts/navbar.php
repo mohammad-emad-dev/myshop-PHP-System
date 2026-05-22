@@ -78,6 +78,10 @@
                         <i class="fas fa-user-circle me-2"></i><?php echo htmlspecialchars($_SESSION['full_name'] ?? 'User'); ?>
                     </a>
                     <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdown">
+                        <li class="dropdown-header border-bottom pb-2 mb-1">
+                            <span class="text-muted small d-block">Signed in as</span>
+                            <span class="badge bg-primary text-white text-uppercase mt-1"><?php echo htmlspecialchars($_SESSION['role'] ?? 'cashier'); ?></span>
+                        </li>
                         <li><a class="dropdown-item" href="settings.php"><i class="fas fa-cog me-2"></i>Settings</a></li>
                         <li>
                             <hr class="dropdown-divider">

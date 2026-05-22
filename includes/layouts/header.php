@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/functions.php';
+require_once __DIR__ . '/../functions.php';
 start_secure_session();
 ?>
 <!DOCTYPE html>
@@ -18,6 +18,6 @@ start_secure_session();
         <?php endforeach; ?>
     <?php endif; ?>
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="assets/style.css">
+    <link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body class="<?php echo isset($body_class) ? htmlspecialchars($body_class) : 'bg-light'; ?>">

@@ -1,7 +1,7 @@
 <?php
-require_once 'includes/functions.php';
+require_once '../includes/functions.php';
 start_secure_session();
-require_once 'includes/db.php';
+require_once '../config/db.php';
 
 verify_login();
 
@@ -61,7 +61,7 @@ $active_page = 'orders';
 $header_title = 'POS Terminal';
 $extra_css = ['https://cdn.jsdelivr.net/npm/sweetalert2@11.10.0/dist/sweetalert2.min.css'];
 
-require_once 'includes/header.php';
+require_once '../includes/layouts/header.php';
 ?>
 <style>
     .pos-container { height: calc(100vh - 80px); overflow: hidden; }
@@ -83,8 +83,8 @@ require_once 'includes/header.php';
 </style>
 
 <div class="d-flex" id="wrapper">
-    <?php require_once 'includes/sidebar.php'; ?>
-    <?php require_once 'includes/navbar.php'; ?>
+    <?php require_once '../includes/layouts/sidebar.php'; ?>
+    <?php require_once '../includes/layouts/navbar.php'; ?>
 
     <div class="container-fluid py-3 px-4 pos-container">
         <div class="row h-100">
@@ -418,5 +418,5 @@ $extra_js = [
     <?php endif; ?>
 <?php endif; ?>
 <?php
-require_once 'includes/footer.php';
+require_once '../includes/layouts/footer.php';
 ?>

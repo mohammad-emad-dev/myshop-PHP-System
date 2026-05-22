@@ -307,4 +307,125 @@ function get_chart_data($conn, $days = 7)
     return array_values($data);
 }
 
+/**
+ * Checks if the current session belongs to an administrator.
+ */
+function is_admin()
+{
+    start_secure_session();
+    return isset($_SESSION['role']) && $_SESSION['role'] === 'admin';
+}
 
+/**
+ * Enforces admin privileges, redirecting cashier accounts to index.
+ */
+function require_admin()
+{
+    verify_login();
+    if (!is_admin()) {
+        header('Location: index.php?error=unauthorized');
+        exit();
+    }
+}
+
+/**
+ * Retrieves all registered staff accounts.
+ */
+function get_staff_members($conn)
+{
+    $sql = "SELECT id, username, full_name, role, created_at FROM Staff ORDER BY created_at DESC";
+    $result = $conn->query($sql);
+    return $result->fetch_all(MYSQLI_ASSOC);
+}
+
+/**
+ * Inserts a new staff account into the database.
+ */
+function create_staff_member($conn, $username, $password, $full_name, $role)
+{
+    $username = trim($username);
+    $full_name = trim($full_name);
+    $role = trim($role);
+
+    if (empty($username) || empty($password) || empty($full_name) || !in_array($role, ['admin', 'cashier'])) {
+        return false;
+    }
+
+    $hashed_password = password_hash($password, PASSWORD_DEFAULT);
+    $stmt = $conn->prepare("INSERT INTO Staff (username, password, full_name, role) VALUES (?, ?, ?, ?)");
+    if (!$stmt) {
+        return false;
+    }
+
+    $stmt->bind_param("ssss", $username, $hashed_password, $full_name, $role);
+    return $stmt->execute();
+}
+
+/**
+ * Modifies an existing staff account's credentials and role.
+ */
+function update_staff_member($conn, $id, $username, $full_name, $role, $password = null)
+{
+    $id = (int)$id;
+    $username = trim($username);
+    $full_name = trim($full_name);
+    $role = trim($role);
+
+    if ($id <= 0 || empty($username) || empty($full_name) || !in_array($role, ['admin', 'cashier'])) {
+        return false;
+    }
+
+    if ($role === 'cashier') {
+        $stmt = $conn->prepare("SELECT role FROM Staff WHERE id = ?");
+        $stmt->bind_param("i", $id);
+        $stmt->execute();
+        $res = $stmt->get_result()->fetch_assoc();
+        if ($res && $res['role'] === 'admin') {
+            $count_res = $conn->query("SELECT COUNT(*) as count FROM Staff WHERE role = 'admin'");
+            $total_admins = $count_res->fetch_assoc()['count'];
+            if ($total_admins <= 1) {
+                return false;
+            }
+        }
+    }
+
+    if (!empty($password)) {
+        $hashed_password = password_hash($password, PASSWORD_DEFAULT);
+        $stmt = $conn->prepare("UPDATE Staff SET username = ?, full_name = ?, role = ?, password = ? WHERE id = ?");
+        $stmt->bind_param("ssssi", $username, $full_name, $role, $hashed_password, $id);
+    } else {
+        $stmt = $conn->prepare("UPDATE Staff SET username = ?, full_name = ?, role = ? WHERE id = ?");
+        $stmt->bind_param("sssi", $username, $full_name, $role, $id);
+    }
+
+    return $stmt->execute();
+}
+
+/**
+ * Removes a staff account from the system.
+ */
+function delete_staff_member($conn, $id, $current_admin_id)
+{
+    $id = (int)$id;
+    $current_admin_id = (int)$current_admin_id;
+
+    if ($id <= 0 || $id === $current_admin_id) {
+        return false;
+    }
+
+    $stmt = $conn->prepare("SELECT role FROM Staff WHERE id = ?");
+    $stmt->bind_param("i", $id);
+    $stmt->execute();
+    $res = $stmt->get_result()->fetch_assoc();
+    if ($res && $res['role'] === 'admin') {
+        $count_res = $conn->query("SELECT COUNT(*) as count FROM Staff WHERE role = 'admin'");
+        $total_admins = $count_res->fetch_assoc()['count'];
+        if ($total_admins <= 1) {
+            return false;
+        }
+    }
+
+    $stmt = $conn->prepare("DELETE FROM Staff WHERE id = ?");
+    $stmt->bind_param("i", $id);
+    return $stmt->execute();
+}

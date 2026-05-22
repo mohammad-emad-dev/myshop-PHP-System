@@ -1,10 +1,11 @@
 <?php
-require_once 'includes/functions.php';
+require_once '../includes/functions.php';
 start_secure_session();
-require_once 'includes/db.php';
+require_once '../config/db.php';
 
-// Verify user authentication
+// Verify user authentication and administrator privileges
 verify_login();
+require_admin();
 
 // Protect against cross-site request forgery and general unauthorized inputs
 $start_date = isset($_GET['start_date']) ? sanitize_input($_GET['start_date']) : '';

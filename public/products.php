@@ -1,7 +1,7 @@
 <?php
-require_once 'includes/functions.php';
+require_once '../includes/functions.php';
 start_secure_session();
-require_once 'includes/db.php';
+require_once '../config/db.php';
 
 verify_login();
 
@@ -13,6 +13,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     $csrf_token = $_POST['csrf_token'] ?? '';
     if (!verify_csrf_token($csrf_token)) {
         $error = 'Security check failed. Invalid request token.';
+    } elseif (!is_admin()) {
+        $error = 'Access denied. You do not have permission to modify products.';
     } else {
         $action = $_POST['action'];
 
@@ -73,6 +75,8 @@ if (isset($_GET['delete'])) {
     $csrf_token = $_GET['csrf_token'] ?? '';
     if (!verify_csrf_token($csrf_token)) {
         $error = 'Security check failed. Invalid request token.';
+    } elseif (!is_admin()) {
+        $error = 'Access denied. You do not have permission to delete products.';
     } else {
         if (delete_product($conn, $id)) {
             $success = 'Product deleted successfully';
@@ -95,12 +99,12 @@ $page_title = 'Products';
 $active_page = 'products';
 
 
-require_once 'includes/header.php';
+require_once '../includes/layouts/header.php';
 ?>
 
 <div class="d-flex" id="wrapper">
-    <?php require_once 'includes/sidebar.php'; ?>
-    <?php require_once 'includes/navbar.php'; ?>
+    <?php require_once '../includes/layouts/sidebar.php'; ?>
+    <?php require_once '../includes/layouts/navbar.php'; ?>
 
     <div class="container-fluid px-4 py-5">
 
@@ -123,9 +127,11 @@ require_once 'includes/header.php';
                 <div class="card shadow-sm border-0 rounded-4">
                     <div class="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center">
                         <h4 class="mb-0 text-secondary fw-bold">All Products</h4>
+                        <?php if (is_admin()): ?>
                         <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addProductModal">
                             <i class="fas fa-plus me-2"></i>Add Product
                         </button>
+                        <?php endif; ?>
                     </div>
                     <div class="card-body">
                         <div class="row mb-3">
@@ -144,7 +150,9 @@ require_once 'includes/header.php';
                                         <th scope="col">Stock</th>
                                         <th scope="col">Threshold</th>
                                         <th scope="col">Image</th>
+                                        <?php if (is_admin()): ?>
                                         <th scope="col">Actions</th>
+                                        <?php endif; ?>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -183,6 +191,7 @@ require_once 'includes/header.php';
                                                     <span class="text-muted fst-italic small">No Image</span>
                                                 <?php endif; ?>
                                             </td>
+                                            <?php if (is_admin()): ?>
                                             <td>
                                                 <button class="btn btn-sm btn-outline-info me-1" onclick='openEditModal(<?php echo json_encode($product); ?>)'>
                                                     <i class="fas fa-edit"></i>
@@ -191,6 +200,7 @@ require_once 'includes/header.php';
                                                     <i class="fas fa-trash"></i>
                                                 </a>
                                             </td>
+                                            <?php endif; ?>
                                         </tr>
                                     <?php endforeach; ?>
                                 </tbody>
@@ -301,7 +311,7 @@ require_once 'includes/header.php';
     </div>
 
 <?php
-$extra_js = ['assets/script.js'];
+$extra_js = ['assets/js/script.js'];
 ?>
 <script>
     // Custom function to open Bootstrap modal and populate data
@@ -318,5 +328,5 @@ $extra_js = ['assets/script.js'];
     }
 </script>
 <?php
-require_once 'includes/footer.php';
+require_once '../includes/layouts/footer.php';
 ?>
