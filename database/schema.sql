@@ -69,17 +69,17 @@ CREATE TABLE OrderDetail (
 INSERT INTO Staff (username, password, full_name)
 VALUES (
         'admin',
-        '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi',
+        '$2y$10$FBOb02FOQBMm3GKVr9dQye1H2X8xys7qvLddk2qT.GzoL1CBBsV.6',
         'System Administrator'
     ),
     (
         'john',
-        '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi',
+        '$2y$10$FBOb02FOQBMm3GKVr9dQye1H2X8xys7qvLddk2qT.GzoL1CBBsV.6',
         'John Smith'
     ),
     (
         'sarah',
-        '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi',
+        '$2y$10$FBOb02FOQBMm3GKVr9dQye1H2X8xys7qvLddk2qT.GzoL1CBBsV.6',
         'Sarah Johnson'
     );
 -- Insert sample products
