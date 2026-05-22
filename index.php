@@ -6,10 +6,12 @@ require_once 'includes/db.php';
 verify_login();
 
 $stats = get_dashboard_stats($conn);
+$chart_data = get_chart_data($conn);
 
 $page_title = 'Dashboard';
 $active_page = 'dashboard';
 $header_title = 'Dashboard';
+$extra_js = ['https://cdn.jsdelivr.net/npm/chart.js'];
 
 require_once 'includes/header.php';
 ?>
@@ -61,6 +63,27 @@ require_once 'includes/header.php';
             </div>
         </div>
 
+        <!-- Sales and Purchases Chart -->
+        <div class="row my-4">
+            <div class="col-md-12">
+                <div class="card shadow-sm border-0">
+                    <div class="card-body p-4">
+                        <div class="d-flex justify-content-between align-items-center mb-4">
+                            <h5 class="card-title text-secondary mb-0">
+                                <i class="fas fa-chart-line me-2 text-primary"></i>Sales & Purchases Flow (Last 7 Days)
+                            </h5>
+                            <span class="badge bg-light text-dark border">
+                                <i class="fas fa-calendar-alt me-1 text-primary"></i> 7-Day Performance
+                            </span>
+                        </div>
+                        <div style="position: relative; height: 350px;">
+                            <canvas id="salesChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div class="row my-5">
             <h3 class="fs-4 mb-3 text-secondary">Quick Actions</h3>
             <div class="col-md-6">
@@ -83,6 +106,150 @@ require_once 'includes/header.php';
             </div>
         </div>
     </div>
+
+    <!-- Chart.js Initialization -->
+    <script>
+        window.addEventListener('load', function () {
+            if (typeof Chart === 'undefined') {
+                console.error('Chart.js failed to load.');
+                return;
+            }
+
+            const chartData = <?php echo json_encode($chart_data); ?>;
+            if (!chartData || chartData.length === 0) {
+                return;
+            }
+
+            const labels = chartData.map(item => item.label);
+            const salesData = chartData.map(item => item.sales);
+            const purchasesData = chartData.map(item => item.purchases);
+
+            const ctx = document.getElementById('salesChart').getContext('2d');
+            
+            // Create gradients for lines
+            const salesGradient = ctx.createLinearGradient(0, 0, 0, 350);
+            salesGradient.addColorStop(0, 'rgba(0, 157, 255, 0.45)');
+            salesGradient.addColorStop(1, 'rgba(0, 157, 255, 0.02)');
+
+            const purchasesGradient = ctx.createLinearGradient(0, 0, 0, 350);
+            purchasesGradient.addColorStop(0, 'rgba(28, 200, 138, 0.45)');
+            purchasesGradient.addColorStop(1, 'rgba(28, 200, 138, 0.02)');
+
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Sales (Cash Inflow)',
+                            data: salesData,
+                            borderColor: '#009dff',
+                            backgroundColor: salesGradient,
+                            fill: true,
+                            tension: 0.4,
+                            borderWidth: 3,
+                            pointBackgroundColor: '#009dff',
+                            pointBorderColor: '#ffffff',
+                            pointBorderWidth: 2,
+                            pointRadius: 5,
+                            pointHoverRadius: 7
+                        },
+                        {
+                            label: 'Purchases (Cash Outflow)',
+                            data: purchasesData,
+                            borderColor: '#1cc88a',
+                            backgroundColor: purchasesGradient,
+                            fill: true,
+                            tension: 0.4,
+                            borderWidth: 3,
+                            pointBackgroundColor: '#1cc88a',
+                            pointBorderColor: '#ffffff',
+                            pointBorderWidth: 2,
+                            pointRadius: 5,
+                            pointHoverRadius: 7
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: {
+                                usePointStyle: true,
+                                boxWidth: 8,
+                                font: {
+                                    family: "'Outfit', 'Inter', 'Helvetica Neue', sans-serif",
+                                    size: 13,
+                                    weight: '500'
+                                },
+                                color: '#6c757d'
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(26, 26, 46, 0.95)',
+                            titleColor: '#ffffff',
+                            titleFont: {
+                                family: "'Outfit', 'Inter', sans-serif",
+                                weight: 'bold'
+                            },
+                            bodyColor: '#ffffff',
+                            bodyFont: {
+                                family: "'Outfit', 'Inter', sans-serif"
+                            },
+                            padding: 12,
+                            cornerRadius: 8,
+                            displayColors: true,
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) {
+                                        label += ': ';
+                                    }
+                                    if (context.parsed.y !== null) {
+                                        label += new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(context.parsed.y);
+                                    }
+                                    return label;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: {
+                                display: false
+                            },
+                            ticks: {
+                                font: {
+                                    family: "'Outfit', 'Inter', sans-serif",
+                                    size: 12
+                                },
+                                color: '#6c757d'
+                            }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            grid: {
+                                color: 'rgba(224, 224, 224, 0.5)',
+                                borderDash: [5, 5]
+                            },
+                            ticks: {
+                                font: {
+                                    family: "'Outfit', 'Inter', sans-serif",
+                                    size: 12
+                                },
+                                color: '#6c757d',
+                                callback: function(value) {
+                                    return '$' + value.toLocaleString();
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        });
+    </script>
 
 <?php
 require_once 'includes/footer.php';

@@ -255,3 +255,49 @@ function verify_csrf_token($token)
     return hash_equals($_SESSION['csrf_token'], $token);
 }
 
+/**
+ * Fetches sales and purchase chart data for the last N days.
+ * Pads missing dates with 0.0 values.
+ */
+function get_chart_data($conn, $days = 7)
+{
+    $data = [];
+    
+    // Generate empty values for the last N days to ensure complete timeline
+    for ($i = $days - 1; $i >= 0; $i--) {
+        $date = date('Y-m-d', strtotime("-$i days"));
+        $data[$date] = [
+            'label' => date('M d', strtotime($date)),
+            'sales' => 0.0,
+            'purchases' => 0.0
+        ];
+    }
+    
+    // Fetch aggregated daily sales and purchases
+    $query = "SELECT DATE(order_date) as order_day, order_type, SUM(total_amount) as total 
+              FROM `Order` 
+              WHERE order_date >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
+              GROUP BY DATE(order_date), order_type
+              ORDER BY DATE(order_date) ASC";
+              
+    $stmt = $conn->prepare($query);
+    if ($stmt) {
+        $stmt->bind_param("i", $days);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        while ($row = $result->fetch_assoc()) {
+            $day = $row['order_day'];
+            if (isset($data[$day])) {
+                if ($row['order_type'] === 'sale') {
+                    $data[$day]['sales'] = floatval($row['total']);
+                } else if ($row['order_type'] === 'purchase') {
+                    $data[$day]['purchases'] = floatval($row['total']);
+                }
+            }
+        }
+    }
+    
+    return array_values($data);
+}
+
+
