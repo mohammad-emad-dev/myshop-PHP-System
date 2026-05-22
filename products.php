@@ -21,6 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $description = sanitize_input($_POST['description']);
             $price = floatval($_POST['price']);
             $stock = intval($_POST['stock']);
+            $alert_threshold = isset($_POST['alert_threshold']) ? max(0, intval($_POST['alert_threshold'])) : 10;
 
             $image_path = null;
             if (isset($_FILES['image']) && $_FILES['image']['error'] === 0) {
@@ -31,7 +32,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             }
 
             if (empty($error)) {
-                if (create_product($conn, $name, $description, $price, $stock, $image_path)) {
+                if (create_product($conn, $name, $description, $price, $stock, $image_path, $alert_threshold)) {
                     $success = 'Product created successfully';
                 } else {
                     $error = 'Failed to create product';
@@ -43,6 +44,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $description = sanitize_input($_POST['description']);
             $price = floatval($_POST['price']);
             $stock = intval($_POST['stock']);
+            $alert_threshold = isset($_POST['alert_threshold']) ? max(0, intval($_POST['alert_threshold'])) : 10;
 
             $image_path = null;
             $upload_ok = true;
@@ -55,7 +57,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             }
 
             if ($upload_ok) {
-                if (update_product($conn, $id, $name, $description, $price, $stock, $image_path)) {
+                if (update_product($conn, $id, $name, $description, $price, $stock, $image_path, $alert_threshold)) {
                     $success = 'Product updated successfully';
                 } else {
                     $error = 'Failed to update product';
@@ -80,11 +82,18 @@ if (isset($_GET['delete'])) {
     }
 }
 
-$products = get_products($conn);
+$filter = $_GET['filter'] ?? '';
+if ($filter === 'low_stock') {
+    $products = get_low_stock_products($conn);
+    $header_title = 'Low Stock Alerts';
+} else {
+    $products = get_products($conn);
+    $header_title = 'Product Management';
+}
 
 $page_title = 'Products';
 $active_page = 'products';
-$header_title = 'Product Management';
+
 
 require_once 'includes/header.php';
 ?>
@@ -133,13 +142,24 @@ require_once 'includes/header.php';
                                         <th scope="col">Description</th>
                                         <th scope="col">Price</th>
                                         <th scope="col">Stock</th>
+                                        <th scope="col">Threshold</th>
                                         <th scope="col">Image</th>
                                         <th scope="col">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <?php foreach ($products as $product): ?>
-                                        <tr>
+                                        <?php
+                                        $highlight_id = isset($_GET['highlight']) ? intval($_GET['highlight']) : 0;
+                                        $is_low = $product['stock'] <= $product['alert_threshold'];
+                                        $row_class = '';
+                                        if ($product['id'] == $highlight_id) {
+                                            $row_class = 'table-warning border border-warning fw-bold';
+                                        } else if ($is_low) {
+                                            $row_class = 'table-danger-subtle';
+                                        }
+                                        ?>
+                                        <tr class="<?php echo $row_class; ?>">
                                             <td><?php echo $product['id']; ?></td>
                                             <td class="fw-bold"><?php echo htmlspecialchars($product['name']); ?></td>
                                             <td class="text-muted">
@@ -147,11 +167,14 @@ require_once 'includes/header.php';
                                             </td>
                                             <td class="text-success fw-bold">$<?php echo number_format($product['price'], 2); ?></td>
                                             <td>
-                                                <?php if ($product['stock'] <= 5): ?>
-                                                    <span class="badge rounded-pill bg-danger">Low Stock (<?php echo $product['stock']; ?>)</span>
+                                                <?php if ($is_low): ?>
+                                                    <span class="badge rounded-pill bg-danger shadow-sm">Low Stock (<?php echo $product['stock']; ?>)</span>
                                                 <?php else: ?>
-                                                    <span class="badge rounded-pill bg-success">In Stock (<?php echo $product['stock']; ?>)</span>
+                                                    <span class="badge rounded-pill bg-success shadow-sm">In Stock (<?php echo $product['stock']; ?>)</span>
                                                 <?php endif; ?>
+                                            </td>
+                                            <td class="fw-bold <?php echo $is_low ? 'text-danger' : 'text-secondary'; ?>">
+                                                <?php echo $product['alert_threshold']; ?>
                                             </td>
                                             <td>
                                                 <?php if ($product['image_path']): ?>
@@ -210,6 +233,10 @@ require_once 'includes/header.php';
                             </div>
                         </div>
                         <div class="mb-3">
+                            <label for="alert_threshold" class="form-label">Low Stock Alert Threshold</label>
+                            <input type="number" class="form-control" id="alert_threshold" name="alert_threshold" min="0" value="10" required>
+                        </div>
+                        <div class="mb-3">
                             <label for="image" class="form-label">Product Image</label>
                             <input class="form-control" type="file" id="image" name="image" accept="image/*">
                         </div>
@@ -256,6 +283,10 @@ require_once 'includes/header.php';
                             </div>
                         </div>
                         <div class="mb-3">
+                            <label for="edit_alert_threshold" class="form-label">Low Stock Alert Threshold</label>
+                            <input type="number" class="form-control" id="edit_alert_threshold" name="alert_threshold" min="0" required>
+                        </div>
+                        <div class="mb-3">
                             <label for="edit_image" class="form-label">Product Image (leave empty to keep current)</label>
                             <input class="form-control" type="file" id="edit_image" name="image" accept="image/*">
                         </div>
@@ -280,6 +311,7 @@ $extra_js = ['assets/script.js'];
         document.getElementById('edit_description').value = product.description;
         document.getElementById('edit_price').value = product.price;
         document.getElementById('edit_stock').value = product.stock;
+        document.getElementById('edit_alert_threshold').value = product.alert_threshold || 10;
 
         var editModal = new bootstrap.Modal(document.getElementById('editProductModal'));
         editModal.show();

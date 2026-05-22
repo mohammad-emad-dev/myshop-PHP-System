@@ -390,6 +390,33 @@ $extra_js = [
         });
     }
 </script>
+<?php if (isset($_GET['purchase_product_id'])): ?>
+    <?php
+    $restock_prod_id = intval($_GET['purchase_product_id']);
+    $restock_prod = get_product_by_id($conn, $restock_prod_id);
+    if ($restock_prod):
+    ?>
+    <script>
+        window.addEventListener('load', function() {
+            // Trigger purchase type selection
+            const typePurchaseRadio = document.getElementById('typePurchase');
+            if (typePurchaseRadio) {
+                typePurchaseRadio.checked = true;
+                // Dispatch change event to update JS variables
+                typePurchaseRadio.dispatchEvent(new Event('change'));
+            }
+            // Add product to cart
+            const productObj = <?php echo json_encode([
+                'id' => intval($restock_prod['id']),
+                'name' => $restock_prod['name'],
+                'price' => floatval($restock_prod['price']),
+                'stock' => intval($restock_prod['stock'])
+            ]); ?>;
+            addToCart(productObj);
+        });
+    </script>
+    <?php endif; ?>
+<?php endif; ?>
 <?php
 require_once 'includes/footer.php';
 ?>

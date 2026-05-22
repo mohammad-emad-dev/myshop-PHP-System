@@ -33,21 +33,28 @@ function get_product_by_id($conn, $id)
     return $stmt->get_result()->fetch_assoc();
 }
 
-function create_product($conn, $name, $description, $price, $stock, $image_path = null)
+function get_low_stock_products($conn)
 {
-    $stmt = $conn->prepare("INSERT INTO Product (name, description, price, stock, image_path) VALUES (?, ?, ?, ?, ?)");
-    $stmt->bind_param("ssdis", $name, $description, $price, $stock, $image_path);
+    $sql = "SELECT * FROM Product WHERE stock <= alert_threshold ORDER BY stock ASC, name ASC";
+    $result = $conn->query($sql);
+    return $result->fetch_all(MYSQLI_ASSOC);
+}
+
+function create_product($conn, $name, $description, $price, $stock, $image_path = null, $alert_threshold = 10)
+{
+    $stmt = $conn->prepare("INSERT INTO Product (name, description, price, stock, image_path, alert_threshold) VALUES (?, ?, ?, ?, ?, ?)");
+    $stmt->bind_param("ssdisi", $name, $description, $price, $stock, $image_path, $alert_threshold);
     return $stmt->execute();
 }
 
-function update_product($conn, $id, $name, $description, $price, $stock, $image_path = null)
+function update_product($conn, $id, $name, $description, $price, $stock, $image_path = null, $alert_threshold = 10)
 {
     if ($image_path) {
-        $stmt = $conn->prepare("UPDATE Product SET name = ?, description = ?, price = ?, stock = ?, image_path = ? WHERE id = ?");
-        $stmt->bind_param("ssdisi", $name, $description, $price, $stock, $image_path, $id);
+        $stmt = $conn->prepare("UPDATE Product SET name = ?, description = ?, price = ?, stock = ?, image_path = ?, alert_threshold = ? WHERE id = ?");
+        $stmt->bind_param("ssdisii", $name, $description, $price, $stock, $image_path, $alert_threshold, $id);
     } else {
-        $stmt = $conn->prepare("UPDATE Product SET name = ?, description = ?, price = ?, stock = ? WHERE id = ?");
-        $stmt->bind_param("ssdii", $name, $description, $price, $stock, $id);
+        $stmt = $conn->prepare("UPDATE Product SET name = ?, description = ?, price = ?, stock = ?, alert_threshold = ? WHERE id = ?");
+        $stmt->bind_param("ssdiii", $name, $description, $price, $stock, $alert_threshold, $id);
     }
     return $stmt->execute();
 }

@@ -27,6 +27,9 @@ function editProduct(product) {
     document.getElementById('edit_description').value = product.description;
     document.getElementById('edit_price').value = product.price;
     document.getElementById('edit_stock').value = product.stock;
+    if (document.getElementById('edit_alert_threshold')) {
+        document.getElementById('edit_alert_threshold').value = product.alert_threshold || 10;
+    }
     openModal('editProductModal');
 }
 

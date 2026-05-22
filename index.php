@@ -84,6 +84,77 @@ require_once 'includes/header.php';
             </div>
         </div>
 
+        <!-- Low Stock Alerts Panel -->
+        <?php
+        $low_stock_products = get_low_stock_products($conn);
+        $total_low_stock = count($low_stock_products);
+        ?>
+        <div class="row my-4">
+            <div class="col-md-12">
+                <div class="card shadow-sm border-0 rounded-4">
+                    <div class="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0 text-secondary fw-bold">
+                            <i class="fas fa-exclamation-triangle text-danger me-2"></i>Low Stock Inventory Alerts
+                        </h5>
+                        <?php if ($total_low_stock > 0): ?>
+                            <span class="badge bg-danger rounded-pill px-3 py-2"><?php echo $total_low_stock; ?> Action Required</span>
+                        <?php else: ?>
+                            <span class="badge bg-success rounded-pill px-3 py-2">All Stock Stable</span>
+                        <?php endif; ?>
+                    </div>
+                    <div class="card-body p-4">
+                        <?php if ($total_low_stock > 0): ?>
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle mb-0">
+                                    <thead class="bg-light text-secondary">
+                                        <tr>
+                                            <th scope="col">Product ID</th>
+                                            <th scope="col">Product Name</th>
+                                            <th scope="col" class="text-center">Current Stock</th>
+                                            <th scope="col" class="text-center">Alert Threshold</th>
+                                            <th scope="col" class="text-end">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php foreach ($low_stock_products as $p): ?>
+                                            <tr>
+                                                <td>#<?php echo $p['id']; ?></td>
+                                                <td class="fw-bold">
+                                                    <?php if ($p['image_path']): ?>
+                                                        <img src="<?php echo htmlspecialchars($p['image_path']); ?>" class="rounded me-2" style="width: 35px; height: 35px; object-fit: cover;" alt="">
+                                                    <?php endif; ?>
+                                                    <?php echo htmlspecialchars($p['name']); ?>
+                                                </td>
+                                                <td class="text-center">
+                                                    <span class="badge rounded-pill bg-danger-subtle text-danger px-2.5 py-1.5 fw-bold fs-7">
+                                                        <?php echo $p['stock']; ?>
+                                                    </span>
+                                                </td>
+                                                <td class="text-center fw-bold text-secondary"><?php echo $p['alert_threshold']; ?></td>
+                                                <td class="text-end">
+                                                    <a href="orders.php?purchase_product_id=<?php echo $p['id']; ?>" class="btn btn-sm btn-success rounded-3 fw-bold">
+                                                        <i class="fas fa-plus me-1"></i> Restock
+                                                    </a>
+                                                    <a href="products.php?highlight=<?php echo $p['id']; ?>" class="btn btn-sm btn-outline-secondary rounded-3 ms-1 fw-bold">
+                                                        <i class="fas fa-edit me-1"></i> Edit Threshold
+                                                    </a>
+                                                </td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        <?php else: ?>
+                            <div class="text-center py-4 text-muted">
+                                <i class="fas fa-check-circle text-success fs-1 mb-2"></i>
+                                <p class="mb-0 fw-bold">Awesome! All product stock levels are above their thresholds.</p>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div class="row my-5">
             <h3 class="fs-4 mb-3 text-secondary">Quick Actions</h3>
             <div class="col-md-6">
