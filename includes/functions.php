@@ -20,14 +20,20 @@ function redirect($url)
 
 function get_products($conn)
 {
-    $sql = "SELECT * FROM Product ORDER BY created_at DESC";
+    $sql = "SELECT p.*, c.name as category_name 
+            FROM Product p 
+            LEFT JOIN Category c ON p.category_id = c.id 
+            ORDER BY p.created_at DESC";
     $result = $conn->query($sql);
     return $result->fetch_all(MYSQLI_ASSOC);
 }
 
 function get_product_by_id($conn, $id)
 {
-    $stmt = $conn->prepare("SELECT * FROM Product WHERE id = ?");
+    $stmt = $conn->prepare("SELECT p.*, c.name as category_name 
+                            FROM Product p 
+                            LEFT JOIN Category c ON p.category_id = c.id 
+                            WHERE p.id = ?");
     $stmt->bind_param("i", $id);
     $stmt->execute();
     return $stmt->get_result()->fetch_assoc();
@@ -35,7 +41,11 @@ function get_product_by_id($conn, $id)
 
 function get_low_stock_products($conn)
 {
-    $sql = "SELECT * FROM Product WHERE stock <= alert_threshold ORDER BY stock ASC, name ASC";
+    $sql = "SELECT p.*, c.name as category_name 
+            FROM Product p 
+            LEFT JOIN Category c ON p.category_id = c.id 
+            WHERE p.stock <= p.alert_threshold 
+            ORDER BY p.stock ASC, p.name ASC";
     $result = $conn->query($sql);
     return $result->fetch_all(MYSQLI_ASSOC);
 }
@@ -84,15 +94,24 @@ function get_stock_movements($conn, $product_id = null)
     }
 }
 
-function create_product($conn, $staff_id, $name, $description, $price, $stock, $image_path = null, $alert_threshold = 10)
+function create_product($conn, $staff_id, $name, $description, $price, $stock, $image_path = null, $alert_threshold = 10, $category_id = null)
 {
     $conn->begin_transaction();
     try {
-        $stmt = $conn->prepare("INSERT INTO Product (name, description, price, stock, image_path, alert_threshold) VALUES (?, ?, ?, ?, ?, ?)");
+        if ($category_id === null) {
+            $gen_stmt = $conn->query("SELECT id FROM Category WHERE name = 'General' LIMIT 1");
+            if ($gen_stmt && $gen_stmt->num_rows > 0) {
+                $category_id = intval($gen_stmt->fetch_assoc()['id']);
+            }
+        } else {
+            $category_id = intval($category_id);
+        }
+
+        $stmt = $conn->prepare("INSERT INTO Product (name, description, price, stock, image_path, alert_threshold, category_id) VALUES (?, ?, ?, ?, ?, ?, ?)");
         if (!$stmt) {
             throw new Exception("Failed to prepare statement");
         }
-        $stmt->bind_param("ssdisi", $name, $description, $price, $stock, $image_path, $alert_threshold);
+        $stmt->bind_param("ssdisii", $name, $description, $price, $stock, $image_path, $alert_threshold, $category_id);
         if (!$stmt->execute()) {
             throw new Exception("Product insertion failed");
         }
@@ -114,7 +133,7 @@ function create_product($conn, $staff_id, $name, $description, $price, $stock, $
     }
 }
 
-function update_product($conn, $staff_id, $id, $name, $description, $price, $stock, $image_path = null, $alert_threshold = 10)
+function update_product($conn, $staff_id, $id, $name, $description, $price, $stock, $image_path = null, $alert_threshold = 10, $category_id = null)
 {
     $conn->begin_transaction();
     try {
@@ -125,18 +144,27 @@ function update_product($conn, $staff_id, $id, $name, $description, $price, $sto
         $old_stock = intval($product['stock']);
         $delta = $stock - $old_stock;
 
-        if ($image_path) {
-            $stmt = $conn->prepare("UPDATE Product SET name = ?, description = ?, price = ?, stock = ?, image_path = ?, alert_threshold = ? WHERE id = ?");
-            if (!$stmt) {
-                throw new Exception("Failed to prepare statement");
+        if ($category_id === null) {
+            $gen_stmt = $conn->query("SELECT id FROM Category WHERE name = 'General' LIMIT 1");
+            if ($gen_stmt && $gen_stmt->num_rows > 0) {
+                $category_id = intval($gen_stmt->fetch_assoc()['id']);
             }
-            $stmt->bind_param("ssdisii", $name, $description, $price, $stock, $image_path, $alert_threshold, $id);
         } else {
-            $stmt = $conn->prepare("UPDATE Product SET name = ?, description = ?, price = ?, stock = ?, alert_threshold = ? WHERE id = ?");
+            $category_id = intval($category_id);
+        }
+
+        if ($image_path) {
+            $stmt = $conn->prepare("UPDATE Product SET name = ?, description = ?, price = ?, stock = ?, image_path = ?, alert_threshold = ?, category_id = ? WHERE id = ?");
             if (!$stmt) {
                 throw new Exception("Failed to prepare statement");
             }
-            $stmt->bind_param("ssdiii", $name, $description, $price, $stock, $alert_threshold, $id);
+            $stmt->bind_param("ssdisiii", $name, $description, $price, $stock, $image_path, $alert_threshold, $category_id, $id);
+        } else {
+            $stmt = $conn->prepare("UPDATE Product SET name = ?, description = ?, price = ?, stock = ?, alert_threshold = ?, category_id = ? WHERE id = ?");
+            if (!$stmt) {
+                throw new Exception("Failed to prepare statement");
+            }
+            $stmt->bind_param("ssdiiii", $name, $description, $price, $stock, $alert_threshold, $category_id, $id);
         }
 
         if (!$stmt->execute()) {
@@ -557,4 +585,169 @@ function delete_staff_member($conn, $id, $current_admin_id)
     $stmt = $conn->prepare("DELETE FROM Staff WHERE id = ?");
     $stmt->bind_param("i", $id);
     return $stmt->execute();
+}
+
+/**
+ * Retrieves all product categories.
+ */
+function get_categories($conn)
+{
+    $sql = "SELECT c.*, COUNT(p.id) as product_count 
+            FROM Category c 
+            LEFT JOIN Product p ON c.id = p.category_id 
+            GROUP BY c.id 
+            ORDER BY c.name ASC";
+    $result = $conn->query($sql);
+    return $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
+}
+
+/**
+ * Retrieves a specific category by its ID.
+ */
+function get_category_by_id($conn, $id)
+{
+    $stmt = $conn->prepare("SELECT * FROM Category WHERE id = ?");
+    if (!$stmt) {
+        return null;
+    }
+    $stmt->bind_param("i", $id);
+    $stmt->execute();
+    $res = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    return $res;
+}
+
+/**
+ * Creates a new product category.
+ */
+function create_category($conn, $name, $description)
+{
+    $name = trim($name);
+    $description = trim($description);
+
+    if (empty($name)) {
+        return false;
+    }
+
+    // Verify uniqueness
+    $stmt = $conn->prepare("SELECT id FROM Category WHERE name = ? LIMIT 1");
+    if (!$stmt) {
+        return false;
+    }
+    $stmt->bind_param("s", $name);
+    $stmt->execute();
+    if ($stmt->get_result()->num_rows > 0) {
+        $stmt->close();
+        return false;
+    }
+    $stmt->close();
+
+    $stmt = $conn->prepare("INSERT INTO Category (name, description) VALUES (?, ?)");
+    if (!$stmt) {
+        return false;
+    }
+    $stmt->bind_param("ss", $name, $description);
+    $res = $stmt->execute();
+    $stmt->close();
+    return $res;
+}
+
+/**
+ * Updates an existing product category.
+ */
+function update_category($conn, $id, $name, $description)
+{
+    $id = (int)$id;
+    $name = trim($name);
+    $description = trim($description);
+
+    if ($id <= 0 || empty($name)) {
+        return false;
+    }
+
+    // Check if another category has the same name
+    $stmt = $conn->prepare("SELECT id FROM Category WHERE name = ? AND id != ? LIMIT 1");
+    if (!$stmt) {
+        return false;
+    }
+    $stmt->bind_param("si", $name, $id);
+    $stmt->execute();
+    if ($stmt->get_result()->num_rows > 0) {
+        $stmt->close();
+        return false;
+    }
+    $stmt->close();
+
+    // Check if category is 'General' and we are trying to rename it
+    $stmt = $conn->prepare("SELECT name FROM Category WHERE id = ?");
+    $stmt->bind_param("i", $id);
+    $stmt->execute();
+    $old_name_res = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    if ($old_name_res && $old_name_res['name'] === 'General' && $name !== 'General') {
+        // Prevent renaming the default category
+        return false;
+    }
+
+    $stmt = $conn->prepare("UPDATE Category SET name = ?, description = ? WHERE id = ?");
+    if (!$stmt) {
+        return false;
+    }
+    $stmt->bind_param("ssi", $name, $description, $id);
+    $res = $stmt->execute();
+    $stmt->close();
+    return $res;
+}
+
+/**
+ * Deletes a category and handles reassigning of products.
+ */
+function delete_category($conn, $id)
+{
+    $id = (int)$id;
+    
+    // Prevent deleting the default category
+    $stmt = $conn->prepare("SELECT name FROM Category WHERE id = ?");
+    if (!$stmt) {
+        return false;
+    }
+    $stmt->bind_param("i", $id);
+    $stmt->execute();
+    $res = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    if (!$res || $res['name'] === 'General') {
+        return false;
+    }
+
+    $conn->begin_transaction();
+    try {
+        $gen_stmt = $conn->query("SELECT id FROM Category WHERE name = 'General' LIMIT 1");
+        $gen_cat_id = null;
+        if ($gen_stmt && $gen_stmt->num_rows > 0) {
+            $gen_cat_id = intval($gen_stmt->fetch_assoc()['id']);
+        }
+
+        $del_stmt = $conn->prepare("DELETE FROM Category WHERE id = ?");
+        if (!$del_stmt) {
+            throw new Exception("Failed to prepare delete statement");
+        }
+        $del_stmt->bind_param("i", $id);
+        if (!$del_stmt->execute()) {
+            throw new Exception("Failed to delete category");
+        }
+        $del_stmt->close();
+
+        if ($gen_cat_id !== null) {
+            $conn->query("UPDATE Product SET category_id = $gen_cat_id WHERE category_id IS NULL");
+        }
+
+        $conn->commit();
+        return true;
+    } catch (Exception $e) {
+        $conn->rollback();
+        error_log("delete_category failed: " . $e->getMessage());
+        return false;
+    }
 }

@@ -55,6 +55,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['complete_order'])) {
 }
 
 $products = get_products($conn);
+$categories = get_categories($conn);
 
 $page_title = 'POS System';
 $active_page = 'orders';
@@ -100,6 +101,18 @@ require_once '../includes/layouts/header.php';
                     </div>
                 </div>
 
+                <!-- Category Navigation Pills -->
+                <div class="mb-3 d-flex overflow-x-auto pb-2" style="gap: 8px; scrollbar-width: thin; -ms-overflow-style: none;">
+                    <button class="btn btn-sm btn-primary category-pill rounded-pill px-3 fw-bold" data-category-id="all" onclick="selectCategory(this, 'all')">
+                        All (الكل)
+                    </button>
+                    <?php foreach ($categories as $cat): ?>
+                        <button class="btn btn-sm btn-outline-secondary category-pill rounded-pill px-3" data-category-id="<?php echo $cat['id']; ?>" onclick="selectCategory(this, <?php echo $cat['id']; ?>)">
+                            <?php echo htmlspecialchars($cat['name']); ?>
+                        </button>
+                    <?php endforeach; ?>
+                </div>
+
                 <!-- Product Grid -->
                 <div class="product-grid-container" id="productGrid">
                     <div class="row g-3">
@@ -109,7 +122,7 @@ require_once '../includes/layouts/header.php';
                             $cardClass = $hasStock ? 'product-card' : 'product-card disabled';
                             $badgeClass = $product['stock'] <= 5 ? 'bg-danger' : 'bg-success';
                             ?>
-                            <div class="col-md-4 col-sm-6 product-item" data-name="<?php echo strtolower($product['name']); ?>">
+                            <div class="col-md-4 col-sm-6 product-item" data-name="<?php echo strtolower($product['name']); ?>" data-category-id="<?php echo $product['category_id']; ?>">
                                 <div class="card h-100 border-0 shadow-sm <?php echo $cardClass; ?>" 
                                      <?php if ($hasStock): ?>
                                          onclick='addToCart(<?php echo json_encode($product); ?>)'
@@ -346,13 +359,38 @@ $extra_js = [
         dataInput.value = JSON.stringify(cart);
     }
 
+    let activeCategoryId = 'all';
+
+    function selectCategory(el, catId) {
+        activeCategoryId = catId;
+        
+        // Remove primary from all pills and add outline
+        document.querySelectorAll('.category-pill').forEach(pill => {
+            pill.classList.remove('btn-primary');
+            pill.classList.add('btn-outline-secondary');
+            pill.classList.remove('fw-bold');
+        });
+        
+        // Mark current pill as active
+        el.classList.remove('btn-outline-secondary');
+        el.classList.add('btn-primary');
+        el.classList.add('fw-bold');
+        
+        filterProducts();
+    }
+
     function filterProducts() {
         const query = document.getElementById('searchProduct').value.toLowerCase();
         const items = document.querySelectorAll('.product-item');
 
         items.forEach(item => {
             const name = item.dataset.name;
-            if (name.includes(query)) {
+            const categoryId = item.dataset.categoryId;
+            
+            const matchesQuery = name.includes(query);
+            const matchesCategory = (activeCategoryId === 'all' || categoryId == activeCategoryId);
+            
+            if (matchesQuery && matchesCategory) {
                 item.style.display = 'block';
             } else {
                 item.style.display = 'none';

@@ -93,4 +93,45 @@ if ($sm_table_check && $sm_table_check->num_rows === 0) {
     }
 }
 
+// Self-healing database migration for Phase 7: Product Categories
+$cat_table_check = $conn->query("SHOW TABLES LIKE 'Category'");
+if ($cat_table_check && $cat_table_check->num_rows === 0) {
+    $create_cat_sql = "CREATE TABLE `Category` (
+        `id` INT AUTO_INCREMENT PRIMARY KEY,
+        `name` VARCHAR(50) NOT NULL UNIQUE,
+        `description` TEXT NULL,
+        `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci";
+    
+    if (!$conn->query($create_cat_sql)) {
+        error_log("Database Migration Failed (Category table creation): " . $conn->error);
+    }
+}
+
+// Ensure default "General" category exists
+$default_cat_check = $conn->query("SELECT id FROM `Category` WHERE name = 'General' LIMIT 1");
+if ($default_cat_check && $default_cat_check->num_rows === 0) {
+    $insert_default_cat = "INSERT INTO `Category` (name, description) VALUES ('General', 'Default classification for uncategorized products')";
+    if (!$conn->query($insert_default_cat)) {
+        error_log("Database Migration Failed (Default category seeding): " . $conn->error);
+    }
+}
+
+// Add category_id column to Product table
+$cat_col_check = $conn->query("SHOW COLUMNS FROM `Product` LIKE 'category_id'");
+if ($cat_col_check && $cat_col_check->num_rows === 0) {
+    $alter_prod_sql = "ALTER TABLE `Product` ADD COLUMN category_id INT NULL, ADD FOREIGN KEY (category_id) REFERENCES Category(id) ON DELETE SET NULL";
+    if ($conn->query($alter_prod_sql)) {
+        // Retroactively link existing products to the default General category
+        $gen_cat_res = $conn->query("SELECT id FROM `Category` WHERE name = 'General' LIMIT 1");
+        if ($gen_cat_res && $gen_cat_res->num_rows > 0) {
+            $gen_cat_id = intval($gen_cat_res->fetch_assoc()['id']);
+            $conn->query("UPDATE `Product` SET category_id = $gen_cat_id WHERE category_id IS NULL");
+        }
+    } else {
+        error_log("Database Migration Failed (Product category_id column): " . $conn->error);
+    }
+}
+
+
 

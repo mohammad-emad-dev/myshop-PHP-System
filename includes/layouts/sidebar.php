@@ -13,6 +13,11 @@ $current_page = $active_page ?? 'dashboard';
         <a href="products.php" class="list-group-item list-group-item-action bg-transparent fw-bold <?php echo $current_page === 'products' ? 'text-primary active' : 'text-white'; ?>">
             <i class="fas fa-box-open me-2"></i>Products
         </a>
+        <?php if (is_admin()): ?>
+        <a href="categories.php" class="list-group-item list-group-item-action bg-transparent fw-bold <?php echo $current_page === 'categories' ? 'text-primary active' : 'text-white'; ?>">
+            <i class="fas fa-tags me-2"></i>Categories
+        </a>
+        <?php endif; ?>
         <a href="orders.php" class="list-group-item list-group-item-action bg-transparent fw-bold <?php echo $current_page === 'orders' ? 'text-primary active' : 'text-white'; ?>">
             <i class="fas fa-shopping-cart me-2"></i>Orders (POS)
         </a>

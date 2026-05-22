@@ -24,6 +24,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $price = floatval($_POST['price']);
             $stock = intval($_POST['stock']);
             $alert_threshold = isset($_POST['alert_threshold']) ? max(0, intval($_POST['alert_threshold'])) : 10;
+            $category_id = isset($_POST['category_id']) ? intval($_POST['category_id']) : null;
 
             $image_path = null;
             if (isset($_FILES['image']) && $_FILES['image']['error'] === 0) {
@@ -34,7 +35,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             }
 
             if (empty($error)) {
-                if (create_product($conn, $_SESSION['staff_id'], $name, $description, $price, $stock, $image_path, $alert_threshold)) {
+                if (create_product($conn, $_SESSION['staff_id'], $name, $description, $price, $stock, $image_path, $alert_threshold, $category_id)) {
                     $success = 'Product created successfully';
                 } else {
                     $error = 'Failed to create product';
@@ -47,6 +48,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $price = floatval($_POST['price']);
             $stock = intval($_POST['stock']);
             $alert_threshold = isset($_POST['alert_threshold']) ? max(0, intval($_POST['alert_threshold'])) : 10;
+            $category_id = isset($_POST['category_id']) ? intval($_POST['category_id']) : null;
 
             $image_path = null;
             $upload_ok = true;
@@ -59,7 +61,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             }
 
             if ($upload_ok) {
-                if (update_product($conn, $_SESSION['staff_id'], $id, $name, $description, $price, $stock, $image_path, $alert_threshold)) {
+                if (update_product($conn, $_SESSION['staff_id'], $id, $name, $description, $price, $stock, $image_path, $alert_threshold, $category_id)) {
                     $success = 'Product updated successfully';
                 } else {
                     $error = 'Failed to update product';
@@ -95,6 +97,7 @@ if ($filter === 'low_stock') {
     $header_title = 'Product Management';
 }
 
+$categories = get_categories($conn);
 $page_title = 'Products';
 $active_page = 'products';
 
@@ -145,6 +148,7 @@ require_once '../includes/layouts/header.php';
                                     <tr>
                                         <th scope="col">ID</th>
                                         <th scope="col">Name</th>
+                                        <th scope="col">Category</th>
                                         <th scope="col">Description</th>
                                         <th scope="col">Price</th>
                                         <th scope="col">Stock</th>
@@ -168,6 +172,11 @@ require_once '../includes/layouts/header.php';
                                         <tr class="<?php echo $row_class; ?>">
                                             <td><?php echo $product['id']; ?></td>
                                             <td class="fw-bold"><?php echo htmlspecialchars($product['name']); ?></td>
+                                            <td>
+                                                <span class="badge bg-secondary-subtle text-secondary rounded-pill px-2">
+                                                    <?php echo htmlspecialchars($product['category_name'] ?: 'Uncategorized'); ?>
+                                                </span>
+                                            </td>
                                             <td class="text-muted">
                                                 <?php echo htmlspecialchars(substr($product['description'], 0, 50)); ?>...
                                             </td>
@@ -230,6 +239,14 @@ require_once '../includes/layouts/header.php';
                             <input type="text" class="form-control" id="name" name="name" required>
                         </div>
                         <div class="mb-3">
+                            <label for="category_id" class="form-label">Category</label>
+                            <select class="form-select" id="category_id" name="category_id" required>
+                                <?php foreach ($categories as $cat): ?>
+                                    <option value="<?php echo $cat['id']; ?>"><?php echo htmlspecialchars($cat['name']); ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="mb-3">
                             <label for="description" class="form-label">Description</label>
                             <textarea class="form-control" id="description" name="description" rows="3" required></textarea>
                         </div>
@@ -280,6 +297,14 @@ require_once '../includes/layouts/header.php';
                             <input type="text" class="form-control" id="edit_name" name="name" required>
                         </div>
                         <div class="mb-3">
+                            <label for="edit_category_id" class="form-label">Category</label>
+                            <select class="form-select" id="edit_category_id" name="category_id" required>
+                                <?php foreach ($categories as $cat): ?>
+                                    <option value="<?php echo $cat['id']; ?>"><?php echo htmlspecialchars($cat['name']); ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="mb-3">
                             <label for="edit_description" class="form-label">Description</label>
                             <textarea class="form-control" id="edit_description" name="description" rows="3" required></textarea>
                         </div>
@@ -319,6 +344,7 @@ $extra_js = ['assets/js/script.js'];
     function openEditModal(product) {
         document.getElementById('edit_id').value = product.id;
         document.getElementById('edit_name').value = product.name;
+        document.getElementById('edit_category_id').value = product.category_id || '';
         document.getElementById('edit_description').value = product.description;
         document.getElementById('edit_price').value = product.price;
         document.getElementById('edit_stock').value = product.stock;
