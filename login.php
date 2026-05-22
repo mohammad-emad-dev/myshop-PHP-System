@@ -1,16 +1,23 @@
 <?php
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
-session_start();
-require_once 'includes/db.php';
 require_once 'includes/functions.php';
+start_secure_session();
+require_once 'includes/db.php';
 
 // Handle Logout
 if (isset($_GET['logout'])) {
-    session_destroy();
-    unset($_SESSION['staff_id']);
-    unset($_SESSION['full_name']);
+    $token = $_GET['csrf_token'] ?? '';
+    if (verify_csrf_token($token)) {
+        // Destroy session safely
+        $_SESSION = [];
+        if (ini_get("session.use_cookies")) {
+            $params = session_get_cookie_params();
+            setcookie(session_name(), '', time() - 42000,
+                $params["path"], $params["domain"],
+                $params["secure"], $params["httponly"]
+            );
+        }
+        session_destroy();
+    }
     redirect('login.php');
 }
 
@@ -21,35 +28,46 @@ if (isset($_SESSION['staff_id'])) {
 $error = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $username = sanitize_input($_POST['username']);
-    $password = $_POST['password'];
+    $csrf_token = $_POST['csrf_token'] ?? '';
+    if (!verify_csrf_token($csrf_token)) {
+        $error = 'Security check failed. Invalid request token.';
+    } else {
+        $username = sanitize_input($_POST['username']);
+        $password = $_POST['password'];
 
-    $stmt = $conn->prepare("SELECT id, password, full_name FROM Staff WHERE username = ?");
-    if (!$stmt) {
-        die("Database Error: " . $conn->error);
-    }
-    $stmt->bind_param("s", $username);
-    $stmt->execute();
-    $result = $stmt->get_result();
+        $stmt = $conn->prepare("SELECT id, password, full_name FROM Staff WHERE username = ?");
+        if (!$stmt) {
+            die("Database Error: " . $conn->error);
+        }
+        $stmt->bind_param("s", $username);
+        $stmt->execute();
+        $result = $stmt->get_result();
 
-    if ($result->num_rows === 1) {
-        $user = $result->fetch_assoc();
+        if ($result->num_rows === 1) {
+            $user = $result->fetch_assoc();
 
-        if (password_verify($password, $user['password'])) {
-            $_SESSION['staff_id'] = $user['id'];
-            $_SESSION['full_name'] = $user['full_name'];
-            redirect('index.php');
+            if (password_verify($password, $user['password'])) {
+                // Secure session regeneration
+                session_regenerate_id(true);
+                $_SESSION['staff_id'] = $user['id'];
+                $_SESSION['full_name'] = $user['full_name'];
+                
+                // Refresh CSRF token for the active session
+                unset($_SESSION['csrf_token']);
+                generate_csrf_token();
+                
+                redirect('index.php');
+            } else {
+                $error = 'Invalid credentials';
+            }
         } else {
             $error = 'Invalid credentials';
         }
-    } else {
-        $error = 'Invalid credentials';
     }
 }
 ?>
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -61,7 +79,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <!-- Custom CSS -->
     <link rel="stylesheet" href="assets/style.css">
 </head>
-
 <body class="bg-gradient-primary login-page d-flex align-items-center justify-content-center min-vh-100">
 
     <div class="container">
@@ -75,12 +92,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <div class="card-body px-5 py-4">
                         <?php if ($error): ?>
                             <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                                <i class="fas fa-exclamation-circle me-2"></i> <?php echo $error; ?>
+                                <i class="fas fa-exclamation-circle me-2"></i> <?php echo htmlspecialchars($error); ?>
                                 <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                             </div>
                         <?php endif; ?>
 
                         <form method="POST" action="">
+                            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(generate_csrf_token()); ?>">
                             <div class="form-floating mb-3">
                                 <input class="form-control" id="username" name="username" type="text"
                                     placeholder="Username" required autofocus />
@@ -108,5 +126,4 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script src="assets/script.js"></script>
 </body>
-
 </html>

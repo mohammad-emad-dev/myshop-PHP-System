@@ -160,17 +160,44 @@ function handle_image_upload($file)
     $target_dir = "uploads/";
 
     if (!file_exists($target_dir)) {
-        mkdir($target_dir, 0777, true);
+        if (!mkdir($target_dir, 0755, true)) {
+            return false;
+        }
     }
 
-    $file_extension = strtolower(pathinfo($file["name"], PATHINFO_EXTENSION));
-    $allowed = ['jpg', 'jpeg', 'png', 'gif'];
-
-    if (!in_array($file_extension, $allowed)) {
+    // Validate PHP upload errors
+    if (!isset($file['error']) || is_array($file['error']) || $file['error'] !== UPLOAD_ERR_OK) {
         return false;
     }
 
-    $new_filename = uniqid() . '.' . $file_extension;
+    // Validate file size (max 5MB)
+    if ($file['size'] > 5000000) {
+        return false;
+    }
+
+    // Validate MIME type securely using Fileinfo
+    $finfo = new finfo(FILEINFO_MIME_TYPE);
+    $mime_type = $finfo->file($file['tmp_name']);
+    $allowed_mimes = [
+        'image/jpeg' => 'jpg',
+        'image/jpg'  => 'jpg',
+        'image/png'  => 'png',
+        'image/gif'  => 'gif'
+    ];
+
+    if (!array_key_exists($mime_type, $allowed_mimes)) {
+        return false;
+    }
+
+    // Double check that it is a valid image using getimagesize
+    $image_info = getimagesize($file['tmp_name']);
+    if ($image_info === false) {
+        return false;
+    }
+
+    // Generate secure random file name
+    $extension = $allowed_mimes[$mime_type];
+    $new_filename = bin2hex(random_bytes(16)) . '.' . $extension;
     $target_file = $target_dir . $new_filename;
 
     if (move_uploaded_file($file["tmp_name"], $target_file)) {
@@ -179,3 +206,52 @@ function handle_image_upload($file)
 
     return false;
 }
+
+/**
+ * Starts a secure PHP session with HTTPOnly and SameSite cookie options.
+ */
+function start_secure_session()
+{
+    if (session_status() === PHP_SESSION_NONE) {
+        ini_set('session.cookie_httponly', 1);
+        ini_set('session.use_only_cookies', 1);
+        
+        $is_secure = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on';
+        if ($is_secure) {
+            ini_set('session.cookie_secure', 1);
+        }
+        
+        session_start([
+            'cookie_lifetime' => 0,
+            'cookie_path' => '/',
+            'cookie_secure' => $is_secure,
+            'cookie_httponly' => true,
+            'cookie_samesite' => 'Lax'
+        ]);
+    }
+}
+
+/**
+ * Generates a CSRF token and stores it in the session if not already set.
+ */
+function generate_csrf_token()
+{
+    start_secure_session();
+    if (empty($_SESSION['csrf_token'])) {
+        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+    }
+    return $_SESSION['csrf_token'];
+}
+
+/**
+ * Verifies a given token against the one stored in the session.
+ */
+function verify_csrf_token($token)
+{
+    start_secure_session();
+    if (empty($_SESSION['csrf_token']) || empty($token)) {
+        return false;
+    }
+    return hash_equals($_SESSION['csrf_token'], $token);
+}
+
