@@ -27,7 +27,53 @@ require_once '../includes/layouts/header.php';
     <?php require_once '../includes/layouts/sidebar.php'; ?>
     <?php require_once '../includes/layouts/navbar.php'; ?>
 
-    <div class="container-fluid px-4 py-5">
+    <div class="container-fluid px-4 py-4">
+        <!-- Summary Stats Bar -->
+        <?php
+        $total_orders_count = count($orders);
+        $total_sales_amount = 0;
+        $total_purchases_amount = 0;
+        $sales_count = 0;
+        $purchases_count = 0;
+        foreach ($orders as $o) {
+            if (($o['order_type'] ?? 'sale') === 'sale') {
+                $total_sales_amount += $o['total_amount'];
+                $sales_count++;
+            } else {
+                $total_purchases_amount += $o['total_amount'];
+                $purchases_count++;
+            }
+        }
+        ?>
+        <div class="row g-3 mb-4">
+            <div class="col-md-4">
+                <div class="p-3 bg-white shadow-sm d-flex justify-content-between align-items-center rounded-3 dashboard-card border-left-primary">
+                    <div>
+                        <h4 class="fs-3 mb-0 fw-bold" style="color:var(--slate-900);"><?php echo $total_orders_count; ?></h4>
+                        <p class="text-muted mb-0 small fw-medium">Total Orders</p>
+                    </div>
+                    <div class="rounded-full primary-bg p-3 d-flex align-items-center justify-content-center" style="width:44px;height:44px;"><i class="fas fa-receipt primary-text"></i></div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="p-3 bg-white shadow-sm d-flex justify-content-between align-items-center rounded-3 dashboard-card border-left-success">
+                    <div>
+                        <h4 class="fs-3 mb-0 fw-bold" style="color:var(--slate-900);">$<?php echo number_format($total_sales_amount, 2); ?></h4>
+                        <p class="text-muted mb-0 small fw-medium">Sales (<?php echo $sales_count; ?>)</p>
+                    </div>
+                    <div class="rounded-full success-bg p-3 d-flex align-items-center justify-content-center" style="width:44px;height:44px;"><i class="fas fa-arrow-up success-text"></i></div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="p-3 bg-white shadow-sm d-flex justify-content-between align-items-center rounded-3 dashboard-card border-left-warning">
+                    <div>
+                        <h4 class="fs-3 mb-0 fw-bold" style="color:var(--slate-900);">$<?php echo number_format($total_purchases_amount, 2); ?></h4>
+                        <p class="text-muted mb-0 small fw-medium">Purchases (<?php echo $purchases_count; ?>)</p>
+                    </div>
+                    <div class="rounded-full warning-bg p-3 d-flex align-items-center justify-content-center" style="width:44px;height:44px;"><i class="fas fa-arrow-down warning-text"></i></div>
+                </div>
+            </div>
+        </div>
         <div class="row my-2">
             <div class="col-md-12">
                 <div class="card shadow-sm border-0 rounded-4">
@@ -48,7 +94,7 @@ require_once '../includes/layouts/header.php';
                     </div>
                     <div class="card-body">
                         <div class="table-responsive">
-                            <table class="table table-hover align-middle">
+                            <table class="table table-hover table-striped align-middle">
                                 <thead class="bg-light text-secondary">
                                     <tr>
                                         <th scope="col">Order ID</th>
@@ -217,7 +263,7 @@ require_once '../includes/layouts/header.php';
         <div id="invoicePrintContainer" style="padding: 40px; font-family: 'Outfit', 'Inter', sans-serif; color: #333; background: #fff;">
             <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #eaeaea; padding-bottom: 20px; margin-bottom: 30px;">
                 <div>
-                    <h1 style="margin: 0; color: #009dff; font-size: 28px; font-weight: bold; letter-spacing: -0.5px;">MYSHOP SYSTEM</h1>
+                    <h1 style="margin: 0; color: #6366f1; font-size: 28px; font-weight: bold; letter-spacing: -0.5px;">MYSHOP SYSTEM</h1>
                     <p style="margin: 5px 0 0 0; color: #6c757d; font-size: 14px;">Enterprise Inventory & POS Solution</p>
                 </div>
                 <div style="text-align: right;">
@@ -272,7 +318,7 @@ require_once '../includes/layouts/header.php';
                     </div>
                     <div style="display: flex; justify-content: space-between; font-size: 18px; font-weight: bold; color: #2d3748; border-top: 1px solid #eee; padding-top: 15px;">
                         <span>Total Amount:</span>
-                        <span style="color: #1cc88a; font-weight: bold;" id="printInvoiceTotal"></span>
+                        <span style="color: #10b981; font-weight: bold;" id="printInvoiceTotal"></span>
                     </div>
                 </div>
             </div>

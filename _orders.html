@@ -1,0 +1,678 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>POS System - myshop</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet">
+    <!-- Google Fonts: Outfit & Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+                        <link href="https://cdn.jsdelivr.net/npm/sweetalert2@11.10.0/dist/sweetalert2.min.css" rel="stylesheet">
+                <!-- Custom CSS -->
+    <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body class="bg-light">
+<!-- Styles moved to style.css to keep page styling clean and standardized -->
+
+<div class="d-flex" id="wrapper">
+    <!-- Sidebar -->
+<div id="sidebar-wrapper">
+    <div class="sidebar-heading">
+        <i class="fas fa-cubes"></i>myshop
+    </div>
+    <div class="list-group list-group-flush">
+        <div class="sidebar-section-label">Main</div>
+        <a href="index.php" class="list-group-item ">
+            <i class="fas fa-th-large"></i>Dashboard
+        </a>
+        <a href="products.php" class="list-group-item ">
+            <i class="fas fa-box-open"></i>Products
+        </a>
+                <a href="categories.php" class="list-group-item ">
+            <i class="fas fa-layer-group"></i>Categories
+        </a>
+        
+        <div class="sidebar-section-label">Sales</div>
+        <a href="orders.php" class="list-group-item active">
+            <i class="fas fa-cash-register"></i>Orders (POS)
+        </a>
+        <a href="order_history.php" class="list-group-item ">
+            <i class="fas fa-receipt"></i>Order History
+        </a>
+        <a href="stock_movements.php" class="list-group-item ">
+            <i class="fas fa-chart-line"></i>Stock Ledger
+        </a>
+
+        <div class="sidebar-section-label">People</div>
+        <a href="customers.php" class="list-group-item ">
+            <i class="fas fa-user-friends"></i>Customers
+        </a>
+        <a href="suppliers.php" class="list-group-item ">
+            <i class="fas fa-truck-loading"></i>Suppliers
+        </a>
+
+        <div class="sidebar-section-label">System</div>
+        <a href="settings.php" class="list-group-item ">
+            <i class="fas fa-sliders-h"></i>Settings
+        </a>
+        <a href="login.php?logout=1&csrf_token=0396dbc7b0446977a96b226238bb5c1772c344b5afcbaf5b69b9e1ede2a8e350"
+           class="list-group-item sidebar-logout mt-auto"
+           onclick="return confirm('Are you sure you want to logout?');">
+            <i class="fas fa-power-off"></i>Logout
+        </a>
+    </div>
+</div>
+<!-- /#sidebar-wrapper -->
+    <!-- Page Content Wrapper -->
+<div id="page-content-wrapper">
+    <nav class="navbar navbar-expand-lg navbar-light px-4">
+        <div class="d-flex align-items-center">
+            <i class="fas fa-bars fs-5 me-3" id="menu-toggle"></i>
+            <div>
+                <h2 class="m-0">POS Terminal</h2>
+            </div>
+        </div>
+
+        <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse"
+            data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent"
+            aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <div class="collapse navbar-collapse" id="navbarSupportedContent">
+            <ul class="navbar-nav ms-auto mb-2 mb-lg-0 align-items-center">
+                                <!-- Notification Bell Dropdown -->
+                <li class="nav-item dropdown me-2 align-self-center list-unstyled">
+                    <a class="nav-link position-relative" href="#" id="notificationDropdown"
+                        role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="fas fa-bell fs-5 text-secondary"></i>
+                                            </a>
+                    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="notificationDropdown" style="width: 340px; max-height: 420px; overflow-y: auto;">
+                        <li class="px-3 py-2 border-bottom d-flex justify-content-between align-items-center">
+                            <span class="fw-bold text-dark" style="font-size: 0.9rem;">Notifications</span>
+                                                    </li>
+                                                    <li class="text-center py-4 text-muted">
+                                <i class="fas fa-check-circle text-success fs-2 d-block mb-2"></i>
+                                <p class="mb-0 small fw-500">All products well stocked!</p>
+                            </li>
+                                            </ul>
+                </li>
+
+                <!-- Separator -->
+                <li class="nav-item d-none d-lg-flex align-self-center mx-2">
+                    <div style="width: 1px; height: 28px; background: var(--slate-200);"></div>
+                </li>
+
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle d-flex align-items-center py-1 px-2 rounded-3" href="#" id="navbarDropdown"
+                        role="button" data-bs-toggle="dropdown" aria-expanded="false"
+                        style="transition: all 0.2s ease;">
+                        <div class="d-flex align-items-center justify-content-center rounded-circle me-2"
+                             style="width: 36px; height: 36px; background: linear-gradient(135deg, var(--primary), #818cf8); color: #fff; font-weight: 700; font-size: 0.85rem;">
+                            S                        </div>
+                        <div class="d-none d-md-block text-start me-1">
+                            <div class="fw-bold text-dark" style="font-size: 0.85rem; line-height: 1.2;">System Administrator</div>
+                            <div class="text-muted" style="font-size: 0.7rem; text-transform: capitalize;">admin</div>
+                        </div>
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdown">
+                        <li class="dropdown-header px-3 pb-2 mb-1 border-bottom">
+                            <span class="text-muted small d-block mb-1">Signed in as</span>
+                            <span class="badge rounded-pill px-2 py-1" style="font-size: 0.68rem; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; background: var(--primary-bg-subtle); color: var(--primary);">admin</span>
+                        </li>
+                        <li><a class="dropdown-item" href="settings.php"><i class="fas fa-sliders-h me-2 text-muted"></i>Settings</a></li>
+                        <li><hr class="dropdown-divider my-1"></li>
+                        <li><a class="dropdown-item text-danger" href="login.php?logout=1&csrf_token=0396dbc7b0446977a96b226238bb5c1772c344b5afcbaf5b69b9e1ede2a8e350"><i class="fas fa-power-off me-2"></i>Logout</a></li>
+                    </ul>
+                </li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="container-fluid py-3 px-4 pos-container">
+        <div class="row h-100">
+            <!-- Left Column: Product Catalog -->
+            <div class="col-lg-8 h-100 d-flex flex-column">
+                <!-- Search Bar -->
+                <div class="row mb-3">
+                    <div class="col-12">
+                        <div class="input-group input-group-lg shadow-sm border rounded-3 overflow-hidden">
+                            <span class="input-group-text bg-white border-0"><i class="fas fa-search text-muted"></i></span>
+                            <input type="text" id="searchProduct" class="form-control border-0" placeholder="Search products by name..." onkeyup="filterProducts()" style="box-shadow: none;">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Category Navigation Pills -->
+                <div class="mb-3 d-flex overflow-x-auto pb-2" style="gap: 8px; scrollbar-width: thin; -ms-overflow-style: none;">
+                    <button class="btn btn-sm btn-primary category-pill rounded-pill px-3 fw-bold" data-category-id="all" onclick="selectCategory(this, 'all')">
+                        All (الكل)
+                    </button>
+                                            <button class="btn btn-sm btn-outline-secondary category-pill rounded-pill px-3" data-category-id="1" onclick="selectCategory(this, 1)">
+                            General                        </button>
+                                    </div>
+
+                <!-- Product Grid -->
+                <div class="product-grid-container" id="productGrid">
+                    <div class="row g-3">
+                                                                                <div class="col-md-4 col-sm-6 product-item" data-name="wireless mouse" data-category-id="1">
+                                <div class="card h-100 border-0 product-card" 
+                                                                              onclick='addToCart({"id":"1","name":"Wireless Mouse","description":"Ergonomic wireless mouse with 2.4GHz connectivity","price":"29.99","stock":"150","image_path":null,"created_at":"2026-05-23 02:35:56","updated_at":"2026-05-23 02:36:48","alert_threshold":"10","category_id":"1","category_name":"General"})'
+                                     >
+                                
+                                    <div class="card-body text-center p-4 position-relative">
+                                        <span class="badge rounded-pill bg-success stock-badge">
+                                            Stock: 150                                        </span>
+                                    
+                                        <div class="mb-3 overflow-hidden rounded-circle mx-auto shadow-sm" style="width: 80px; height: 80px;">
+                                                                                            <div class="w-100 h-100 bg-light d-flex align-items-center justify-content-center text-muted">
+                                                    <i class="fas fa-box fa-2x"></i>
+                                                </div>
+                                                                                    </div>
+
+                                        <h5 class="card-title text-dark fw-bold mb-1" style="font-size: 1.05rem; font-family: var(--font-heading);">Wireless Mouse</h5>
+                                        <p class="card-text text-primary fs-5 fw-bold mb-0">$29.99</p>
+                                    </div>
+                                                                    </div>
+                            </div>
+                                                                                <div class="col-md-4 col-sm-6 product-item" data-name="mechanical keyboard" data-category-id="1">
+                                <div class="card h-100 border-0 product-card" 
+                                                                              onclick='addToCart({"id":"2","name":"Mechanical Keyboard","description":"RGB backlit mechanical gaming keyboard","price":"89.99","stock":"74","image_path":null,"created_at":"2026-05-23 02:35:56","updated_at":"2026-05-23 02:49:19","alert_threshold":"10","category_id":"1","category_name":"General"})'
+                                     >
+                                
+                                    <div class="card-body text-center p-4 position-relative">
+                                        <span class="badge rounded-pill bg-success stock-badge">
+                                            Stock: 74                                        </span>
+                                    
+                                        <div class="mb-3 overflow-hidden rounded-circle mx-auto shadow-sm" style="width: 80px; height: 80px;">
+                                                                                            <div class="w-100 h-100 bg-light d-flex align-items-center justify-content-center text-muted">
+                                                    <i class="fas fa-box fa-2x"></i>
+                                                </div>
+                                                                                    </div>
+
+                                        <h5 class="card-title text-dark fw-bold mb-1" style="font-size: 1.05rem; font-family: var(--font-heading);">Mechanical Keyboard</h5>
+                                        <p class="card-text text-primary fs-5 fw-bold mb-0">$89.99</p>
+                                    </div>
+                                                                    </div>
+                            </div>
+                                                                                <div class="col-md-4 col-sm-6 product-item" data-name="usb-c hub" data-category-id="1">
+                                <div class="card h-100 border-0 product-card" 
+                                                                              onclick='addToCart({"id":"3","name":"USB-C Hub","description":"7-in-1 USB-C multiport adapter","price":"45.50","stock":"200","image_path":null,"created_at":"2026-05-23 02:35:56","updated_at":"2026-05-23 02:49:42","alert_threshold":"10","category_id":"1","category_name":"General"})'
+                                     >
+                                
+                                    <div class="card-body text-center p-4 position-relative">
+                                        <span class="badge rounded-pill bg-success stock-badge">
+                                            Stock: 200                                        </span>
+                                    
+                                        <div class="mb-3 overflow-hidden rounded-circle mx-auto shadow-sm" style="width: 80px; height: 80px;">
+                                                                                            <div class="w-100 h-100 bg-light d-flex align-items-center justify-content-center text-muted">
+                                                    <i class="fas fa-box fa-2x"></i>
+                                                </div>
+                                                                                    </div>
+
+                                        <h5 class="card-title text-dark fw-bold mb-1" style="font-size: 1.05rem; font-family: var(--font-heading);">USB-C Hub</h5>
+                                        <p class="card-text text-primary fs-5 fw-bold mb-0">$45.50</p>
+                                    </div>
+                                                                    </div>
+                            </div>
+                                                                                <div class="col-md-4 col-sm-6 product-item" data-name="laptop stand" data-category-id="1">
+                                <div class="card h-100 border-0 product-card" 
+                                                                              onclick='addToCart({"id":"4","name":"Laptop Stand","description":"Adjustable aluminum laptop stand","price":"34.99","stock":"120","image_path":null,"created_at":"2026-05-23 02:35:56","updated_at":"2026-05-23 02:36:48","alert_threshold":"10","category_id":"1","category_name":"General"})'
+                                     >
+                                
+                                    <div class="card-body text-center p-4 position-relative">
+                                        <span class="badge rounded-pill bg-success stock-badge">
+                                            Stock: 120                                        </span>
+                                    
+                                        <div class="mb-3 overflow-hidden rounded-circle mx-auto shadow-sm" style="width: 80px; height: 80px;">
+                                                                                            <div class="w-100 h-100 bg-light d-flex align-items-center justify-content-center text-muted">
+                                                    <i class="fas fa-box fa-2x"></i>
+                                                </div>
+                                                                                    </div>
+
+                                        <h5 class="card-title text-dark fw-bold mb-1" style="font-size: 1.05rem; font-family: var(--font-heading);">Laptop Stand</h5>
+                                        <p class="card-text text-primary fs-5 fw-bold mb-0">$34.99</p>
+                                    </div>
+                                                                    </div>
+                            </div>
+                                                                                <div class="col-md-4 col-sm-6 product-item" data-name="webcam hd" data-category-id="1">
+                                <div class="card h-100 border-0 product-card" 
+                                                                              onclick='addToCart({"id":"5","name":"Webcam HD","description":"1080p webcam with built-in microphone","price":"59.99","stock":"90","image_path":null,"created_at":"2026-05-23 02:35:56","updated_at":"2026-05-23 02:36:48","alert_threshold":"10","category_id":"1","category_name":"General"})'
+                                     >
+                                
+                                    <div class="card-body text-center p-4 position-relative">
+                                        <span class="badge rounded-pill bg-success stock-badge">
+                                            Stock: 90                                        </span>
+                                    
+                                        <div class="mb-3 overflow-hidden rounded-circle mx-auto shadow-sm" style="width: 80px; height: 80px;">
+                                                                                            <div class="w-100 h-100 bg-light d-flex align-items-center justify-content-center text-muted">
+                                                    <i class="fas fa-box fa-2x"></i>
+                                                </div>
+                                                                                    </div>
+
+                                        <h5 class="card-title text-dark fw-bold mb-1" style="font-size: 1.05rem; font-family: var(--font-heading);">Webcam HD</h5>
+                                        <p class="card-text text-primary fs-5 fw-bold mb-0">$59.99</p>
+                                    </div>
+                                                                    </div>
+                            </div>
+                                                                                <div class="col-md-4 col-sm-6 product-item" data-name="external ssd 1tb" data-category-id="1">
+                                <div class="card h-100 border-0 product-card" 
+                                                                              onclick='addToCart({"id":"6","name":"External SSD 1TB","description":"Portable solid state drive with USB 3.1","price":"119.99","stock":"60","image_path":null,"created_at":"2026-05-23 02:35:56","updated_at":"2026-05-23 02:36:48","alert_threshold":"10","category_id":"1","category_name":"General"})'
+                                     >
+                                
+                                    <div class="card-body text-center p-4 position-relative">
+                                        <span class="badge rounded-pill bg-success stock-badge">
+                                            Stock: 60                                        </span>
+                                    
+                                        <div class="mb-3 overflow-hidden rounded-circle mx-auto shadow-sm" style="width: 80px; height: 80px;">
+                                                                                            <div class="w-100 h-100 bg-light d-flex align-items-center justify-content-center text-muted">
+                                                    <i class="fas fa-box fa-2x"></i>
+                                                </div>
+                                                                                    </div>
+
+                                        <h5 class="card-title text-dark fw-bold mb-1" style="font-size: 1.05rem; font-family: var(--font-heading);">External SSD 1TB</h5>
+                                        <p class="card-text text-primary fs-5 fw-bold mb-0">$119.99</p>
+                                    </div>
+                                                                    </div>
+                            </div>
+                                                                                <div class="col-md-4 col-sm-6 product-item" data-name="wireless headset" data-category-id="1">
+                                <div class="card h-100 border-0 product-card" 
+                                                                              onclick='addToCart({"id":"7","name":"Wireless Headset","description":"Bluetooth noise-cancelling headset","price":"79.99","stock":"85","image_path":null,"created_at":"2026-05-23 02:35:56","updated_at":"2026-05-23 02:36:48","alert_threshold":"10","category_id":"1","category_name":"General"})'
+                                     >
+                                
+                                    <div class="card-body text-center p-4 position-relative">
+                                        <span class="badge rounded-pill bg-success stock-badge">
+                                            Stock: 85                                        </span>
+                                    
+                                        <div class="mb-3 overflow-hidden rounded-circle mx-auto shadow-sm" style="width: 80px; height: 80px;">
+                                                                                            <div class="w-100 h-100 bg-light d-flex align-items-center justify-content-center text-muted">
+                                                    <i class="fas fa-box fa-2x"></i>
+                                                </div>
+                                                                                    </div>
+
+                                        <h5 class="card-title text-dark fw-bold mb-1" style="font-size: 1.05rem; font-family: var(--font-heading);">Wireless Headset</h5>
+                                        <p class="card-text text-primary fs-5 fw-bold mb-0">$79.99</p>
+                                    </div>
+                                                                    </div>
+                            </div>
+                                                                                <div class="col-md-4 col-sm-6 product-item" data-name="monitor 24"" data-category-id="1">
+                                <div class="card h-100 border-0 product-card" 
+                                                                              onclick='addToCart({"id":"8","name":"Monitor 24\"","description":"Full HD IPS display with HDMI","price":"189.99","stock":"45","image_path":null,"created_at":"2026-05-23 02:35:56","updated_at":"2026-05-23 02:36:48","alert_threshold":"10","category_id":"1","category_name":"General"})'
+                                     >
+                                
+                                    <div class="card-body text-center p-4 position-relative">
+                                        <span class="badge rounded-pill bg-success stock-badge">
+                                            Stock: 45                                        </span>
+                                    
+                                        <div class="mb-3 overflow-hidden rounded-circle mx-auto shadow-sm" style="width: 80px; height: 80px;">
+                                                                                            <div class="w-100 h-100 bg-light d-flex align-items-center justify-content-center text-muted">
+                                                    <i class="fas fa-box fa-2x"></i>
+                                                </div>
+                                                                                    </div>
+
+                                        <h5 class="card-title text-dark fw-bold mb-1" style="font-size: 1.05rem; font-family: var(--font-heading);">Monitor 24&quot;</h5>
+                                        <p class="card-text text-primary fs-5 fw-bold mb-0">$189.99</p>
+                                    </div>
+                                                                    </div>
+                            </div>
+                                                                                <div class="col-md-4 col-sm-6 product-item" data-name="cable management kit" data-category-id="1">
+                                <div class="card h-100 border-0 product-card" 
+                                                                              onclick='addToCart({"id":"9","name":"Cable Management Kit","description":"Desktop cable organizer set","price":"15.99","stock":"300","image_path":null,"created_at":"2026-05-23 02:35:56","updated_at":"2026-05-23 02:36:48","alert_threshold":"10","category_id":"1","category_name":"General"})'
+                                     >
+                                
+                                    <div class="card-body text-center p-4 position-relative">
+                                        <span class="badge rounded-pill bg-success stock-badge">
+                                            Stock: 300                                        </span>
+                                    
+                                        <div class="mb-3 overflow-hidden rounded-circle mx-auto shadow-sm" style="width: 80px; height: 80px;">
+                                                                                            <div class="w-100 h-100 bg-light d-flex align-items-center justify-content-center text-muted">
+                                                    <i class="fas fa-box fa-2x"></i>
+                                                </div>
+                                                                                    </div>
+
+                                        <h5 class="card-title text-dark fw-bold mb-1" style="font-size: 1.05rem; font-family: var(--font-heading);">Cable Management Kit</h5>
+                                        <p class="card-text text-primary fs-5 fw-bold mb-0">$15.99</p>
+                                    </div>
+                                                                    </div>
+                            </div>
+                                                                                <div class="col-md-4 col-sm-6 product-item" data-name="phone holder" data-category-id="1">
+                                <div class="card h-100 border-0 product-card" 
+                                                                              onclick='addToCart({"id":"10","name":"Phone Holder","description":"Adjustable desk phone mount","price":"12.99","stock":"250","image_path":null,"created_at":"2026-05-23 02:35:56","updated_at":"2026-05-23 02:36:48","alert_threshold":"10","category_id":"1","category_name":"General"})'
+                                     >
+                                
+                                    <div class="card-body text-center p-4 position-relative">
+                                        <span class="badge rounded-pill bg-success stock-badge">
+                                            Stock: 250                                        </span>
+                                    
+                                        <div class="mb-3 overflow-hidden rounded-circle mx-auto shadow-sm" style="width: 80px; height: 80px;">
+                                                                                            <div class="w-100 h-100 bg-light d-flex align-items-center justify-content-center text-muted">
+                                                    <i class="fas fa-box fa-2x"></i>
+                                                </div>
+                                                                                    </div>
+
+                                        <h5 class="card-title text-dark fw-bold mb-1" style="font-size: 1.05rem; font-family: var(--font-heading);">Phone Holder</h5>
+                                        <p class="card-text text-primary fs-5 fw-bold mb-0">$12.99</p>
+                                    </div>
+                                                                    </div>
+                            </div>
+                                            </div>
+                </div>
+            </div>
+
+            <!-- Right Column: Cart -->
+            <div class="col-lg-4 h-100">
+                <div class="card shadow-sm border-0 rounded-4 cart-panel">
+                    <div class="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center border-bottom">
+                        <h5 class="mb-0 text-secondary fw-bold" style="font-family: var(--font-heading);"><i class="fas fa-shopping-cart me-2 text-primary"></i>Current Order</h5>
+                        <span class="badge primary-bg primary-text rounded-pill px-2.5 py-1.5" style="font-size: 0.75rem; font-weight: 700;" id="cartCount">0 Items</span>
+                    </div>
+                    
+                    <div class="card-body border-bottom py-3">
+                        <label class="form-label fw-bold mb-2"><i class="fas fa-exchange-alt me-2"></i>Transaction Type</label>
+                        <div class="btn-group w-100" role="group">
+                            <input type="radio" class="btn-check" name="orderType" id="typeSale" value="sale" checked>
+                            <label class="btn btn-outline-primary" for="typeSale"><i class="fas fa-cash-register me-1"></i> Sale</label>
+                            
+                            <input type="radio" class="btn-check" name="orderType" id="typePurchase" value="purchase">
+                            <label class="btn btn-outline-success" for="typePurchase"><i class="fas fa-box me-1"></i> Purchase</label>
+                        </div>
+                    </div>
+                    
+                    <div class="cart-items-container p-3">
+                        <table class="table table-hover align-middle mb-0">
+                            <tbody id="cartTableBody">
+                                <tr class="text-center text-muted" id="emptyCartMsg">
+                                    <td class="py-5">
+                                        <i class="fas fa-shopping-basket fa-3x mb-3 text-secondary opacity-50"></i>
+                                        <p>Select products from the left to start an order.</p>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="p-4 bg-white border-top">
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="text-muted">Subtotal</span>
+                            <span class="fw-bold" id="cartSubtotal">$0.00</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-4">
+                            <span class="fs-4 fw-bold text-dark">Total</span>
+                            <span class="fs-3 fw-bold text-success" id="cartTotal">$0.00</span>
+                        </div>
+                        
+                        <form method="POST" id="orderForm">
+                            <input type="hidden" name="csrf_token" value="0396dbc7b0446977a96b226238bb5c1772c344b5afcbaf5b69b9e1ede2a8e350">
+                            <input type="hidden" name="cart_data" id="cartDataInput">
+                            <input type="hidden" name="complete_order" value="1">
+                            <input type="hidden" name="order_type" id="orderTypeInput" value="sale">
+                            
+                            <!-- Customer Selection Dropdown -->
+                            <div class="mb-3" id="formCustomerGroup">
+                                <label for="customerSelect" class="form-label fw-bold mb-1 text-secondary"><i class="fas fa-user me-1 text-primary"></i> Customer</label>
+                                <select class="form-select rounded-3" name="customer_id" id="customerSelect">
+                                                                            <option value="1">Walk-in Customer - 0000000000</option>
+                                                                    </select>
+                            </div>
+
+                            <!-- Supplier Selection Dropdown -->
+                            <div class="mb-3" id="formSupplierGroup" style="display: none;">
+                                <label for="supplierSelect" class="form-label fw-bold mb-1 text-secondary"><i class="fas fa-truck me-1 text-success"></i> Supplier</label>
+                                <select class="form-select rounded-3" name="supplier_id" id="supplierSelect">
+                                                                            <option value="1">General Supplier - 0000000000</option>
+                                                                    </select>
+                            </div>
+
+                            <button type="button" class="btn btn-success w-100 py-3 fs-5 fw-bold shadow-sm" onclick="submitOrder()">
+                                <i class="fas fa-check-circle me-2"></i>Complete Order
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<script>
+    // --- POS Logic ---
+    let cart = [];
+    let orderType = 'sale'; // Default to sale
+
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('input[name="orderType"]').forEach(radio => {
+            radio.addEventListener('change', function() {
+                orderType = this.value;
+                document.getElementById('orderTypeInput').value = orderType;
+                
+                // Toggle visible selector groups dynamically
+                if (orderType === 'sale') {
+                    document.getElementById('formCustomerGroup').style.display = 'block';
+                    document.getElementById('formSupplierGroup').style.display = 'none';
+                } else {
+                    document.getElementById('formCustomerGroup').style.display = 'none';
+                    document.getElementById('formSupplierGroup').style.display = 'block';
+                }
+                
+                // Clear cart when transaction type changes to prevent stock validation confusion
+                cart = [];
+                renderCart();
+            });
+        });
+    });
+
+    function addToCart(product) {
+        if (orderType === 'sale' && product.stock <= 0) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Out of Stock',
+                text: 'This product is currently out of stock!',
+                confirmButtonColor: '#198754'
+            });
+            return;
+        }
+
+        const existingItem = cart.find(item => item.id === product.id);
+
+        if (existingItem) {
+            if (orderType === 'sale' && existingItem.qty >= product.stock) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Stock Limit Reached',
+                    text: `Cannot add more. Only ${product.stock} in stock!`,
+                    confirmButtonColor: '#198754'
+                });
+                return;
+            }
+            existingItem.qty++;
+        } else {
+            cart.push({
+                id: product.id,
+                name: product.name,
+                price: parseFloat(product.price),
+                stock: parseInt(product.stock),
+                qty: 1
+            });
+        }
+        renderCart();
+    }
+
+    function updateQty(index, delta) {
+        const item = cart[index];
+        const newQty = item.qty + delta;
+
+        if (orderType === 'sale' && newQty > item.stock) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Stock Limit',
+                text: `Max stock available: ${item.stock}`,
+                confirmButtonColor: '#198754'
+            });
+            return;
+        }
+
+        if (newQty <= 0) {
+            removeFromCart(index);
+            return;
+        }
+
+        item.qty = newQty;
+        renderCart();
+    }
+
+    function removeFromCart(index) {
+        cart.splice(index, 1);
+        renderCart();
+    }
+
+    function renderCart() {
+        const tbody = document.getElementById('cartTableBody');
+        const subtotalEl = document.getElementById('cartSubtotal');
+        const totalEl = document.getElementById('cartTotal');
+        const countEl = document.getElementById('cartCount');
+        const dataInput = document.getElementById('cartDataInput');
+
+        tbody.innerHTML = '';
+
+        let total = 0;
+        let itemCount = 0;
+
+        if (cart.length === 0) {
+            tbody.innerHTML = `
+                <tr class="text-center text-muted" id="emptyCartMsg">
+                    <td class="py-5">
+                        <i class="fas fa-shopping-basket fa-3x mb-3 text-secondary opacity-50"></i>
+                        <p class="small mb-0">Select products from the left to start an order.</p>
+                    </td>
+                </tr>`;
+        } else {
+            cart.forEach((item, index) => {
+                const lineTotal = item.price * item.qty;
+                total += lineTotal;
+                itemCount += item.qty;
+
+                tbody.innerHTML += `
+                    <tr class="cart-item-row">
+                        <td>
+                            <div class="fw-bold text-dark mb-0">${item.name}</div>
+                            <small class="text-muted">$${item.price.toFixed(2)}</small>
+                        </td>
+                        <td width="100">
+                            <div class="d-flex align-items-center justify-content-center">
+                                <button type="button" class="cart-qty-btn" onclick="updateQty(${index}, -1)">-</button>
+                                <input type="text" class="cart-qty-input" value="${item.qty}" readonly>
+                                <button type="button" class="cart-qty-btn" onclick="updateQty(${index}, 1)">+</button>
+                            </div>
+                        </td>
+                        <td class="text-end fw-bold text-dark">$${lineTotal.toFixed(2)}</td>
+                        <td class="text-end" width="40">
+                            <button type="button" class="btn btn-sm text-danger p-0" onclick="removeFromCart(${index})">
+                                <i class="fas fa-trash-alt"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        const formattedTotal = '$' + total.toFixed(2);
+        subtotalEl.innerText = formattedTotal;
+        totalEl.innerText = formattedTotal;
+        countEl.innerText = itemCount + ' Items';
+        dataInput.value = JSON.stringify(cart);
+    }
+
+    let activeCategoryId = 'all';
+
+    function selectCategory(el, catId) {
+        activeCategoryId = catId;
+        
+        // Remove primary from all pills and add outline
+        document.querySelectorAll('.category-pill').forEach(pill => {
+            pill.classList.remove('btn-primary');
+            pill.classList.add('btn-outline-secondary');
+            pill.classList.remove('fw-bold');
+        });
+        
+        // Mark current pill as active
+        el.classList.remove('btn-outline-secondary');
+        el.classList.add('btn-primary');
+        el.classList.add('fw-bold');
+        
+        filterProducts();
+    }
+
+    function filterProducts() {
+        const query = document.getElementById('searchProduct').value.toLowerCase();
+        const items = document.querySelectorAll('.product-item');
+
+        items.forEach(item => {
+            const name = item.dataset.name;
+            const categoryId = item.dataset.categoryId;
+            
+            const matchesQuery = name.includes(query);
+            const matchesCategory = (activeCategoryId === 'all' || categoryId == activeCategoryId);
+            
+            if (matchesQuery && matchesCategory) {
+                item.style.display = 'block';
+            } else {
+                item.style.display = 'none';
+            }
+        });
+    }
+
+    function submitOrder() {
+        if (cart.length === 0) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Cart Empty',
+                text: 'Please add products to the cart first!',
+                confirmButtonColor: '#198754'
+            });
+            return;
+        }
+        
+        const typeText = orderType === 'sale' ? 'Sale' : 'Purchase';
+        const icon = orderType === 'sale' ? 'question' : 'info';
+        
+        Swal.fire({
+            title: `Complete ${typeText}?`,
+            text: `Process this ${typeText.toLowerCase()} transaction?`,
+            icon: icon,
+            showCancelButton: true,
+            confirmButtonColor: '#198754',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: 'Yes, complete it!',
+            cancelButtonText: 'Cancel'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                document.getElementById('orderForm').submit();
+            }
+        });
+    }
+</script>
+    </div> <!-- /#page-content-wrapper -->
+</div> <!-- /#wrapper -->
+
+<!-- Bootstrap 5 Bundle JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+            <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11.10.0/dist/sweetalert2.all.min.js"></script>
+    <!-- Custom JS -->
+<script src="assets/js/script.js"></script>
+<script>
+    var el = document.getElementById("wrapper");
+    var toggleButton = document.getElementById("menu-toggle");
+
+    if (toggleButton && el) {
+        toggleButton.onclick = function () {
+            el.classList.toggle("toggled");
+        };
+    }
+</script>
+</body>
+</html>
+

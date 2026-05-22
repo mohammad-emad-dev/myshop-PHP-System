@@ -1,34 +1,143 @@
-<?php
-require_once '../includes/functions.php';
-start_secure_session();
-require_once '../config/db.php';
-
-verify_login();
-
-$stats = get_dashboard_stats($conn);
-$chart_data = get_chart_data($conn);
-$inventory_valuation = get_inventory_valuation($conn);
-$top_selling_products = get_top_selling_products($conn, 5);
-$category_sales = get_category_sales_distribution($conn);
-
-$page_title = 'Dashboard';
-$active_page = 'dashboard';
-$header_title = 'Dashboard';
-$extra_js = ['https://cdn.jsdelivr.net/npm/chart.js'];
-
-require_once '../includes/layouts/header.php';
-?>
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - myshop</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet">
+    <!-- Google Fonts: Outfit & Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+        <!-- Custom CSS -->
+    <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body class="bg-light">
 
 <div class="d-flex" id="wrapper">
-    <?php require_once '../includes/layouts/sidebar.php'; ?>
-    <?php require_once '../includes/layouts/navbar.php'; ?>
+    <!-- Sidebar -->
+<div id="sidebar-wrapper">
+    <div class="sidebar-heading">
+        <i class="fas fa-cubes"></i>myshop
+    </div>
+    <div class="list-group list-group-flush">
+        <div class="sidebar-section-label">Main</div>
+        <a href="index.php" class="list-group-item active">
+            <i class="fas fa-th-large"></i>Dashboard
+        </a>
+        <a href="products.php" class="list-group-item ">
+            <i class="fas fa-box-open"></i>Products
+        </a>
+                <a href="categories.php" class="list-group-item ">
+            <i class="fas fa-layer-group"></i>Categories
+        </a>
+        
+        <div class="sidebar-section-label">Sales</div>
+        <a href="orders.php" class="list-group-item ">
+            <i class="fas fa-cash-register"></i>Orders (POS)
+        </a>
+        <a href="order_history.php" class="list-group-item ">
+            <i class="fas fa-receipt"></i>Order History
+        </a>
+        <a href="stock_movements.php" class="list-group-item ">
+            <i class="fas fa-chart-line"></i>Stock Ledger
+        </a>
+
+        <div class="sidebar-section-label">People</div>
+        <a href="customers.php" class="list-group-item ">
+            <i class="fas fa-user-friends"></i>Customers
+        </a>
+        <a href="suppliers.php" class="list-group-item ">
+            <i class="fas fa-truck-loading"></i>Suppliers
+        </a>
+
+        <div class="sidebar-section-label">System</div>
+        <a href="settings.php" class="list-group-item ">
+            <i class="fas fa-sliders-h"></i>Settings
+        </a>
+        <a href="login.php?logout=1&csrf_token=0396dbc7b0446977a96b226238bb5c1772c344b5afcbaf5b69b9e1ede2a8e350"
+           class="list-group-item sidebar-logout mt-auto"
+           onclick="return confirm('Are you sure you want to logout?');">
+            <i class="fas fa-power-off"></i>Logout
+        </a>
+    </div>
+</div>
+<!-- /#sidebar-wrapper -->
+    <!-- Page Content Wrapper -->
+<div id="page-content-wrapper">
+    <nav class="navbar navbar-expand-lg navbar-light px-4">
+        <div class="d-flex align-items-center">
+            <i class="fas fa-bars fs-5 me-3" id="menu-toggle"></i>
+            <div>
+                <h2 class="m-0">Dashboard</h2>
+            </div>
+        </div>
+
+        <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse"
+            data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent"
+            aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <div class="collapse navbar-collapse" id="navbarSupportedContent">
+            <ul class="navbar-nav ms-auto mb-2 mb-lg-0 align-items-center">
+                                <!-- Notification Bell Dropdown -->
+                <li class="nav-item dropdown me-2 align-self-center list-unstyled">
+                    <a class="nav-link position-relative" href="#" id="notificationDropdown"
+                        role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="fas fa-bell fs-5 text-secondary"></i>
+                                            </a>
+                    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="notificationDropdown" style="width: 340px; max-height: 420px; overflow-y: auto;">
+                        <li class="px-3 py-2 border-bottom d-flex justify-content-between align-items-center">
+                            <span class="fw-bold text-dark" style="font-size: 0.9rem;">Notifications</span>
+                                                    </li>
+                                                    <li class="text-center py-4 text-muted">
+                                <i class="fas fa-check-circle text-success fs-2 d-block mb-2"></i>
+                                <p class="mb-0 small fw-500">All products well stocked!</p>
+                            </li>
+                                            </ul>
+                </li>
+
+                <!-- Separator -->
+                <li class="nav-item d-none d-lg-flex align-self-center mx-2">
+                    <div style="width: 1px; height: 28px; background: var(--slate-200);"></div>
+                </li>
+
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle d-flex align-items-center py-1 px-2 rounded-3" href="#" id="navbarDropdown"
+                        role="button" data-bs-toggle="dropdown" aria-expanded="false"
+                        style="transition: all 0.2s ease;">
+                        <div class="d-flex align-items-center justify-content-center rounded-circle me-2"
+                             style="width: 36px; height: 36px; background: linear-gradient(135deg, var(--primary), #818cf8); color: #fff; font-weight: 700; font-size: 0.85rem;">
+                            S                        </div>
+                        <div class="d-none d-md-block text-start me-1">
+                            <div class="fw-bold text-dark" style="font-size: 0.85rem; line-height: 1.2;">System Administrator</div>
+                            <div class="text-muted" style="font-size: 0.7rem; text-transform: capitalize;">admin</div>
+                        </div>
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdown">
+                        <li class="dropdown-header px-3 pb-2 mb-1 border-bottom">
+                            <span class="text-muted small d-block mb-1">Signed in as</span>
+                            <span class="badge rounded-pill px-2 py-1" style="font-size: 0.68rem; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; background: var(--primary-bg-subtle); color: var(--primary);">admin</span>
+                        </li>
+                        <li><a class="dropdown-item" href="settings.php"><i class="fas fa-sliders-h me-2 text-muted"></i>Settings</a></li>
+                        <li><hr class="dropdown-divider my-1"></li>
+                        <li><a class="dropdown-item text-danger" href="login.php?logout=1&csrf_token=0396dbc7b0446977a96b226238bb5c1772c344b5afcbaf5b69b9e1ede2a8e350"><i class="fas fa-power-off me-2"></i>Logout</a></li>
+                    </ul>
+                </li>
+            </ul>
+        </div>
+    </nav>
 
     <div class="container-fluid px-4 py-4">
         <div class="row g-3 my-2">
             <div class="col-xl col-md-4 col-sm-6">
                 <div class="p-4 bg-white shadow-sm d-flex justify-content-between align-items-center rounded-3 dashboard-card border-left-primary h-100">
                     <div>
-                        <h3 class="fs-2 mb-1" style="font-family: var(--font-heading); font-weight: 800; color: var(--slate-900);"><?php echo number_format($stats['total_products']); ?></h3>
+                        <h3 class="fs-2 mb-1" style="font-family: var(--font-heading); font-weight: 800; color: var(--slate-900);">10</h3>
                         <p class="fs-6 text-muted mb-0 fw-medium">Products</p>
                     </div>
                     <div class="rounded-full primary-bg p-3 d-flex align-items-center justify-content-center" style="width: 52px; height: 52px;">
@@ -40,7 +149,7 @@ require_once '../includes/layouts/header.php';
             <div class="col-xl col-md-4 col-sm-6">
                 <div class="p-4 bg-white shadow-sm d-flex justify-content-between align-items-center rounded-3 dashboard-card border-left-success h-100">
                     <div>
-                        <h3 class="fs-2 mb-1" style="font-family: var(--font-heading); font-weight: 800; color: var(--slate-900);"><?php echo number_format($stats['total_orders']); ?></h3>
+                        <h3 class="fs-2 mb-1" style="font-family: var(--font-heading); font-weight: 800; color: var(--slate-900);">5</h3>
                         <p class="fs-6 text-muted mb-0 fw-medium">Orders</p>
                     </div>
                     <div class="rounded-full success-bg p-3 d-flex align-items-center justify-content-center" style="width: 52px; height: 52px;">
@@ -52,7 +161,7 @@ require_once '../includes/layouts/header.php';
             <div class="col-xl col-md-4 col-sm-6">
                 <div class="p-4 bg-white shadow-sm d-flex justify-content-between align-items-center rounded-3 dashboard-card border-left-info h-100">
                     <div>
-                        <h3 class="fs-2 mb-1" style="font-family: var(--font-heading); font-weight: 800; color: var(--slate-900);">$<?php echo number_format($stats['total_sales'], 2); ?></h3>
+                        <h3 class="fs-2 mb-1" style="font-family: var(--font-heading); font-weight: 800; color: var(--slate-900);">$782.42</h3>
                         <p class="fs-6 text-muted mb-0 fw-medium">Sales</p>
                     </div>
                     <div class="rounded-full info-bg p-3 d-flex align-items-center justify-content-center" style="width: 52px; height: 52px;">
@@ -64,7 +173,7 @@ require_once '../includes/layouts/header.php';
             <div class="col-xl col-md-6 col-sm-6">
                 <div class="p-4 bg-white shadow-sm d-flex justify-content-between align-items-center rounded-3 dashboard-card border-left-warning h-100">
                     <div>
-                        <h3 class="fs-2 mb-1" style="font-family: var(--font-heading); font-weight: 800; color: var(--slate-900);"><?php echo number_format($stats['total_stock']); ?></h3>
+                        <h3 class="fs-2 mb-1" style="font-family: var(--font-heading); font-weight: 800; color: var(--slate-900);">1,374</h3>
                         <p class="fs-6 text-muted mb-0 fw-medium">Total Stock</p>
                     </div>
                     <div class="rounded-full warning-bg p-3 d-flex align-items-center justify-content-center" style="width: 52px; height: 52px;">
@@ -76,7 +185,7 @@ require_once '../includes/layouts/header.php';
             <div class="col-xl col-md-6 col-sm-12">
                 <div class="p-4 bg-white shadow-sm d-flex justify-content-between align-items-center rounded-3 dashboard-card border-left-purple h-100">
                     <div>
-                        <h3 class="fs-2 mb-1" style="font-family: var(--font-heading); font-weight: 800; color: var(--slate-900);">$<?php echo number_format($inventory_valuation, 2); ?></h3>
+                        <h3 class="fs-2 mb-1" style="font-family: var(--font-heading); font-weight: 800; color: var(--slate-900);">$60,448.26</h3>
                         <p class="fs-6 text-muted mb-0 fw-medium">Valuation</p>
                     </div>
                     <div class="rounded-full purple-bg p-3 d-flex align-items-center justify-content-center" style="width: 52px; height: 52px;">
@@ -117,34 +226,72 @@ require_once '../includes/layouts/header.php';
                         </h5>
                     </div>
                     <div class="card-body p-4">
-                        <?php if (!empty($top_selling_products)): ?>
-                            <?php 
-                            $max_qty = max(array_column($top_selling_products, 'total_qty'));
-                            foreach ($top_selling_products as $index => $tp): 
-                                $percentage = $max_qty > 0 ? round(($tp['total_qty'] / $max_qty) * 100) : 0;
-                            ?>
-                                <div class="mb-3">
+                                                                                    <div class="mb-3">
                                     <div class="d-flex justify-content-between align-items-center mb-1">
                                         <span class="fw-bold text-dark">
-                                            <span class="badge bg-light text-secondary me-2">#<?php echo $index + 1; ?></span>
-                                            <?php echo htmlspecialchars($tp['name']); ?>
-                                        </span>
+                                            <span class="badge bg-light text-secondary me-2">#1</span>
+                                            Wireless Mouse                                        </span>
                                         <span class="text-muted small fw-bold">
-                                            <?php echo number_format($tp['total_qty']); ?> sold ($<?php echo number_format($tp['total_sales'], 2); ?>)
+                                            2 sold ($59.98)
                                         </span>
                                     </div>
                                     <div class="progress rounded-pill" style="height: 6px; background-color: var(--slate-100);">
-                                        <div class="progress-bar rounded-pill" role="progressbar" style="width: <?php echo $percentage; ?>%; background-color: var(--primary) !important;" aria-valuenow="<?php echo $percentage; ?>" aria-valuemin="0" aria-valuemax="100"></div>
+                                        <div class="progress-bar rounded-pill" role="progressbar" style="width: 100%; background-color: var(--primary) !important;" aria-valuenow="100" aria-valuemin="0" aria-valuemax="100"></div>
                                     </div>
                                 </div>
-                            <?php endforeach; ?>
-                        <?php else: ?>
-                            <div class="text-center py-4 text-muted">
-                                <i class="fas fa-info-circle fs-1 mb-2 text-secondary"></i>
-                                <p class="mb-0">No sales data recorded yet.</p>
-                            </div>
-                        <?php endif; ?>
-                    </div>
+                                                            <div class="mb-3">
+                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                        <span class="fw-bold text-dark">
+                                            <span class="badge bg-light text-secondary me-2">#2</span>
+                                            USB-C Hub                                        </span>
+                                        <span class="text-muted small fw-bold">
+                                            2 sold ($91.00)
+                                        </span>
+                                    </div>
+                                    <div class="progress rounded-pill" style="height: 6px; background-color: var(--slate-100);">
+                                        <div class="progress-bar rounded-pill" role="progressbar" style="width: 100%; background-color: var(--primary) !important;" aria-valuenow="100" aria-valuemin="0" aria-valuemax="100"></div>
+                                    </div>
+                                </div>
+                                                            <div class="mb-3">
+                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                        <span class="fw-bold text-dark">
+                                            <span class="badge bg-light text-secondary me-2">#3</span>
+                                            Mechanical Keyboard                                        </span>
+                                        <span class="text-muted small fw-bold">
+                                            2 sold ($179.98)
+                                        </span>
+                                    </div>
+                                    <div class="progress rounded-pill" style="height: 6px; background-color: var(--slate-100);">
+                                        <div class="progress-bar rounded-pill" role="progressbar" style="width: 100%; background-color: var(--primary) !important;" aria-valuenow="100" aria-valuemin="0" aria-valuemax="100"></div>
+                                    </div>
+                                </div>
+                                                            <div class="mb-3">
+                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                        <span class="fw-bold text-dark">
+                                            <span class="badge bg-light text-secondary me-2">#4</span>
+                                            Cable Management Kit                                        </span>
+                                        <span class="text-muted small fw-bold">
+                                            1 sold ($15.99)
+                                        </span>
+                                    </div>
+                                    <div class="progress rounded-pill" style="height: 6px; background-color: var(--slate-100);">
+                                        <div class="progress-bar rounded-pill" role="progressbar" style="width: 50%; background-color: var(--primary) !important;" aria-valuenow="50" aria-valuemin="0" aria-valuemax="100"></div>
+                                    </div>
+                                </div>
+                                                            <div class="mb-3">
+                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                        <span class="fw-bold text-dark">
+                                            <span class="badge bg-light text-secondary me-2">#5</span>
+                                            Monitor 24&quot;                                        </span>
+                                        <span class="text-muted small fw-bold">
+                                            1 sold ($189.99)
+                                        </span>
+                                    </div>
+                                    <div class="progress rounded-pill" style="height: 6px; background-color: var(--slate-100);">
+                                        <div class="progress-bar rounded-pill" role="progressbar" style="width: 50%; background-color: var(--primary) !important;" aria-valuenow="50" aria-valuemin="0" aria-valuemax="100"></div>
+                                    </div>
+                                </div>
+                                                                        </div>
                 </div>
             </div>
             
@@ -156,155 +303,53 @@ require_once '../includes/layouts/header.php';
                         </h5>
                     </div>
                     <div class="card-body p-4 d-flex flex-column justify-content-center">
-                        <?php if (!empty($category_sales)): ?>
-                            <div style="position: relative; height: 250px;">
+                                                    <div style="position: relative; height: 250px;">
                                 <canvas id="categoryChart"></canvas>
                             </div>
-                        <?php else: ?>
-                            <div class="text-center py-4 text-muted">
-                                <i class="fas fa-info-circle fs-1 mb-2 text-secondary"></i>
-                                <p class="mb-0">No sales distribution data available.</p>
-                            </div>
-                        <?php endif; ?>
-                    </div>
+                                            </div>
                 </div>
             </div>
         </div>
 
         <!-- Low Stock Alerts Panel -->
-        <?php
-        $low_stock_products = get_low_stock_products($conn);
-        $total_low_stock = count($low_stock_products);
-        ?>
-        <div class="row my-4">
+                <div class="row my-4">
             <div class="col-md-12">
                 <div class="card shadow-sm border-0 rounded-4">
                     <div class="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center">
                         <h5 class="mb-0 text-secondary fw-bold">
                             <i class="fas fa-exclamation-triangle text-danger me-2"></i>Low Stock Inventory Alerts
                         </h5>
-                        <?php if ($total_low_stock > 0): ?>
-                            <span class="badge bg-danger rounded-pill px-3 py-2"><?php echo $total_low_stock; ?> Action Required</span>
-                        <?php else: ?>
-                            <span class="badge bg-success rounded-pill px-3 py-2">All Stock Stable</span>
-                        <?php endif; ?>
-                    </div>
+                                                    <span class="badge bg-success rounded-pill px-3 py-2">All Stock Stable</span>
+                                            </div>
                     <div class="card-body p-4">
-                        <?php if ($total_low_stock > 0): ?>
-                            <div class="table-responsive">
-                                <table class="table table-hover align-middle mb-0">
-                                    <thead class="bg-light text-secondary">
-                                        <tr>
-                                            <th scope="col">Product ID</th>
-                                            <th scope="col">Product Name</th>
-                                            <th scope="col" class="text-center">Current Stock</th>
-                                            <th scope="col" class="text-center">Alert Threshold</th>
-                                            <th scope="col" class="text-end">Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <?php foreach ($low_stock_products as $p): ?>
-                                            <tr>
-                                                <td>#<?php echo $p['id']; ?></td>
-                                                <td class="fw-bold">
-                                                    <?php if ($p['image_path']): ?>
-                                                        <img src="<?php echo htmlspecialchars($p['image_path']); ?>" class="rounded me-2" style="width: 35px; height: 35px; object-fit: cover;" alt="">
-                                                    <?php endif; ?>
-                                                    <?php echo htmlspecialchars($p['name']); ?>
-                                                </td>
-                                                <td class="text-center">
-                                                    <span class="badge rounded-pill bg-danger-subtle text-danger px-2.5 py-1.5 fw-bold fs-7">
-                                                        <?php echo $p['stock']; ?>
-                                                    </span>
-                                                </td>
-                                                <td class="text-center fw-bold text-secondary"><?php echo $p['alert_threshold']; ?></td>
-                                                <td class="text-end">
-                                                    <a href="orders.php?purchase_product_id=<?php echo $p['id']; ?>" class="btn btn-sm btn-success rounded-3 fw-bold">
-                                                        <i class="fas fa-plus me-1"></i> Restock
-                                                    </a>
-                                                    <?php if (is_admin()): ?>
-                                                    <a href="products.php?highlight=<?php echo $p['id']; ?>" class="btn btn-sm btn-outline-secondary rounded-3 ms-1 fw-bold">
-                                                        <i class="fas fa-edit me-1"></i> Edit Threshold
-                                                    </a>
-                                                    <?php endif; ?>
-                                                </td>
-                                            </tr>
-                                        <?php endforeach; ?>
-                                    </tbody>
-                                </table>
-                            </div>
-                        <?php else: ?>
-                            <div class="text-center py-4 text-muted">
+                                                    <div class="text-center py-4 text-muted">
                                 <i class="fas fa-check-circle text-success fs-1 mb-2"></i>
                                 <p class="mb-0 fw-bold">Awesome! All product stock levels are above their thresholds.</p>
                             </div>
-                        <?php endif; ?>
-                    </div>
+                                            </div>
                 </div>
             </div>
         </div>
 
         <div class="row my-5">
-            <h3 class="fs-5 mb-3 fw-bold" style="font-family: var(--font-heading); color: var(--slate-700);"><i class="fas fa-bolt me-2 text-warning"></i>Quick Actions</h3>
-            <div class="col-lg-3 col-md-6 mb-3">
-                <a href="products.php" class="text-decoration-none">
-                    <div class="card border-0 h-100 shadow-sm" style="background: linear-gradient(135deg, #6366f1, #818cf8); border-radius: var(--radius-lg); transition: all 0.3s ease;">
-                        <div class="card-body p-4 text-white">
-                            <div class="d-flex align-items-center mb-3">
-                                <div class="rounded-circle d-flex align-items-center justify-content-center" style="width:48px;height:48px;background:rgba(255,255,255,0.2);">
-                                    <i class="fas fa-box-open fs-5"></i>
-                                </div>
-                            </div>
-                            <h5 class="fw-bold mb-1" style="font-family:var(--font-heading);color:#fff;">Products</h5>
-                            <p class="mb-0 small" style="opacity:0.85;">Add, edit & manage inventory items</p>
-                        </div>
+            <h3 class="fs-4 mb-3 text-secondary">Quick Actions</h3>
+            <div class="col-md-6">
+                <div class="card shadow-sm border-0">
+                    <div class="card-body p-4">
+                        <h5 class="card-title text-primary"><i class="fas fa-box me-2"></i>Product Management</h5>
+                        <p class="card-text text-muted">View, add, edit, and manage all products in your inventory.</p>
+                        <a href="products.php" class="btn btn-primary"><i class="fas fa-arrow-right me-2"></i>Manage Products</a>
                     </div>
-                </a>
+                </div>
             </div>
-            <div class="col-lg-3 col-md-6 mb-3">
-                <a href="orders.php" class="text-decoration-none">
-                    <div class="card border-0 h-100 shadow-sm" style="background: linear-gradient(135deg, #10b981, #34d399); border-radius: var(--radius-lg); transition: all 0.3s ease;">
-                        <div class="card-body p-4 text-white">
-                            <div class="d-flex align-items-center mb-3">
-                                <div class="rounded-circle d-flex align-items-center justify-content-center" style="width:48px;height:48px;background:rgba(255,255,255,0.2);">
-                                    <i class="fas fa-cash-register fs-5"></i>
-                                </div>
-                            </div>
-                            <h5 class="fw-bold mb-1" style="font-family:var(--font-heading);color:#fff;">POS Terminal</h5>
-                            <p class="mb-0 small" style="opacity:0.85;">Process sales & purchase orders</p>
-                        </div>
+            <div class="col-md-6">
+                <div class="card shadow-sm border-0">
+                    <div class="card-body p-4">
+                        <h5 class="card-title text-success"><i class="fas fa-shopping-cart me-2"></i>Order Processing</h5>
+                        <p class="card-text text-muted">Create new orders and view order history with details.</p>
+                        <a href="orders.php" class="btn btn-success"><i class="fas fa-arrow-right me-2"></i>Manage Orders</a>
                     </div>
-                </a>
-            </div>
-            <div class="col-lg-3 col-md-6 mb-3">
-                <a href="customers.php" class="text-decoration-none">
-                    <div class="card border-0 h-100 shadow-sm" style="background: linear-gradient(135deg, #8b5cf6, #a78bfa); border-radius: var(--radius-lg); transition: all 0.3s ease;">
-                        <div class="card-body p-4 text-white">
-                            <div class="d-flex align-items-center mb-3">
-                                <div class="rounded-circle d-flex align-items-center justify-content-center" style="width:48px;height:48px;background:rgba(255,255,255,0.2);">
-                                    <i class="fas fa-user-friends fs-5"></i>
-                                </div>
-                            </div>
-                            <h5 class="fw-bold mb-1" style="font-family:var(--font-heading);color:#fff;">Customers</h5>
-                            <p class="mb-0 small" style="opacity:0.85;">Manage customer records & contacts</p>
-                        </div>
-                    </div>
-                </a>
-            </div>
-            <div class="col-lg-3 col-md-6 mb-3">
-                <a href="order_history.php" class="text-decoration-none">
-                    <div class="card border-0 h-100 shadow-sm" style="background: linear-gradient(135deg, #06b6d4, #22d3ee); border-radius: var(--radius-lg); transition: all 0.3s ease;">
-                        <div class="card-body p-4 text-white">
-                            <div class="d-flex align-items-center mb-3">
-                                <div class="rounded-circle d-flex align-items-center justify-content-center" style="width:48px;height:48px;background:rgba(255,255,255,0.2);">
-                                    <i class="fas fa-chart-bar fs-5"></i>
-                                </div>
-                            </div>
-                            <h5 class="fw-bold mb-1" style="font-family:var(--font-heading);color:#fff;">Reports</h5>
-                            <p class="mb-0 small" style="opacity:0.85;">View history & export CSV reports</p>
-                        </div>
-                    </div>
-                </a>
+                </div>
             </div>
         </div>
     </div>
@@ -317,7 +362,7 @@ require_once '../includes/layouts/header.php';
                 return;
             }
 
-            const chartData = <?php echo json_encode($chart_data); ?>;
+            const chartData = [{"label":"May 17","sales":0,"purchases":0},{"label":"May 18","sales":0,"purchases":0},{"label":"May 19","sales":0,"purchases":0},{"label":"May 20","sales":0,"purchases":0},{"label":"May 21","sales":0,"purchases":0},{"label":"May 22","sales":0,"purchases":0},{"label":"May 23","sales":135.49,"purchases":45.5}];
             if (!chartData || chartData.length === 0) {
                 return;
             }
@@ -452,7 +497,7 @@ require_once '../includes/layouts/header.php';
             });
 
             // Category Sales Doughnut Chart
-            const categoryData = <?php echo json_encode($category_sales); ?>;
+            const categoryData = [{"category_name":"General","total_sales":"736.92"}];
             if (categoryData && categoryData.length > 0) {
                 const catCtx = document.getElementById('categoryChart').getContext('2d');
                 const catLabels = categoryData.map(item => item.category_name);
@@ -533,6 +578,24 @@ require_once '../includes/layouts/header.php';
         });
     </script>
 
-<?php
-require_once '../includes/layouts/footer.php';
-?>
+    </div> <!-- /#page-content-wrapper -->
+</div> <!-- /#wrapper -->
+
+<!-- Bootstrap 5 Bundle JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+            <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Custom JS -->
+<script src="assets/js/script.js"></script>
+<script>
+    var el = document.getElementById("wrapper");
+    var toggleButton = document.getElementById("menu-toggle");
+
+    if (toggleButton && el) {
+        toggleButton.onclick = function () {
+            el.classList.toggle("toggled");
+        };
+    }
+</script>
+</body>
+</html>
+

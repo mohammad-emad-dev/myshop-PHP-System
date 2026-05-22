@@ -150,7 +150,12 @@ require_once '../includes/layouts/header.php';
                 <div class="card shadow-sm border-0 rounded-4 cart-panel">
                     <div class="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center border-bottom">
                         <h5 class="mb-0 text-secondary fw-bold" style="font-family: var(--font-heading);"><i class="fas fa-shopping-cart me-2 text-primary"></i>Current Order</h5>
-                        <span class="badge primary-bg primary-text rounded-pill px-2.5 py-1.5" style="font-size: 0.75rem; font-weight: 700;" id="cartCount">0 Items</span>
+                        <div class="d-flex align-items-center gap-2">
+                            <button type="button" class="btn btn-sm btn-outline-danger rounded-pill px-2 py-1" id="clearCartBtn" style="display:none;font-size:0.72rem;" onclick="clearCart()">
+                                <i class="fas fa-times me-1"></i>Clear
+                            </button>
+                            <span class="badge primary-bg primary-text rounded-pill px-2 py-1" style="font-size: 0.75rem; font-weight: 700;" id="cartCount">0 Items</span>
+                        </div>
                     </div>
                     
                     <div class="card-body border-bottom py-3">
@@ -374,6 +379,35 @@ $extra_js = [
         totalEl.innerText = formattedTotal;
         countEl.innerText = itemCount + ' Items';
         dataInput.value = JSON.stringify(cart);
+
+        // Toggle clear cart button & complete button animation
+        const clearBtn = document.getElementById('clearCartBtn');
+        const completeBtn = document.querySelector('#orderForm button[type="button"]');
+        if (cart.length > 0) {
+            clearBtn.style.display = 'inline-block';
+            completeBtn.classList.add('pulse-btn');
+        } else {
+            clearBtn.style.display = 'none';
+            completeBtn.classList.remove('pulse-btn');
+        }
+    }
+
+    function clearCart() {
+        if (cart.length === 0) return;
+        Swal.fire({
+            title: 'Clear Cart?',
+            text: 'Remove all items from the current order?',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#ef4444',
+            cancelButtonColor: '#64748b',
+            confirmButtonText: 'Yes, clear it'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                cart = [];
+                renderCart();
+            }
+        });
     }
 
     let activeCategoryId = 'all';
@@ -445,6 +479,32 @@ $extra_js = [
         });
     }
 </script>
+<?php if (!empty($success)): ?>
+<script>
+    window.addEventListener('load', function() {
+        Swal.fire({
+            icon: 'success',
+            title: 'Order Completed!',
+            text: <?php echo json_encode($success); ?>,
+            confirmButtonColor: '#6366f1',
+            timer: 4000,
+            timerProgressBar: true
+        });
+    });
+</script>
+<?php endif; ?>
+<?php if (!empty($error)): ?>
+<script>
+    window.addEventListener('load', function() {
+        Swal.fire({
+            icon: 'error',
+            title: 'Order Failed',
+            text: <?php echo json_encode($error); ?>,
+            confirmButtonColor: '#ef4444'
+        });
+    });
+</script>
+<?php endif; ?>
 <?php if (isset($_GET['purchase_product_id'])): ?>
     <?php
     $restock_prod_id = intval($_GET['purchase_product_id']);

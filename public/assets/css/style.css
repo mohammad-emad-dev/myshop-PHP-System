@@ -948,3 +948,126 @@ a { text-decoration: none; }
 .dashboard-card.border-left-info:hover { box-shadow: 0 8px 25px rgba(6,182,212,0.15) !important; }
 .dashboard-card.border-left-warning:hover { box-shadow: 0 8px 25px rgba(245,158,11,0.15) !important; }
 .dashboard-card.border-left-purple:hover { box-shadow: 0 8px 25px rgba(139,92,246,0.15) !important; }
+
+/* ============================
+   QUICK ACTION GRADIENT CARDS
+   ============================ */
+.col-lg-3 > a > .card[style*="linear-gradient"]:hover {
+    transform: translateY(-6px) !important;
+    box-shadow: 0 12px 30px rgba(0,0,0,0.18) !important;
+}
+
+/* ============================
+   PULSE BUTTON ANIMATION
+   ============================ */
+@keyframes pulseGlow {
+    0%, 100% { box-shadow: 0 2px 8px rgba(16,185,129,0.25); }
+    50% { box-shadow: 0 4px 20px rgba(16,185,129,0.5); }
+}
+
+.pulse-btn {
+    animation: pulseGlow 2s ease-in-out infinite;
+}
+
+/* ============================
+   TABLE STRIPED ROWS
+   ============================ */
+.table-striped > tbody > tr:nth-of-type(odd) {
+    background-color: rgba(99,102,241,0.02);
+}
+
+/* ============================
+   FORM SECTIONS
+   ============================ */
+.settings-section {
+    background: #ffffff;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border-color);
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.settings-section h5 {
+    font-family: var(--font-heading);
+    font-weight: 700;
+    color: var(--slate-800);
+    margin-bottom: 1.25rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 2px solid var(--slate-100);
+}
+
+/* ============================
+   PRODUCT IMAGE THUMBNAILS
+   ============================ */
+.product-thumb {
+    width: 42px;
+    height: 42px;
+    border-radius: var(--radius-md);
+    object-fit: cover;
+    box-shadow: var(--shadow-xs);
+    border: 2px solid var(--slate-100);
+}
+
+/* ============================
+   COUNT BADGES IN HEADERS
+   ============================ */
+.count-badge {
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 0.25em 0.65em;
+    border-radius: var(--radius-full);
+    margin-left: 0.5rem;
+    vertical-align: middle;
+}
+
+/* ============================
+   EMPTY STATE STYLING
+   ============================ */
+.empty-state {
+    text-align: center;
+    padding: 3rem 1.5rem;
+}
+
+.empty-state i {
+    font-size: 3rem;
+    color: var(--slate-300);
+    margin-bottom: 1rem;
+    display: block;
+}
+
+.empty-state p {
+    color: var(--slate-400);
+    font-size: 0.9rem;
+    margin: 0;
+}
+
+/* ============================
+   MOVEMENT TYPE BADGES
+   ============================ */
+.badge-sale {
+    background: var(--primary-bg-subtle);
+    color: var(--primary);
+}
+
+.badge-purchase {
+    background: var(--success-bg-subtle);
+    color: var(--success);
+}
+
+.badge-adjustment {
+    background: var(--warning-bg-subtle);
+    color: var(--warning);
+}
+
+/* ============================
+   RESPONSIVE IMPROVEMENTS
+   ============================ */
+@media (max-width: 767px) {
+    .container-fluid { padding: 1rem !important; }
+    .dashboard-card { margin-bottom: 0.5rem; }
+    .pos-container { height: auto !important; overflow: visible !important; }
+    .product-grid-container { height: auto !important; max-height: 50vh; }
+    .cart-panel { margin-top: 1rem; }
+    .navbar h2 { font-size: 1.1rem !important; }
+}
+
