@@ -33,3 +33,64 @@ if ($role_check && $role_check->num_rows === 0) {
     }
 }
 
+// Self-healing database migration for Phase 6: StockMovement Ledger
+$sm_table_check = $conn->query("SHOW TABLES LIKE 'StockMovement'");
+if ($sm_table_check && $sm_table_check->num_rows === 0) {
+    $create_sm_sql = "CREATE TABLE `StockMovement` (
+        `id` INT AUTO_INCREMENT PRIMARY KEY,
+        `product_id` INT NOT NULL,
+        `staff_id` INT NOT NULL,
+        `quantity` INT NOT NULL,
+        `movement_type` VARCHAR(20) NOT NULL,
+        `reason` TEXT NULL,
+        `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (`product_id`) REFERENCES `Product`(`id`) ON DELETE CASCADE,
+        FOREIGN KEY (`staff_id`) REFERENCES `Staff`(`id`) ON DELETE CASCADE
+    ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci";
+    
+    if ($conn->query($create_sm_sql)) {
+        // Retroactively backfill movements from Orders and calculate baselines
+        $orders_sql = "SELECT od.product_id, o.staff_id, od.quantity, o.order_type, o.order_date, o.id as order_id 
+                       FROM OrderDetail od 
+                       JOIN `Order` o ON od.order_id = o.id";
+        $past_orders = $conn->query($orders_sql);
+        if ($past_orders) {
+            $insert_stmt = $conn->prepare("INSERT INTO `StockMovement` (product_id, staff_id, quantity, movement_type, reason, created_at) VALUES (?, ?, ?, ?, ?, ?)");
+            while ($row = $past_orders->fetch_assoc()) {
+                $prod_id = $row['product_id'];
+                $stf_id = $row['staff_id'];
+                $qty = ($row['order_type'] === 'sale') ? -$row['quantity'] : $row['quantity'];
+                $type = $row['order_type'];
+                $reason = ($row['order_type'] === 'sale') ? "Order #" . $row['order_id'] . " Sale" : "Order #" . $row['order_id'] . " Purchase";
+                $created = $row['order_date'];
+                
+                $insert_stmt->bind_param("iiisss", $prod_id, $stf_id, $qty, $type, $reason, $created);
+                $insert_stmt->execute();
+            }
+            $insert_stmt->close();
+        }
+
+        // Add baselines for products to match current actual stock
+        $products_sql = "SELECT id, stock, (SELECT COALESCE(SUM(quantity), 0) FROM `StockMovement` WHERE product_id = Product.id) as sum_qty FROM `Product`";
+        $products = $conn->query($products_sql);
+        if ($products) {
+            $admin_res = $conn->query("SELECT id FROM `Staff` WHERE role = 'admin' LIMIT 1");
+            $admin_id = ($admin_res && $admin_res->num_rows > 0) ? $admin_res->fetch_assoc()['id'] : 1;
+            
+            $insert_stmt = $conn->prepare("INSERT INTO `StockMovement` (product_id, staff_id, quantity, movement_type, reason) VALUES (?, ?, ?, 'manual_adjustment', ?)");
+            while ($p = $products->fetch_assoc()) {
+                $delta = $p['stock'] - $p['sum_qty'];
+                if ($delta != 0) {
+                    $reason = "Existing Stock Baseline";
+                    $insert_stmt->bind_param("iiis", $p['id'], $admin_id, $delta, $reason);
+                    $insert_stmt->execute();
+                }
+            }
+            $insert_stmt->close();
+        }
+    } else {
+        error_log("Database Migration Failed (StockMovement): " . $conn->error);
+    }
+}
+
+

@@ -40,23 +40,124 @@ function get_low_stock_products($conn)
     return $result->fetch_all(MYSQLI_ASSOC);
 }
 
-function create_product($conn, $name, $description, $price, $stock, $image_path = null, $alert_threshold = 10)
+function log_stock_movement($conn, $product_id, $staff_id, $quantity, $movement_type, $reason = null)
 {
-    $stmt = $conn->prepare("INSERT INTO Product (name, description, price, stock, image_path, alert_threshold) VALUES (?, ?, ?, ?, ?, ?)");
-    $stmt->bind_param("ssdisi", $name, $description, $price, $stock, $image_path, $alert_threshold);
-    return $stmt->execute();
+    $stmt = $conn->prepare("INSERT INTO `StockMovement` (product_id, staff_id, quantity, movement_type, reason) VALUES (?, ?, ?, ?, ?)");
+    if (!$stmt) {
+        return false;
+    }
+    $stmt->bind_param("iiiss", $product_id, $staff_id, $quantity, $movement_type, $reason);
+    $result = $stmt->execute();
+    $stmt->close();
+    return $result;
 }
 
-function update_product($conn, $id, $name, $description, $price, $stock, $image_path = null, $alert_threshold = 10)
+function get_stock_movements($conn, $product_id = null)
 {
-    if ($image_path) {
-        $stmt = $conn->prepare("UPDATE Product SET name = ?, description = ?, price = ?, stock = ?, image_path = ?, alert_threshold = ? WHERE id = ?");
-        $stmt->bind_param("ssdisii", $name, $description, $price, $stock, $image_path, $alert_threshold, $id);
+    if ($product_id !== null) {
+        $stmt = $conn->prepare("SELECT sm.*, p.name as product_name, s.full_name as staff_name 
+                               FROM `StockMovement` sm
+                               JOIN Product p ON sm.product_id = p.id
+                               JOIN Staff s ON sm.staff_id = s.id
+                               WHERE sm.product_id = ?
+                               ORDER BY sm.created_at DESC, sm.id DESC");
+        if (!$stmt) {
+            return [];
+        }
+        $stmt->bind_param("i", $product_id);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $data = $result->fetch_all(MYSQLI_ASSOC);
+        $stmt->close();
+        return $data;
     } else {
-        $stmt = $conn->prepare("UPDATE Product SET name = ?, description = ?, price = ?, stock = ?, alert_threshold = ? WHERE id = ?");
-        $stmt->bind_param("ssdiii", $name, $description, $price, $stock, $alert_threshold, $id);
+        $sql = "SELECT sm.*, p.name as product_name, s.full_name as staff_name 
+                FROM `StockMovement` sm
+                JOIN Product p ON sm.product_id = p.id
+                JOIN Staff s ON sm.staff_id = s.id
+                ORDER BY sm.created_at DESC, sm.id DESC";
+        $result = $conn->query($sql);
+        if (!$result) {
+            return [];
+        }
+        return $result->fetch_all(MYSQLI_ASSOC);
     }
-    return $stmt->execute();
+}
+
+function create_product($conn, $staff_id, $name, $description, $price, $stock, $image_path = null, $alert_threshold = 10)
+{
+    $conn->begin_transaction();
+    try {
+        $stmt = $conn->prepare("INSERT INTO Product (name, description, price, stock, image_path, alert_threshold) VALUES (?, ?, ?, ?, ?, ?)");
+        if (!$stmt) {
+            throw new Exception("Failed to prepare statement");
+        }
+        $stmt->bind_param("ssdisi", $name, $description, $price, $stock, $image_path, $alert_threshold);
+        if (!$stmt->execute()) {
+            throw new Exception("Product insertion failed");
+        }
+        $product_id = $conn->insert_id;
+        $stmt->close();
+
+        if ($stock != 0) {
+            if (!log_stock_movement($conn, $product_id, $staff_id, $stock, 'manual_adjustment', 'Initial stock allocation')) {
+                throw new Exception("Stock movement logging failed");
+            }
+        }
+
+        $conn->commit();
+        return true;
+    } catch (Exception $e) {
+        $conn->rollback();
+        error_log("create_product failed: " . $e->getMessage());
+        return false;
+    }
+}
+
+function update_product($conn, $staff_id, $id, $name, $description, $price, $stock, $image_path = null, $alert_threshold = 10)
+{
+    $conn->begin_transaction();
+    try {
+        $product = get_product_by_id($conn, $id);
+        if (!$product) {
+            throw new Exception("Product not found");
+        }
+        $old_stock = intval($product['stock']);
+        $delta = $stock - $old_stock;
+
+        if ($image_path) {
+            $stmt = $conn->prepare("UPDATE Product SET name = ?, description = ?, price = ?, stock = ?, image_path = ?, alert_threshold = ? WHERE id = ?");
+            if (!$stmt) {
+                throw new Exception("Failed to prepare statement");
+            }
+            $stmt->bind_param("ssdisii", $name, $description, $price, $stock, $image_path, $alert_threshold, $id);
+        } else {
+            $stmt = $conn->prepare("UPDATE Product SET name = ?, description = ?, price = ?, stock = ?, alert_threshold = ? WHERE id = ?");
+            if (!$stmt) {
+                throw new Exception("Failed to prepare statement");
+            }
+            $stmt->bind_param("ssdiii", $name, $description, $price, $stock, $alert_threshold, $id);
+        }
+
+        if (!$stmt->execute()) {
+            throw new Exception("Product update failed");
+        }
+        $stmt->close();
+
+        if ($delta != 0) {
+            $reason = "Manual stock adjustment (from " . $old_stock . " to " . $stock . ")";
+            if (!log_stock_movement($conn, $id, $staff_id, $delta, 'manual_adjustment', $reason)) {
+                throw new Exception("Stock movement logging failed");
+            }
+        }
+
+        $conn->commit();
+        return true;
+    } catch (Exception $e) {
+        $conn->rollback();
+        error_log("update_product failed: " . $e->getMessage());
+        return false;
+    }
 }
 
 function delete_product($conn, $id)
@@ -65,17 +166,26 @@ function delete_product($conn, $id)
     try {
         // Delete dependencies in OrderDetail first (Cascade Delete)
         $stmt = $conn->prepare("DELETE FROM OrderDetail WHERE product_id = ?");
+        if (!$stmt) {
+            throw new Exception("Failed to prepare delete detail statement");
+        }
         $stmt->bind_param("i", $id);
         $stmt->execute();
+        $stmt->close();
 
         // Delete the product
         $stmt = $conn->prepare("DELETE FROM Product WHERE id = ?");
+        if (!$stmt) {
+            throw new Exception("Failed to prepare delete product statement");
+        }
         $stmt->bind_param("i", $id);
 
         if ($stmt->execute()) {
+            $stmt->close();
             $conn->commit();
             return true;
         } else {
+            $stmt->close();
             throw new Exception("Failed to delete product");
         }
     } catch (Exception $e) {
@@ -87,7 +197,6 @@ function delete_product($conn, $id)
 function create_order($conn, $staff_id, $items, $order_type = 'sale')
 {
     $conn->begin_transaction();
-
     try {
         $total = 0;
         foreach ($items as $item) {
@@ -95,15 +204,22 @@ function create_order($conn, $staff_id, $items, $order_type = 'sale')
         }
 
         $stmt = $conn->prepare("INSERT INTO `Order` (total_amount, staff_id, order_type) VALUES (?, ?, ?)");
+        if (!$stmt) {
+            throw new Exception("Failed to prepare order statement");
+        }
         $stmt->bind_param("dis", $total, $staff_id, $order_type);
         $stmt->execute();
         $order_id = $conn->insert_id;
+        $stmt->close();
 
-        $stmt = $conn->prepare("INSERT INTO OrderDetail (order_id, product_id, quantity, unit_price, subtotal) VALUES (?, ?, ?, ?, ?)");
+        $detail_stmt = $conn->prepare("INSERT INTO OrderDetail (order_id, product_id, quantity, unit_price, subtotal) VALUES (?, ?, ?, ?, ?)");
+        if (!$detail_stmt) {
+            throw new Exception("Failed to prepare order details statement");
+        }
 
         foreach ($items as $item) {
-            $stmt->bind_param("iiidd", $order_id, $item['product_id'], $item['quantity'], $item['unit_price'], $item['subtotal']);
-            $stmt->execute();
+            $detail_stmt->bind_param("iiidd", $order_id, $item['product_id'], $item['quantity'], $item['unit_price'], $item['subtotal']);
+            $detail_stmt->execute();
 
             // Adjust stock based on order type
             if ($order_type === 'sale') {
@@ -111,14 +227,27 @@ function create_order($conn, $staff_id, $items, $order_type = 'sale')
             } else { // purchase
                 $update_stmt = $conn->prepare("UPDATE Product SET stock = stock + ? WHERE id = ?");
             }
+            if (!$update_stmt) {
+                throw new Exception("Failed to prepare update stock statement");
+            }
             $update_stmt->bind_param("ii", $item['quantity'], $item['product_id']);
             $update_stmt->execute();
+            $update_stmt->close();
+
+            // Log stock movement
+            $movement_qty = ($order_type === 'sale') ? -$item['quantity'] : $item['quantity'];
+            $reason = ($order_type === 'sale') ? "Order #{$order_id} Sale" : "Order #{$order_id} Purchase";
+            if (!log_stock_movement($conn, $item['product_id'], $staff_id, $movement_qty, $order_type, $reason)) {
+                throw new Exception("Stock movement logging failed");
+            }
         }
+        $detail_stmt->close();
 
         $conn->commit();
         return $order_id;
     } catch (Exception $e) {
         $conn->rollback();
+        error_log("create_order failed: " . $e->getMessage());
         return false;
     }
 }

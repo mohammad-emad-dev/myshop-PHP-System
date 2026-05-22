@@ -19,6 +19,9 @@ $current_page = $active_page ?? 'dashboard';
         <a href="order_history.php" class="list-group-item list-group-item-action bg-transparent fw-bold <?php echo $current_page === 'order_history' ? 'text-primary active' : 'text-white'; ?>">
             <i class="fas fa-history me-2"></i>Order History
         </a>
+        <a href="stock_movements.php" class="list-group-item list-group-item-action bg-transparent fw-bold <?php echo $current_page === 'stock_movements' ? 'text-primary active' : 'text-white'; ?>">
+            <i class="fas fa-exchange-alt me-2"></i>Stock Ledger
+        </a>
         <a href="settings.php" class="list-group-item list-group-item-action bg-transparent fw-bold <?php echo $current_page === 'settings' ? 'text-primary active' : 'text-white'; ?>">
             <i class="fas fa-cog me-2"></i>Settings
         </a>

@@ -34,7 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             }
 
             if (empty($error)) {
-                if (create_product($conn, $name, $description, $price, $stock, $image_path, $alert_threshold)) {
+                if (create_product($conn, $_SESSION['staff_id'], $name, $description, $price, $stock, $image_path, $alert_threshold)) {
                     $success = 'Product created successfully';
                 } else {
                     $error = 'Failed to create product';
@@ -59,7 +59,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             }
 
             if ($upload_ok) {
-                if (update_product($conn, $id, $name, $description, $price, $stock, $image_path, $alert_threshold)) {
+                if (update_product($conn, $_SESSION['staff_id'], $id, $name, $description, $price, $stock, $image_path, $alert_threshold)) {
                     $success = 'Product updated successfully';
                 } else {
                     $error = 'Failed to update product';
@@ -150,9 +150,7 @@ require_once '../includes/layouts/header.php';
                                         <th scope="col">Stock</th>
                                         <th scope="col">Threshold</th>
                                         <th scope="col">Image</th>
-                                        <?php if (is_admin()): ?>
                                         <th scope="col">Actions</th>
-                                        <?php endif; ?>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -191,16 +189,19 @@ require_once '../includes/layouts/header.php';
                                                     <span class="text-muted fst-italic small">No Image</span>
                                                 <?php endif; ?>
                                             </td>
-                                            <?php if (is_admin()): ?>
-                                            <td>
-                                                <button class="btn btn-sm btn-outline-info me-1" onclick='openEditModal(<?php echo json_encode($product); ?>)'>
-                                                    <i class="fas fa-edit"></i>
-                                                </button>
-                                                <a href="products.php?delete=<?php echo $product['id']; ?>&csrf_token=<?php echo htmlspecialchars($_SESSION['csrf_token'] ?? ''); ?>" class="btn btn-sm btn-outline-danger" onclick="return confirm('Are you sure you want to delete this product?');">
-                                                    <i class="fas fa-trash"></i>
-                                                </a>
-                                            </td>
-                                            <?php endif; ?>
+                                             <td>
+                                                 <a href="stock_movements.php?product_id=<?php echo $product['id']; ?>" class="btn btn-sm btn-outline-secondary me-1" title="Stock History">
+                                                     <i class="fas fa-history"></i>
+                                                 </a>
+                                                 <?php if (is_admin()): ?>
+                                                 <button class="btn btn-sm btn-outline-info me-1" onclick='openEditModal(<?php echo json_encode($product); ?>)'>
+                                                     <i class="fas fa-edit"></i>
+                                                 </button>
+                                                 <a href="products.php?delete=<?php echo $product['id']; ?>&csrf_token=<?php echo htmlspecialchars($_SESSION['csrf_token'] ?? ''); ?>" class="btn btn-sm btn-outline-danger" onclick="return confirm('Are you sure you want to delete this product?');">
+                                                     <i class="fas fa-trash"></i>
+                                                 </a>
+                                                 <?php endif; ?>
+                                             </td>
                                         </tr>
                                     <?php endforeach; ?>
                                 </tbody>
