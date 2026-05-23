@@ -84,6 +84,10 @@ h1, h2, h3, h4, h5, h6, .fs-1, .fs-2, .fs-3, .fs-4, .fs-5, .fs-6 {
     letter-spacing: -0.01em;
 }
 
+/* Protect FontAwesome from utility class overrides */
+i.fas, i.fa, i.far, i.fal { font-family: "Font Awesome 6 Free" !important; }
+i.fab { font-family: "Font Awesome 6 Brands" !important; }
+
 a { text-decoration: none; }
 
 ::selection {
