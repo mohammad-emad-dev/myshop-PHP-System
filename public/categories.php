@@ -67,6 +67,7 @@ $categories = get_categories($conn);
 $page_title = 'Categories';
 $active_page = 'categories';
 $header_title = 'Categories';
+$extra_css = ['https://cdn.jsdelivr.net/npm/sweetalert2@11.10.0/dist/sweetalert2.min.css'];
 
 require_once '../includes/layouts/header.php';
 ?>
@@ -77,20 +78,6 @@ require_once '../includes/layouts/header.php';
 
     <div class="container-fluid px-4 py-4">
 
-        <?php if ($success): ?>
-            <div class="alert alert-success alert-dismissible fade show" role="alert">
-                <i class="fas fa-check-circle me-2"></i> <?php echo htmlspecialchars($success); ?>
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            </div>
-        <?php endif; ?>
-
-        <?php if ($error): ?>
-            <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                <i class="fas fa-exclamation-circle me-2"></i> <?php echo htmlspecialchars($error); ?>
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            </div>
-        <?php endif; ?>
-
         <div class="row my-2">
             <div class="col-md-12">
                 <div class="card shadow-sm border-0 rounded-4">
@@ -99,8 +86,8 @@ require_once '../includes/layouts/header.php';
                             <i class="fas fa-tags me-2 text-primary"></i>Product Categories
                             <span class="badge bg-primary rounded-pill ms-2" style="font-size: 0.7rem;"><?php echo count($categories); ?></span>
                         </h4>
-                        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addCategoryModal">
-                            <i class="fas fa-plus me-2"></i>Add Category
+                        <button class="btn btn-primary shadow-sm fw-bold px-4 rounded-pill pulse-btn" data-bs-toggle="modal" data-bs-target="#addCategoryModal" style="transition: all 0.3s ease;">
+                            <i class="fas fa-plus-circle me-2 fs-5 align-middle"></i>Add Category
                         </button>
                     </div>
                     <div class="card-body">
@@ -158,11 +145,9 @@ require_once '../includes/layouts/header.php';
                                                     <button class="btn btn-sm btn-outline-info me-1" onclick='openEditModal(<?php echo json_encode($category); ?>)'>
                                                         <i class="fas fa-edit"></i>
                                                     </button>
-                                                    <a href="categories.php?delete=<?php echo $category['id']; ?>&csrf_token=<?php echo htmlspecialchars($_SESSION['csrf_token'] ?? ''); ?>" 
-                                                       class="btn btn-sm btn-outline-danger" 
-                                                       onclick="return confirm('Are you sure you want to delete this category? Associated products will revert to General.');">
+                                                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="confirmDelete(<?php echo $category['id']; ?>, '<?php echo htmlspecialchars($_SESSION['csrf_token'] ?? ''); ?>')">
                                                         <i class="fas fa-trash"></i>
-                                                    </a>
+                                                    </button>
                                                 <?php endif; ?>
                                             </td>
                                         </tr>
@@ -245,6 +230,11 @@ require_once '../includes/layouts/header.php';
     </div>
 </div>
 
+<?php
+$extra_js = [
+    'https://cdn.jsdelivr.net/npm/sweetalert2@11.10.0/dist/sweetalert2.all.min.js'
+];
+?>
 <script>
 document.addEventListener("DOMContentLoaded", function() {
     const searchInput = document.getElementById("searchCategory");
@@ -270,6 +260,50 @@ function openEditModal(category) {
     var editModal = new bootstrap.Modal(document.getElementById('editCategoryModal'));
     editModal.show();
 }
+
+function confirmDelete(id, token) {
+    Swal.fire({
+        title: 'Delete Category?',
+        text: 'Are you sure you want to delete this category? Associated products will revert to General.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        cancelButtonColor: '#64748b',
+        confirmButtonText: 'Yes, delete it!'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            window.location.href = `categories.php?delete=${id}&csrf_token=${token}`;
+        }
+    });
+}
 </script>
+
+<?php if (!empty($success)): ?>
+<script>
+    window.addEventListener('load', function() {
+        Swal.fire({
+            icon: 'success',
+            title: 'Success!',
+            text: <?php echo json_encode($success); ?>,
+            confirmButtonColor: '#10b981',
+            timer: 3000,
+            timerProgressBar: true
+        });
+    });
+</script>
+<?php endif; ?>
+
+<?php if (!empty($error)): ?>
+<script>
+    window.addEventListener('load', function() {
+        Swal.fire({
+            icon: 'error',
+            title: 'Error',
+            text: <?php echo json_encode($error); ?>,
+            confirmButtonColor: '#ef4444'
+        });
+    });
+</script>
+<?php endif; ?>
 
 <?php require_once '../includes/layouts/footer.php'; ?>
