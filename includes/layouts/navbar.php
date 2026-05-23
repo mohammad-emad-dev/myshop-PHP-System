@@ -1,6 +1,6 @@
 <!-- Page Content Wrapper -->
 <div id="page-content-wrapper">
-    <nav class="navbar navbar-expand-lg navbar-light px-4">
+    <nav class="navbar navbar-expand-lg navbar-light px-4" style="position: relative; z-index: 1050; background: var(--body-bg);">
         <div class="d-flex align-items-center">
             <i class="fas fa-bars fs-5 me-3" id="menu-toggle"></i>
             <div>
