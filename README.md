@@ -1,159 +1,119 @@
-# Inventory and Order Management System (IOMS)
+# myshop — Inventory & POS System
 
-A complete, production-ready web application for managing inventory and sales, built with Native PHP and MySQL. The system offers a streamlined interface for tracking products, processing orders, and visualizing sales data.
+A full-featured point-of-sale and inventory management system built with PHP and MySQL. Designed for small-to-medium retail businesses that need a fast, reliable way to handle daily sales, track stock, manage customers and suppliers, and generate invoices — all from a single dashboard.
 
----
-
-## 🚀 Features
-
-* **Secure Authentication**: Robust staff login system utilizing password hashing for enhanced security.
-* **Interactive Dashboard**: Provides a visual overview with key metrics including total products, orders, sales volume, and stock levels.
-* **Comprehensive Product Management**: Full CRUD (Create, Read, Update, Delete) operations, including support for product image uploads.
-* **Efficient Order Processing**: Create orders containing multiple items with automatic stock level adjustments upon completion.
-* **Modern User Interface**: A responsive design featuring gradients, smooth animations, and glassmorphism effects for a premium feel.
-* **Real-time Search**: Dynamic filtering capability to instantly locate products within the inventory.
-* **Stock Validation Logic**: Intelligent system that prevents order creation if quantities exceed available inventory.
+![Dashboard Preview](docs/preview.png)
 
 ---
 
-## 🎨 Tech Stack
+## Why This Project?
 
-* **Backend**: Native PHP (No frameworks used, demonstrating core PHP capabilities).
-* **Database**: MySQL with prepared statements for security and performance.
-* **Frontend**: HTML5, CSS3, and Vanilla JavaScript for a lightweight and fast user experience.
-* **Security Measures**:
-    * Password hashing using `bcrypt`.
-    * Prepared statements to prevent SQL injection.
-    * XSS protection via `htmlspecialchars()`.
-    * Secure session management.
+Most small shops either rely on pen-and-paper or overpay for bloated SaaS tools. **myshop** fills that gap: it's lightweight, runs on any XAMPP/LAMP stack, and covers the essentials without the complexity. No frameworks, no build tools — just clean PHP that works out of the box.
 
 ---
 
-## 📁 Project Structure
+## What It Does
 
-```text
-/ioms
-├── /assets
-│   ├── style.css           # Modern styling with gradients & animations
-│   └── script.js           # UI interactions & AJAX functionality
-├── /includes
-│   ├── db.php              # MySQL connection handler configuration
-│   └── functions.php       # Reusable helper PHP functions
-├── /database
-│   └── schema.sql          # Database schema definition (4 tables)
-├── /uploads                # Directory for storing product images
-├── index.php               # Dashboard / Home page
-├── login.php               # User Authentication page
-├── products.php            # Product management (CRUD) page
-├── orders.php              # Order processing and management page
-└── get_order_details.php   # AJAX endpoint for fetching order data
-```
-## 📸 Screenshots
+**POS Terminal** — A real-time point-of-sale interface. Click products to add them to cart, switch between sale and purchase modes, assign customers or suppliers to each transaction, and confirm with a single click. Stock updates instantly.
 
-| Dashboard | Login Page |
-|:---:|:---:|
-| ![Dashboard](screenshots/Dashboard.png) | ![Login](screenshots/login.png) |
+**Dashboard** — At a glance: total products, orders, revenue, stock levels, and inventory valuation. A 7-day sales/purchases chart and category distribution doughnut give you the full picture. Low-stock alerts tell you exactly what needs restocking.
 
-| Products Management | POS Terminal |
-|:---:|:---:|
-| ![Products](screenshots/Products.png) | ![POS](screenshots/orders.png) |
+**Order History & Invoices** — Every transaction is logged with full details. View any order, see the line items, and download a professional PDF invoice. Filter by sales or purchases, export to CSV for accounting.
 
-## 🗄️ Database Schema
+**Products & Categories** — Full CRUD for your catalog. Upload product images, set prices, track stock levels, and define low-stock alert thresholds. Organize everything into categories.
 
-The system relies on a strictly normalized database consisting of 4 tables:
+**Customers & Suppliers** — Maintain a contact database for both sides of your business. Link customers to sales and suppliers to purchases for complete traceability.
 
-* **Staff**: Manages user authentication details (`id`, `username`, `password`, `full_name`, `created_at`).
-* **Product**: Stores inventory item information (`id`, `name`, `description`, `price`, `stock`, `image_path`, `timestamps`).
-* **Order**: Records general order information (`id`, `order_date`, `total_amount`, `staff_id`, `created_at`).
-* **OrderDetail**: Links products to orders with specific quantities (`id`, `order_id`, `product_id`, `quantity`, `unit_price`, `subtotal`).
+**Stock Ledger** — A chronological record of every stock movement — sales, purchases, and manual adjustments. Know exactly where every unit went.
 
-## ⚙️ Installation Guide
+**Staff & Settings** — Role-based access (admin vs. cashier). Admins manage staff accounts, update profiles, and change passwords. Cashiers can only operate the POS and view history.
 
-### Prerequisites
-* PHP 7.4 or higher.
-* MySQL 5.7 or higher.
-* Web Server (Apache/Nginx).
-* XAMPP or WAMP (Recommended for local development).
+---
 
-### Step 1: Clone/Copy Files
-Place the project files into your web server's root directory:
-* **XAMPP**: `C:\xampp\htdocs\ioms`
-* **WAMP**: `C:\wamp64\www\ioms`
+## Tech Stack
 
-### Step 2: Database Setup
-1. Open **phpMyAdmin** (usually at `http://localhost/phpmyadmin`).
-2. Navigate to the **"Import"** tab.
-3. Select the `database/schema.sql` file from the project folder.
-4. Click **"Go"** to execute.
-   * This creates the `ioms_db` database, tables, and populates them with sample data.
+| Layer | Technology |
+|-------|-----------|
+| Backend | PHP 8+ (native, no framework) |
+| Database | MySQL / MariaDB |
+| Frontend | Bootstrap 5, Chart.js, SweetAlert2 |
+| Fonts | Google Fonts (Outfit, Inter) |
+| Icons | Font Awesome 6 Free |
+| PDF Export | html2pdf.js |
+| Server | Apache (XAMPP / LAMP) |
 
-### Step 3: Configure Connection
-Open `includes/db.php` and update the credentials if necessary:
-```php
-$host = 'localhost';
-$username = 'root';      // Default XAMPP/WAMP username
-$password = '';          // Default XAMPP/WAMP password (leave empty)
-$database = 'ioms_db';
+---
+
+## Getting Started
+
+```bash
+# 1. Clone the repo
+git clone https://github.com/mohammad-emad-dev/myshop-PHP-System.git
+
+# 2. Move to your web server directory
+cp -r myshop-PHP-System /path/to/htdocs/myshop
+
+# 3. Import the database
+mysql -u root -p < database/schema.sql
+
+# 4. Open in browser
+http://localhost/myshop/public/login.php
 ```
 
-### Step 4: Create Uploads Directory
-Ensure a folder named `uploads` exists in the root directory for images.
-* **Windows**: Create the folder and ensure write permissions are enabled.
-* **Linux/Mac**: Run `mkdir uploads` and `chmod 777 uploads`.
+**Default admin login:**
+- Username: `admin`
+- Password: `admin123`
 
-### Step 5: Launch
-Open your browser and go to: `http://localhost/ioms/login.php`
-
-## 🔐 Default Credentials
-
-Use the following account to log in as an administrator:
-* **Username**: `admin`
-* **Password**: `admin123`
-
-Additional test accounts:
-* `john` / `admin123`
-* `sarah` / `admin123`
-
-## 📖 Usage Guide
-
-### 📊 Dashboard
-* Provides an immediate snapshot of business performance.
-* Displays cards for **Total Products**, **Total Orders**, **Total Sales**, and **Current Stock**.
-
-### 📦 Product Management
-* Navigate to the **Products** page.
-* **Add**: Use the "+ Add Product" button to input details and upload an image.
-* **Edit/Delete**: Use the action buttons next to each product in the list.
-* **Search**: Use the real-time search bar to filter the product list instantly.
-
-### 🛒 Order Management
-* Navigate to the **Orders** page.
-* **Create Order**:
-    1. Click "+ Create Order".
-    2. Select a product and enter the quantity.
-    3. Use "Add Another Product" for bulk orders.
-    4. The total is calculated automatically.
-    5. Submit to save the order and update stock.
-* **View Details**: Inspect specific items within any past order.
-
-## 🛡️ Security Features
-* **Password Hashing**: Utilizes `password_hash()` with bcrypt algorithms.
-* **SQL Injection Prevention**: All database queries use prepared statements.
-* **XSS Protection**: Inputs are sanitized using `htmlspecialchars()`.
-* **CSRF Protection**: Implemented via session validation.
-
-## 🔧 Troubleshooting
-
-| Issue | Solution |
-|-------|----------|
-| **Connection Failed** | Verify MySQL is running and credentials in `db.php` are correct. |
-| **Image Upload Failed** | Check if `uploads/` folder exists and has write permissions. Ensure file is an image. |
-| **Session Errors** | Clear browser cookies and ensure `session_start()` is active in PHP config. |
-
-## 📄 License
-
-This project is open-source and available for educational and commercial use.
+> The system auto-creates the database and tables on first run if they don't exist. Just make sure MySQL is running.
 
 ---
 
-**Built with ❤️ using Native PHP and MySQL**
+## Project Structure
+
+```
+myshop/
+├── config/          # Database connection & auto-migration
+├── database/        # SQL schema with seed data
+├── includes/
+│   ├── functions.php    # All business logic (CRUD, auth, helpers)
+│   └── layouts/         # Shared UI components (header, sidebar, navbar, footer)
+├── public/
+│   ├── assets/
+│   │   ├── css/style.css   # Complete design system
+│   │   └── js/script.js
+│   ├── index.php           # Dashboard
+│   ├── orders.php          # POS terminal
+│   ├── order_history.php   # Transaction history + invoices
+│   ├── products.php        # Product management
+│   ├── categories.php      # Category management
+│   ├── customers.php       # Customer management
+│   ├── suppliers.php       # Supplier management
+│   ├── stock_movements.php # Stock ledger
+│   └── settings.php        # Profile & staff management
+└── uploads/          # Product images
+```
+
+---
+
+## Security
+
+- **CSRF protection** on every form and destructive action
+- **Bcrypt password hashing** with `PASSWORD_BCRYPT`
+- **Prepared statements** everywhere — no raw SQL concatenation
+- **Session regeneration** on login to prevent fixation attacks
+- **Input sanitization** on all user-submitted data
+- **Role-based access control** — admin-only pages are enforced server-side
+
+---
+
+## License
+
+MIT — use it however you want.
+
+---
+
+## Contact
+
+Built by **Mohammad Emad**
+
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-Connect-blue?style=for-the-badge&logo=linkedin)](https://www.linkedin.com/in/%E2%80%AAmohammad-emad%E2%80%AC%E2%80%8F-61532b160)
