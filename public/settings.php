@@ -194,6 +194,26 @@ require_once '../includes/layouts/header.php';
         <!-- Manage Staff accounts panel -->
         <div class="row my-4 justify-content-center">
             <div class="col-lg-10 col-md-12">
+                
+                <!-- System Backups (Admin Only) -->
+                <div class="card shadow-sm border-0 rounded-4 mb-4 border-start border-danger border-4">
+                    <div class="card-header bg-white border-0 py-3">
+                        <h4 class="mb-0 text-secondary fw-bold"><i class="fas fa-server me-2 text-danger"></i>System Administration & Backups</h4>
+                    </div>
+                    <div class="card-body p-4 bg-danger-subtle bg-opacity-10 rounded-bottom-4">
+                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+                            <div>
+                                <h5 class="fw-bold text-dark mb-1">Database Backup (.sql)</h5>
+                                <p class="text-muted mb-0 small">Download a full snapshot of the entire database including products, orders, and encrypted staff accounts.</p>
+                                <p class="text-danger small fw-bold mt-1 mb-0"><i class="fas fa-exclamation-triangle me-1"></i>Keep this file secure! It contains sensitive business data.</p>
+                            </div>
+                            <a href="backup_database.php" class="btn btn-danger btn-lg shadow-sm fw-bold px-4 pulse-btn rounded-3">
+                                <i class="fas fa-download me-2"></i>Download Backup
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="card shadow-sm border-0 rounded-4">
                     <div class="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center">
                         <h4 class="mb-0 text-secondary fw-bold"><i class="fas fa-users me-2 text-primary"></i>Manage Staff Accounts</h4>
