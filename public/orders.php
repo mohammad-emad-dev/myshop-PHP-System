@@ -122,10 +122,20 @@ require_once '../includes/layouts/header.php';
         <div class="row h-100">
             <!-- Left Column: Product Catalog -->
             <div class="col-lg-8 h-100 d-flex flex-column">
+                <!-- Barcode Scanner Input -->
+                <div class="row mb-3">
+                    <div class="col-12">
+                        <div class="input-group input-group-lg shadow-sm border border-primary border-2 rounded-3 overflow-hidden">
+                            <span class="input-group-text bg-primary text-white border-0"><i class="fas fa-barcode"></i></span>
+                            <input type="text" id="barcodeInput" class="form-control border-0 fw-bold text-primary" placeholder="Scan barcode here... (Auto adds to cart)" style="box-shadow: none; letter-spacing: 2px;" autofocus autocomplete="off">
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Search Bar -->
                 <div class="row mb-3">
                     <div class="col-12">
-                        <div class="input-group input-group-lg shadow-sm border rounded-3 overflow-hidden">
+                        <div class="input-group shadow-sm border rounded-3 overflow-hidden">
                             <span class="input-group-text bg-white border-0"><i class="fas fa-search text-muted"></i></span>
                             <input type="text" id="searchProduct" class="form-control border-0" placeholder="Search products by name..." onkeyup="filterProducts()" style="box-shadow: none;">
                         </div>
@@ -153,7 +163,7 @@ require_once '../includes/layouts/header.php';
                             $cardClass = $hasStock ? 'product-card' : 'product-card disabled';
                             $badgeClass = $product['stock'] <= 5 ? 'bg-danger' : 'bg-success';
                             ?>
-                            <div class="col-md-4 col-sm-6 product-item" data-name="<?php echo strtolower($product['name']); ?>" data-category-id="<?php echo $product['category_id']; ?>">
+                            <div class="col-md-4 col-sm-6 product-item" data-name="<?php echo strtolower($product['name']); ?>" data-category-id="<?php echo $product['category_id']; ?>" data-barcode="<?php echo htmlspecialchars($product['barcode'] ?? ''); ?>">
                                 <div class="card h-100 border-0 <?php echo $cardClass; ?>" 
                                      <?php if ($hasStock): ?>
                                          onclick='addToCart(<?php echo json_encode($product); ?>)'
@@ -301,7 +311,91 @@ $extra_js = [
                 renderCart();
             });
         });
+
+        // Barcode Scanner Listener
+        const barcodeInput = document.getElementById('barcodeInput');
+        if (barcodeInput) {
+            barcodeInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault(); // Prevent form submission
+                    const scannedCode = this.value.trim();
+                    if (scannedCode !== '') {
+                        handleBarcodeScan(scannedCode);
+                    }
+                    this.value = ''; // Clear input for next scan
+                }
+            });
+            
+            // Keep focus on barcode scanner if user clicks outside but not on another input
+            document.addEventListener('click', function(e) {
+                if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'SELECT' && e.target.tagName !== 'TEXTAREA' && e.target.tagName !== 'BUTTON') {
+                    barcodeInput.focus();
+                }
+            });
+        }
     });
+
+    function handleBarcodeScan(barcode) {
+        // Search all products for matching barcode
+        // We injected product data into addToCart in the HTML, but we can also find it via the DOM attributes
+        const productItems = document.querySelectorAll('.product-item');
+        let found = false;
+        
+        productItems.forEach(item => {
+            if (item.dataset.barcode === barcode) {
+                // Trigger the click event on the card if it's not disabled
+                const card = item.querySelector('.card:not(.disabled)');
+                if (card) {
+                    card.click();
+                    found = true;
+                    // Optional: play a subtle beep
+                    playBeep();
+                } else {
+                    // Out of stock
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Out of Stock',
+                        text: 'This product is scanned but currently out of stock!',
+                        confirmButtonColor: '#198754'
+                    });
+                    found = true;
+                }
+            }
+        });
+        
+        if (!found) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Not Found',
+                text: 'No product matches this barcode: ' + barcode,
+                timer: 2000,
+                showConfirmButton: false
+            });
+        }
+    }
+    
+    function playBeep() {
+        // Create a short beep sound using AudioContext
+        try {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = ctx.createOscillator();
+            const gainNode = ctx.createGain();
+            
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(800, ctx.currentTime); // Frequency in Hz
+            
+            gainNode.gain.setValueAtTime(0.1, ctx.currentTime); // Volume
+            gainNode.gain.exponentialRampToValueAtTime(0.00001, ctx.currentTime + 0.1);
+            
+            osc.connect(gainNode);
+            gainNode.connect(ctx.destination);
+            
+            osc.start();
+            osc.stop(ctx.currentTime + 0.1);
+        } catch(e) {
+            console.log("Audio not supported");
+        }
+    }
 
     function addToCart(product) {
         if (orderType === 'sale' && product.stock <= 0) {

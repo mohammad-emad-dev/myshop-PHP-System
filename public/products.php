@@ -25,6 +25,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $stock = max(0, intval($_POST['stock']));
             $alert_threshold = isset($_POST['alert_threshold']) ? max(0, intval($_POST['alert_threshold'])) : 10;
             $category_id = isset($_POST['category_id']) ? intval($_POST['category_id']) : null;
+            $barcode = isset($_POST['barcode']) ? sanitize_input($_POST['barcode']) : null;
 
             $image_path = null;
             if (isset($_FILES['image']) && $_FILES['image']['error'] === 0) {
@@ -35,10 +36,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             }
 
             if (empty($error)) {
-                if (create_product($conn, $_SESSION['staff_id'], $name, $description, $price, $stock, $image_path, $alert_threshold, $category_id)) {
+                if (create_product($conn, $_SESSION['staff_id'], $name, $description, $price, $stock, $image_path, $alert_threshold, $category_id, $barcode)) {
                     $success = 'Product created successfully';
                 } else {
-                    $error = 'Failed to create product';
+                    $error = 'Failed to create product. Check if the barcode is already in use.';
                 }
             }
         } else if ($action === 'update') {
@@ -49,6 +50,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $stock = max(0, intval($_POST['stock']));
             $alert_threshold = isset($_POST['alert_threshold']) ? max(0, intval($_POST['alert_threshold'])) : 10;
             $category_id = isset($_POST['category_id']) ? intval($_POST['category_id']) : null;
+            $barcode = isset($_POST['barcode']) ? sanitize_input($_POST['barcode']) : null;
 
             $image_path = null;
             $upload_ok = true;
@@ -61,10 +63,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             }
 
             if ($upload_ok) {
-                if (update_product($conn, $_SESSION['staff_id'], $id, $name, $description, $price, $stock, $image_path, $alert_threshold, $category_id)) {
+                if (update_product($conn, $_SESSION['staff_id'], $id, $name, $description, $price, $stock, $image_path, $alert_threshold, $category_id, $barcode)) {
                     $success = 'Product updated successfully';
                 } else {
-                    $error = 'Failed to update product';
+                    $error = 'Failed to update product. Check if the barcode is already in use.';
                 }
             }
         }
@@ -174,7 +176,14 @@ require_once '../includes/layouts/header.php';
                                         ?>
                                         <tr class="<?php echo $row_class; ?>">
                                             <td><?php echo $product['id']; ?></td>
-                                            <td class="fw-bold"><?php echo htmlspecialchars($product['name']); ?></td>
+                                            <td>
+                                                <div class="fw-bold"><?php echo htmlspecialchars($product['name']); ?></div>
+                                                <?php if (!empty($product['barcode'])): ?>
+                                                    <span class="badge bg-light text-dark border mt-1" style="font-family: monospace; font-size: 0.75rem;">
+                                                        <i class="fas fa-barcode me-1"></i><?php echo htmlspecialchars($product['barcode']); ?>
+                                                    </span>
+                                                <?php endif; ?>
+                                            </td>
                                             <td>
                                                 <span class="badge bg-secondary-subtle text-secondary rounded-pill px-2">
                                                     <?php echo htmlspecialchars($product['category_name'] ?: 'Uncategorized'); ?>
@@ -254,6 +263,13 @@ require_once '../includes/layouts/header.php';
                             </select>
                         </div>
                         <div class="mb-3">
+                            <label for="barcode" class="form-label">Barcode (Optional)</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-white"><i class="fas fa-barcode text-muted"></i></span>
+                                <input type="text" class="form-control" id="barcode" name="barcode" placeholder="Scan or type barcode">
+                            </div>
+                        </div>
+                        <div class="mb-3">
                             <label for="description" class="form-label">Description</label>
                             <textarea class="form-control" id="description" name="description" rows="3" required></textarea>
                         </div>
@@ -312,6 +328,13 @@ require_once '../includes/layouts/header.php';
                             </select>
                         </div>
                         <div class="mb-3">
+                            <label for="edit_barcode" class="form-label">Barcode (Optional)</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-white"><i class="fas fa-barcode text-muted"></i></span>
+                                <input type="text" class="form-control" id="edit_barcode" name="barcode" placeholder="Scan or type barcode">
+                            </div>
+                        </div>
+                        <div class="mb-3">
                             <label for="edit_description" class="form-label">Description</label>
                             <textarea class="form-control" id="edit_description" name="description" rows="3" required></textarea>
                         </div>
@@ -355,6 +378,7 @@ $extra_js = [
         document.getElementById('edit_id').value = product.id;
         document.getElementById('edit_name').value = product.name;
         document.getElementById('edit_category_id').value = product.category_id || '';
+        document.getElementById('edit_barcode').value = product.barcode || '';
         document.getElementById('edit_description').value = product.description;
         document.getElementById('edit_price').value = product.price;
         document.getElementById('edit_stock').value = product.stock;

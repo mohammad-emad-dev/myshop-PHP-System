@@ -122,7 +122,7 @@ function get_stock_movements($conn, $product_id = null)
     }
 }
 
-function create_product($conn, $staff_id, $name, $description, $price, $stock, $image_path = null, $alert_threshold = 10, $category_id = null)
+function create_product($conn, $staff_id, $name, $description, $price, $stock, $image_path = null, $alert_threshold = 10, $category_id = null, $barcode = null)
 {
     $conn->begin_transaction();
     try {
@@ -135,11 +135,18 @@ function create_product($conn, $staff_id, $name, $description, $price, $stock, $
             $category_id = intval($category_id);
         }
 
-        $stmt = $conn->prepare("INSERT INTO Product (name, description, price, stock, image_path, alert_threshold, category_id) VALUES (?, ?, ?, ?, ?, ?, ?)");
+        // Clean empty barcode strings to NULL to avoid unique constraint violations
+        if (empty(trim($barcode))) {
+            $barcode = null;
+        } else {
+            $barcode = trim($barcode);
+        }
+
+        $stmt = $conn->prepare("INSERT INTO Product (name, description, price, stock, image_path, alert_threshold, category_id, barcode) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
         if (!$stmt) {
             throw new Exception("Failed to prepare statement");
         }
-        $stmt->bind_param("ssdisii", $name, $description, $price, $stock, $image_path, $alert_threshold, $category_id);
+        $stmt->bind_param("ssdisiis", $name, $description, $price, $stock, $image_path, $alert_threshold, $category_id, $barcode);
         if (!$stmt->execute()) {
             throw new Exception("Product insertion failed");
         }
@@ -161,7 +168,7 @@ function create_product($conn, $staff_id, $name, $description, $price, $stock, $
     }
 }
 
-function update_product($conn, $staff_id, $id, $name, $description, $price, $stock, $image_path = null, $alert_threshold = 10, $category_id = null)
+function update_product($conn, $staff_id, $id, $name, $description, $price, $stock, $image_path = null, $alert_threshold = 10, $category_id = null, $barcode = null)
 {
     $conn->begin_transaction();
     try {
@@ -181,18 +188,25 @@ function update_product($conn, $staff_id, $id, $name, $description, $price, $sto
             $category_id = intval($category_id);
         }
 
-        if ($image_path) {
-            $stmt = $conn->prepare("UPDATE Product SET name = ?, description = ?, price = ?, stock = ?, image_path = ?, alert_threshold = ?, category_id = ? WHERE id = ?");
-            if (!$stmt) {
-                throw new Exception("Failed to prepare statement");
-            }
-            $stmt->bind_param("ssdisiii", $name, $description, $price, $stock, $image_path, $alert_threshold, $category_id, $id);
+        // Clean empty barcode strings to NULL to avoid unique constraint violations
+        if (empty(trim($barcode))) {
+            $barcode = null;
         } else {
-            $stmt = $conn->prepare("UPDATE Product SET name = ?, description = ?, price = ?, stock = ?, alert_threshold = ?, category_id = ? WHERE id = ?");
+            $barcode = trim($barcode);
+        }
+
+        if ($image_path) {
+            $stmt = $conn->prepare("UPDATE Product SET name = ?, description = ?, price = ?, stock = ?, image_path = ?, alert_threshold = ?, category_id = ?, barcode = ? WHERE id = ?");
             if (!$stmt) {
                 throw new Exception("Failed to prepare statement");
             }
-            $stmt->bind_param("ssdiiii", $name, $description, $price, $stock, $alert_threshold, $category_id, $id);
+            $stmt->bind_param("ssdisiisi", $name, $description, $price, $stock, $image_path, $alert_threshold, $category_id, $barcode, $id);
+        } else {
+            $stmt = $conn->prepare("UPDATE Product SET name = ?, description = ?, price = ?, stock = ?, alert_threshold = ?, category_id = ?, barcode = ? WHERE id = ?");
+            if (!$stmt) {
+                throw new Exception("Failed to prepare statement");
+            }
+            $stmt->bind_param("ssdiiisi", $name, $description, $price, $stock, $alert_threshold, $category_id, $barcode, $id);
         }
 
         if (!$stmt->execute()) {
