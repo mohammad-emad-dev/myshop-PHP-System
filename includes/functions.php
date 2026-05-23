@@ -47,7 +47,7 @@ function get_low_stock_products($conn)
             WHERE p.stock <= p.alert_threshold 
             ORDER BY p.stock ASC, p.name ASC";
     $result = $conn->query($sql);
-    return $result->fetch_all(MYSQLI_ASSOC);
+    return $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
 }
 
 function log_stock_movement($conn, $product_id, $staff_id, $quantity, $movement_type, $reason = null)
@@ -335,19 +335,33 @@ function get_order_details($conn, $order_id)
 
 function get_dashboard_stats($conn)
 {
-    $stats = [];
+    $stats = [
+        'total_products' => 0,
+        'total_orders'   => 0,
+        'total_sales'    => 0.0,
+        'total_stock'    => 0
+    ];
 
     $result = $conn->query("SELECT COUNT(*) as count FROM Product");
-    $stats['total_products'] = $result->fetch_assoc()['count'];
+    if ($result) {
+        $stats['total_products'] = (int) $result->fetch_assoc()['count'];
+    }
 
     $result = $conn->query("SELECT COUNT(*) as count FROM `Order`");
-    $stats['total_orders'] = $result->fetch_assoc()['count'];
+    if ($result) {
+        $stats['total_orders'] = (int) $result->fetch_assoc()['count'];
+    }
 
-    $result = $conn->query("SELECT COALESCE(SUM(total_amount), 0) as total FROM `Order`");
-    $stats['total_sales'] = $result->fetch_assoc()['total'];
+    // Only count revenue from SALES, not purchases
+    $result = $conn->query("SELECT COALESCE(SUM(total_amount), 0) as total FROM `Order` WHERE order_type = 'sale'");
+    if ($result) {
+        $stats['total_sales'] = (float) $result->fetch_assoc()['total'];
+    }
 
-    $result = $conn->query("SELECT SUM(stock) as total FROM Product");
-    $stats['total_stock'] = $result->fetch_assoc()['total'];
+    $result = $conn->query("SELECT COALESCE(SUM(stock), 0) as total FROM Product");
+    if ($result) {
+        $stats['total_stock'] = (int) $result->fetch_assoc()['total'];
+    }
 
     return $stats;
 }
@@ -996,16 +1010,22 @@ function get_inventory_valuation($conn)
  */
 function get_top_selling_products($conn, $limit = 5)
 {
-    $limit = (int)$limit;
+    $limit = max(1, min((int)$limit, 50));
     $sql = "SELECT p.name, SUM(od.quantity) as total_qty, SUM(od.subtotal) as total_sales 
             FROM OrderDetail od 
             JOIN `Order` o ON od.order_id = o.id 
             JOIN Product p ON od.product_id = p.id 
             WHERE o.order_type = 'sale' 
-            GROUP BY od.product_id 
+            GROUP BY od.product_id, p.name 
             ORDER BY total_qty DESC 
-            LIMIT $limit";
-    $result = $conn->query($sql);
+            LIMIT ?";
+    $stmt = $conn->prepare($sql);
+    if (!$stmt) {
+        return [];
+    }
+    $stmt->bind_param('i', $limit);
+    $stmt->execute();
+    $result = $stmt->get_result();
     return $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
 }
 

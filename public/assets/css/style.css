@@ -952,9 +952,13 @@ a { text-decoration: none; }
 /* ============================
    QUICK ACTION GRADIENT CARDS
    ============================ */
-.col-lg-3 > a > .card[style*="linear-gradient"]:hover {
-    transform: translateY(-6px) !important;
-    box-shadow: 0 12px 30px rgba(0,0,0,0.18) !important;
+.quick-action-card {
+    transition: all 0.3s ease;
+}
+
+.quick-action-card:hover {
+    transform: translateY(-6px);
+    box-shadow: 0 12px 30px rgba(0,0,0,0.18);
 }
 
 /* ============================

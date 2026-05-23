@@ -51,7 +51,7 @@
                                                 <img src="<?php echo htmlspecialchars($low_prod['image_path']); ?>" class="rounded-circle" style="width: 38px; height: 38px; object-fit: cover;" alt="">
                                             <?php else: ?>
                                                 <div class="rounded-circle bg-warning-subtle text-warning d-flex align-items-center justify-content-center" style="width: 38px; height: 38px;">
-                                                    <i class="fas fa-exclamation-triangle" style="font-size: 0.85rem;"></i>
+                                                    <i class="fas fa-triangle-exclamation" style="font-size: 0.85rem;"></i>
                                                 </div>
                                             <?php endif; ?>
                                         </div>
@@ -97,7 +97,7 @@
                             <span class="text-muted small d-block mb-1">Signed in as</span>
                             <span class="badge rounded-pill px-2 py-1" style="font-size: 0.68rem; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; background: var(--primary-bg-subtle); color: var(--primary);"><?php echo htmlspecialchars($_SESSION['role'] ?? 'cashier'); ?></span>
                         </li>
-                        <li><a class="dropdown-item" href="settings.php"><i class="fas fa-sliders-h me-2 text-muted"></i>Settings</a></li>
+                        <li><a class="dropdown-item" href="settings.php"><i class="fas fa-gear me-2 text-muted"></i>Settings</a></li>
                         <li><hr class="dropdown-divider my-1"></li>
                         <li><a class="dropdown-item text-danger" href="login.php?logout=1&csrf_token=<?php echo htmlspecialchars($_SESSION['csrf_token'] ?? ''); ?>"><i class="fas fa-power-off me-2"></i>Logout</a></li>
                     </ul>
