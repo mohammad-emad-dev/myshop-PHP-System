@@ -80,26 +80,40 @@
                 </li>
 
                 <li class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle d-flex align-items-center py-1 px-2 rounded-3" href="#" id="navbarDropdown"
+                    <a class="nav-link dropdown-toggle d-flex align-items-center py-1 px-2 rounded-3 border-0" href="#" id="navbarDropdown"
                         role="button" data-bs-toggle="dropdown" aria-expanded="false"
                         style="transition: all 0.2s ease;">
-                        <div class="d-flex align-items-center justify-content-center rounded-circle me-2"
-                             style="width: 36px; height: 36px; background: linear-gradient(135deg, var(--primary), #818cf8); color: #fff; font-weight: 700; font-size: 0.85rem;">
+                        <div class="d-flex align-items-center justify-content-center rounded-circle me-2 shadow-sm"
+                             style="width: 38px; height: 38px; background: linear-gradient(135deg, var(--primary), #818cf8); color: #ffffff; font-weight: 700; font-size: 1rem;">
                             <?php echo strtoupper(substr($_SESSION['full_name'] ?? 'U', 0, 1)); ?>
                         </div>
                         <div class="d-none d-md-block text-start me-1">
-                            <div class="fw-bold text-dark" style="font-size: 0.85rem; line-height: 1.2;"><?php echo htmlspecialchars($_SESSION['full_name'] ?? 'User'); ?></div>
-                            <div class="text-muted" style="font-size: 0.7rem; text-transform: capitalize;"><?php echo htmlspecialchars($_SESSION['role'] ?? 'cashier'); ?></div>
+                            <div class="fw-bold text-dark" style="font-size: 0.9rem; line-height: 1.1;"><?php echo htmlspecialchars($_SESSION['full_name'] ?? 'User'); ?></div>
+                            <div class="text-muted mt-1" style="font-size: 0.75rem; text-transform: capitalize; font-weight: 500;"><?php echo htmlspecialchars($_SESSION['role'] ?? 'cashier'); ?></div>
                         </div>
                     </a>
-                    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdown">
-                        <li class="dropdown-header px-3 pb-2 mb-1 border-bottom">
-                            <span class="text-muted small d-block mb-1">Signed in as</span>
-                            <span class="badge rounded-pill px-2 py-1" style="font-size: 0.68rem; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; background: var(--primary-bg-subtle); color: var(--primary);"><?php echo htmlspecialchars($_SESSION['role'] ?? 'cashier'); ?></span>
+                    <ul class="dropdown-menu dropdown-menu-end shadow border-0 mt-2" aria-labelledby="navbarDropdown" style="min-width: 220px; border-radius: var(--radius-lg);">
+                        <li class="px-3 py-2 border-bottom mb-1 bg-light rounded-top" style="border-top-left-radius: var(--radius-lg); border-top-right-radius: var(--radius-lg);">
+                            <span class="text-muted small d-block fw-semibold mb-1" style="font-size: 0.75rem;">Signed in as</span>
+                            <div class="d-flex align-items-center">
+                                <span class="badge rounded-pill bg-primary-subtle text-primary border border-primary-subtle px-2 py-1 text-uppercase" style="font-size: 0.7rem; font-weight: 700; letter-spacing: 0.5px;">
+                                    <?php echo htmlspecialchars($_SESSION['role'] ?? 'cashier'); ?>
+                                </span>
+                            </div>
                         </li>
-                        <li><a class="dropdown-item" href="settings.php"><i class="fas fa-gear me-2 text-muted"></i>Settings</a></li>
-                        <li><hr class="dropdown-divider my-1"></li>
-                        <li><a class="dropdown-item text-danger" href="login.php?logout=1&csrf_token=<?php echo htmlspecialchars($_SESSION['csrf_token'] ?? ''); ?>"><i class="fas fa-power-off me-2"></i>Logout</a></li>
+                        <li class="p-1">
+                            <a class="dropdown-item rounded-3 d-flex align-items-center py-2" href="settings.php">
+                                <i class="fas fa-cog fa-fw me-2 text-secondary fs-6"></i>
+                                <span class="fw-semibold text-dark">Settings</span>
+                            </a>
+                        </li>
+                        <li class="px-3"><hr class="dropdown-divider my-1"></li>
+                        <li class="p-1">
+                            <a class="dropdown-item rounded-3 d-flex align-items-center py-2 text-danger" href="login.php?logout=1&csrf_token=<?php echo htmlspecialchars($_SESSION['csrf_token'] ?? ''); ?>">
+                                <i class="fas fa-sign-out-alt fa-fw me-2 fs-6"></i>
+                                <span class="fw-bold">Logout</span>
+                            </a>
+                        </li>
                     </ul>
                 </li>
             </ul>
