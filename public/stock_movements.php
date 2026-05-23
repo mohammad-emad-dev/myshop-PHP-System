@@ -44,6 +44,16 @@ require_once '../includes/layouts/header.php';
                 </h1>
                 <p class="text-muted mb-0 mt-1">Detailed history of all inventory stock updates, additions, and manual corrections.</p>
             </div>
+            <div class="d-flex gap-2">
+                <?php if (is_admin()): ?>
+                <a href="export_report.php?entity=stock" class="btn btn-success rounded-3 shadow-sm px-4 fw-medium" target="_blank">
+                    <i class="fas fa-file-excel me-2"></i>Export CSV
+                </a>
+                <?php endif; ?>
+                <button class="btn btn-primary rounded-3 shadow-sm px-4 fw-medium pulse-btn" data-bs-toggle="modal" data-bs-target="#addMovementModal">
+                    <i class="fas fa-plus-circle me-2"></i>New Adjustment
+                </button>
+            </div>
         </div>
 
         <!-- Filter Card -->

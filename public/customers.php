@@ -90,14 +90,23 @@ require_once '../includes/layouts/header.php';
         <div class="row my-2">
             <div class="col-md-12">
                 <div class="card shadow-sm border-0 rounded-4">
-                    <div class="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center">
-                        <h4 class="mb-0 fw-bold" style="color: var(--slate-700); font-family: var(--font-heading);">
-                            <i class="fas fa-users me-2 text-primary"></i>Customers
-                            <span class="badge bg-primary rounded-pill ms-2" style="font-size: 0.7rem;"><?php echo count($customers); ?></span>
-                        </h4>
-                        <button class="btn btn-primary shadow-sm fw-bold px-4 rounded-pill pulse-btn" data-bs-toggle="modal" data-bs-target="#addCustomerModal" style="transition: all 0.3s ease;">
-                            <i class="fas fa-user-plus me-2 fs-5 align-middle"></i>Add Customer
-                        </button>
+                    <div class="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <div class="d-flex align-items-center">
+                            <h4 class="mb-0 fw-bold" style="color: var(--slate-700); font-family: var(--font-heading);">
+                                <i class="fas fa-users me-2 text-primary"></i>Customers
+                                <span class="badge bg-primary rounded-pill ms-2" style="font-size: 0.7rem;"><?php echo count($customers); ?></span>
+                            </h4>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <?php if (is_admin()): ?>
+                            <a href="export_report.php?entity=customers" class="btn btn-success rounded-3 shadow-sm px-4 fw-medium" target="_blank">
+                                <i class="fas fa-file-excel me-2"></i>Export CSV
+                            </a>
+                            <?php endif; ?>
+                            <button class="btn btn-primary shadow-sm fw-bold px-4 rounded-3 pulse-btn" data-bs-toggle="modal" data-bs-target="#addCustomerModal" style="transition: all 0.3s ease;">
+                                <i class="fas fa-user-plus me-2 fs-5 align-middle"></i>Add Customer
+                            </button>
+                        </div>
                     </div>
                     <div class="card-body">
                         <div class="row mb-3">

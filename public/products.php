@@ -116,17 +116,25 @@ require_once '../includes/layouts/header.php';
             <div class="col-md-12">
                 <div class="card shadow-sm border-0 rounded-4">
                     <div class="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center">
-                        <div class="d-flex align-items-center">
-                            <h4 class="mb-0 text-secondary fw-bold me-3" style="font-family: var(--font-heading);">All Products</h4>
-                            <span class="badge bg-primary-subtle text-primary rounded-pill px-3 py-2 fw-bold fs-6 shadow-sm border border-primary-subtle">
-                                <i class="fas fa-box me-1"></i> <?php echo count($products); ?> Items
-                            </span>
+                        <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+                            <div>
+                                <h1 class="h3 mb-0 fw-bold" style="color: var(--slate-700); font-family: var(--font-heading);">
+                                    Inventory Catalog
+                                    <span class="badge bg-primary rounded-pill ms-2 align-middle" style="font-size: 0.75rem;"><?php echo count($products); ?> Items</span>
+                                </h1>
+                                <p class="text-muted mb-0 mt-1">Manage all your products, pricing, and stock alerts.</p>
+                            </div>
+                            <div class="d-flex gap-2">
+                                <?php if (is_admin()): ?>
+                                <a href="export_report.php?entity=products" class="btn btn-success rounded-3 shadow-sm px-4 fw-medium" target="_blank">
+                                    <i class="fas fa-file-excel me-2"></i>Export CSV
+                                </a>
+                                <button class="btn btn-primary rounded-3 shadow-sm px-4 fw-medium pulse-btn" data-bs-toggle="modal" data-bs-target="#addProductModal">
+                                    <i class="fas fa-plus-circle me-2"></i>Add Product
+                                </button>
+                                <?php endif; ?>
+                            </div>
                         </div>
-                        <?php if (is_admin()): ?>
-                        <button class="btn btn-primary shadow-sm fw-bold px-4 rounded-pill pulse-btn" data-bs-toggle="modal" data-bs-target="#addProductModal" style="transition: all 0.3s ease;">
-                            <i class="fas fa-plus-circle me-2 fs-5 align-middle"></i>Add Product
-                        </button>
-                        <?php endif; ?>
                     </div>
                     <div class="card-body">
                         <div class="row mb-3">
