@@ -38,8 +38,11 @@ require_once '../includes/layouts/header.php';
         
         <div class="d-flex justify-content-between align-items-center mb-4">
             <div>
-                <h1 class="h3 mb-0 text-dark fw-bold">Stock Ledger (سجل حركة المخزون)</h1>
-                <p class="text-muted mb-0">Detailed history of all inventory stock updates, additions, and manual corrections.</p>
+                <h1 class="h3 mb-0 fw-bold" style="color: var(--slate-700); font-family: var(--font-heading);">
+                    Stock Ledger (سجل حركة المخزون)
+                    <span class="badge bg-primary rounded-pill ms-2 align-middle" style="font-size: 0.75rem;"><?php echo count($movements); ?> Records</span>
+                </h1>
+                <p class="text-muted mb-0 mt-1">Detailed history of all inventory stock updates, additions, and manual corrections.</p>
             </div>
         </div>
 
@@ -78,7 +81,7 @@ require_once '../includes/layouts/header.php';
         <div class="card shadow-sm border-0 rounded-4">
             <div class="card-body">
                 <div class="table-responsive">
-                    <table class="table table-hover align-middle">
+                    <table class="table table-hover table-striped align-middle">
                         <thead class="bg-light text-secondary">
                             <tr>
                                 <th scope="col" style="width: 80px;">ID</th>

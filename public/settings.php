@@ -127,6 +127,7 @@ if (isset($_GET['delete_staff'])) {
 $page_title = 'Settings';
 $active_page = 'settings';
 $header_title = 'Staff Settings';
+$extra_css = ['https://cdn.jsdelivr.net/npm/sweetalert2@11.10.0/dist/sweetalert2.min.css'];
 
 require_once '../includes/layouts/header.php';
 ?>
@@ -136,20 +137,6 @@ require_once '../includes/layouts/header.php';
     <?php require_once '../includes/layouts/navbar.php'; ?>
 
     <div class="container-fluid px-4 py-5">
-        
-        <?php if ($success): ?>
-            <div class="alert alert-success alert-dismissible fade show" role="alert">
-                <i class="fas fa-check-circle me-2"></i> <?php echo htmlspecialchars($success); ?>
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            </div>
-        <?php endif; ?>
-
-        <?php if ($error): ?>
-            <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                <i class="fas fa-exclamation-circle me-2"></i> <?php echo htmlspecialchars($error); ?>
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            </div>
-        <?php endif; ?>
 
         <div class="row my-2 justify-content-center">
             <div class="col-lg-6 col-md-8">
@@ -210,7 +197,7 @@ require_once '../includes/layouts/header.php';
                 <div class="card shadow-sm border-0 rounded-4">
                     <div class="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center">
                         <h4 class="mb-0 text-secondary fw-bold"><i class="fas fa-users me-2 text-primary"></i>Manage Staff Accounts</h4>
-                        <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addStaffModal">
+                        <button class="btn btn-primary btn-sm shadow-sm px-3 rounded-pill pulse-btn" data-bs-toggle="modal" data-bs-target="#addStaffModal" style="transition: all 0.3s ease;">
                             <i class="fas fa-user-plus me-1"></i> Add Staff
                         </button>
                     </div>
@@ -245,11 +232,9 @@ require_once '../includes/layouts/header.php';
                                                 <i class="fas fa-edit"></i>
                                             </button>
                                             <?php if ($m['id'] !== $staff_id): ?>
-                                            <a href="settings.php?delete_staff=<?php echo $m['id']; ?>&csrf_token=<?php echo htmlspecialchars($_SESSION['csrf_token'] ?? ''); ?>" 
-                                               class="btn btn-sm btn-outline-danger" 
-                                               onclick="return confirm('Are you sure you want to delete this staff member?');">
+                                            <button type="button" class="btn btn-sm btn-outline-danger" onclick="confirmDelete(<?php echo $m['id']; ?>, '<?php echo htmlspecialchars($_SESSION['csrf_token'] ?? ''); ?>')">
                                                 <i class="fas fa-trash"></i>
-                                            </a>
+                                            </button>
                                             <?php endif; ?>
                                         </td>
                                     </tr>
@@ -355,10 +340,57 @@ require_once '../includes/layouts/header.php';
             var modal = new bootstrap.Modal(document.getElementById('editStaffModal'));
             modal.show();
         }
+
+        function confirmDelete(id, token) {
+            Swal.fire({
+                title: 'Delete Staff Member?',
+                text: 'Are you sure you want to delete this staff account? This action cannot be undone.',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#ef4444',
+                cancelButtonColor: '#64748b',
+                confirmButtonText: 'Yes, delete it!'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    window.location.href = `settings.php?delete_staff=${id}&csrf_token=${token}`;
+                }
+            });
+        }
         </script>
         <?php endif; ?>
     </div>
 
 <?php
+$extra_js = [
+    'https://cdn.jsdelivr.net/npm/sweetalert2@11.10.0/dist/sweetalert2.all.min.js'
+];
 require_once '../includes/layouts/footer.php';
 ?>
+
+<?php if (!empty($success)): ?>
+<script>
+    window.addEventListener('load', function() {
+        Swal.fire({
+            icon: 'success',
+            title: 'Success!',
+            text: <?php echo json_encode($success); ?>,
+            confirmButtonColor: '#10b981',
+            timer: 3000,
+            timerProgressBar: true
+        });
+    });
+</script>
+<?php endif; ?>
+
+<?php if (!empty($error)): ?>
+<script>
+    window.addEventListener('load', function() {
+        Swal.fire({
+            icon: 'error',
+            title: 'Error',
+            text: <?php echo json_encode($error); ?>,
+            confirmButtonColor: '#ef4444'
+        });
+    });
+</script>
+<?php endif; ?>

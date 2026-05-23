@@ -77,6 +77,7 @@ $customers = get_customers($conn);
 $page_title = 'Customers Management';
 $active_page = 'customers';
 $header_title = 'Customers';
+$extra_css = ['https://cdn.jsdelivr.net/npm/sweetalert2@11.10.0/dist/sweetalert2.min.css'];
 
 require_once '../includes/layouts/header.php';
 ?>
@@ -86,20 +87,6 @@ require_once '../includes/layouts/header.php';
     <?php require_once '../includes/layouts/navbar.php'; ?>
 
     <div class="container-fluid px-4 py-4">
-        <?php if ($success): ?>
-            <div class="alert alert-success alert-dismissible fade show" role="alert">
-                <i class="fas fa-check-circle me-2"></i> <?php echo htmlspecialchars($success); ?>
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            </div>
-        <?php endif; ?>
-
-        <?php if ($error): ?>
-            <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                <i class="fas fa-exclamation-circle me-2"></i> <?php echo htmlspecialchars($error); ?>
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            </div>
-        <?php endif; ?>
-
         <div class="row my-2">
             <div class="col-md-12">
                 <div class="card shadow-sm border-0 rounded-4">
@@ -108,8 +95,8 @@ require_once '../includes/layouts/header.php';
                             <i class="fas fa-users me-2 text-primary"></i>Customers
                             <span class="badge bg-primary rounded-pill ms-2" style="font-size: 0.7rem;"><?php echo count($customers); ?></span>
                         </h4>
-                        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addCustomerModal">
-                            <i class="fas fa-plus me-2"></i>Add Customer
+                        <button class="btn btn-primary shadow-sm fw-bold px-4 rounded-pill pulse-btn" data-bs-toggle="modal" data-bs-target="#addCustomerModal" style="transition: all 0.3s ease;">
+                            <i class="fas fa-user-plus me-2 fs-5 align-middle"></i>Add Customer
                         </button>
                     </div>
                     <div class="card-body">
@@ -161,11 +148,9 @@ require_once '../includes/layouts/header.php';
                                                     <button class="btn btn-sm btn-outline-primary me-1" onclick='openEditModal(<?php echo json_encode($customer); ?>)'>
                                                         <i class="fas fa-edit"></i>
                                                     </button>
-                                                    <a href="customers.php?delete=<?php echo $customer['id']; ?>&csrf_token=<?php echo htmlspecialchars($_SESSION['csrf_token'] ?? ''); ?>" 
-                                                       class="btn btn-sm btn-outline-danger" 
-                                                       onclick="return confirm('Are you sure you want to delete this customer? This action cannot be undone.');">
+                                                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="confirmDelete(<?php echo $customer['id']; ?>, '<?php echo htmlspecialchars($_SESSION['csrf_token'] ?? ''); ?>')">
                                                         <i class="fas fa-trash"></i>
-                                                    </a>
+                                                    </button>
                                                 <?php endif; ?>
                                             </td>
                                         </tr>
@@ -292,6 +277,56 @@ function openEditModal(customer) {
     var editModal = new bootstrap.Modal(document.getElementById('editCustomerModal'));
     editModal.show();
 }
+
+function confirmDelete(id, token) {
+    Swal.fire({
+        title: 'Delete Customer?',
+        text: 'Are you sure you want to delete this customer? Past orders for this customer will show as walk-in orders.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        cancelButtonColor: '#64748b',
+        confirmButtonText: 'Yes, delete it!'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            window.location.href = `customers.php?delete=${id}&csrf_token=${token}`;
+        }
+    });
+}
 </script>
+
+<?php
+$extra_js = [
+    'https://cdn.jsdelivr.net/npm/sweetalert2@11.10.0/dist/sweetalert2.all.min.js'
+];
+?>
+
+<?php if (!empty($success)): ?>
+<script>
+    window.addEventListener('load', function() {
+        Swal.fire({
+            icon: 'success',
+            title: 'Success!',
+            text: <?php echo json_encode($success); ?>,
+            confirmButtonColor: '#10b981',
+            timer: 3000,
+            timerProgressBar: true
+        });
+    });
+</script>
+<?php endif; ?>
+
+<?php if (!empty($error)): ?>
+<script>
+    window.addEventListener('load', function() {
+        Swal.fire({
+            icon: 'error',
+            title: 'Error',
+            text: <?php echo json_encode($error); ?>,
+            confirmButtonColor: '#ef4444'
+        });
+    });
+</script>
+<?php endif; ?>
 
 <?php require_once '../includes/layouts/footer.php'; ?>
