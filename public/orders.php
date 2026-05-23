@@ -16,29 +16,58 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['complete_order'])) {
     } else {
         $cart_json = $_POST['cart_data'] ?? '[]';
         $cart_items = json_decode($cart_json, true);
-        $order_type = $_POST['order_type'] ?? 'sale';
+        
+        // Ensure valid JSON payload
+        if (json_last_error() !== JSON_ERROR_NONE || !is_array($cart_items)) {
+            $cart_items = [];
+        }
 
-        if (empty($cart_items) || !is_array($cart_items)) {
-            $error = "Cart is empty. Please add products.";
+        $order_type = $_POST['order_type'] ?? 'sale';
+        if (!in_array($order_type, ['sale', 'purchase'], true)) {
+            $order_type = 'sale';
+        }
+
+        if (empty($cart_items)) {
+            $error = "Cart is empty or invalid. Please add products.";
         } else {
             $order_items = [];
             $valid_order = true;
 
             foreach ($cart_items as $item) {
-                $prod = get_product_by_id($conn, $item['id']);
-                
-                // Stock validation only for sales
-                if ($order_type === 'sale' && (!$prod || $prod['stock'] < $item['qty'])) {
-                    $error = "Insufficient stock for product: " . htmlspecialchars($item['name']);
+                // Ensure valid integers
+                $product_id = isset($item['id']) ? intval($item['id']) : 0;
+                $quantity = isset($item['qty']) ? intval($item['qty']) : 0;
+
+                if ($product_id <= 0 || $quantity <= 0) {
+                    $error = "Invalid product or quantity detected.";
                     $valid_order = false;
                     break;
                 }
 
+                // Security: Fetch product from DB to ensure it exists and to get the true price.
+                // NEVER trust client-side prices!
+                $prod = get_product_by_id($conn, $product_id);
+                if (!$prod) {
+                    $error = "Product ID #{$product_id} does not exist.";
+                    $valid_order = false;
+                    break;
+                }
+                
+                // Stock validation only for sales
+                if ($order_type === 'sale' && $prod['stock'] < $quantity) {
+                    $error = "Insufficient stock for product: " . htmlspecialchars($prod['name']);
+                    $valid_order = false;
+                    break;
+                }
+
+                $actual_price = (float)$prod['price'];
+                $subtotal = $actual_price * $quantity;
+
                 $order_items[] = [
-                    'product_id' => $item['id'],
-                    'quantity' => intval($item['qty']),
-                    'unit_price' => floatval($item['price']),
-                    'subtotal' => floatval($item['price'] * $item['qty'])
+                    'product_id' => $product_id,
+                    'quantity'   => $quantity,
+                    'unit_price' => $actual_price,
+                    'subtotal'   => $subtotal
                 ];
             }
 
@@ -218,7 +247,7 @@ require_once '../includes/layouts/header.php';
                                 </select>
                             </div>
 
-                            <button type="button" class="btn btn-success w-100 py-3 fs-5 fw-bold shadow-sm" onclick="submitOrder()">
+                            <button type="button" class="btn btn-success w-100 py-3 fs-5 fw-bold shadow-sm" id="completeOrderBtn" onclick="submitOrder()" disabled>
                                 <i class="fas fa-check-circle me-2"></i>Complete Order
                             </button>
                         </form>
@@ -380,15 +409,17 @@ $extra_js = [
         countEl.innerText = itemCount + ' Items';
         dataInput.value = JSON.stringify(cart);
 
-        // Toggle clear cart button & complete button animation
+        // Toggle clear cart button & complete button state
         const clearBtn = document.getElementById('clearCartBtn');
-        const completeBtn = document.querySelector('#orderForm button[type="button"]');
+        const completeBtn = document.getElementById('completeOrderBtn');
         if (cart.length > 0) {
             clearBtn.style.display = 'inline-block';
             completeBtn.classList.add('pulse-btn');
+            completeBtn.disabled = false;
         } else {
             clearBtn.style.display = 'none';
             completeBtn.classList.remove('pulse-btn');
+            completeBtn.disabled = true;
         }
     }
 

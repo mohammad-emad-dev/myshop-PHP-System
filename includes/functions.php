@@ -259,16 +259,21 @@ function create_order($conn, $staff_id, $items, $order_type = 'sale', $customer_
             $detail_stmt->execute();
 
             // Adjust stock based on order type
+            // Adjust stock based on order type
             if ($order_type === 'sale') {
-                $update_stmt = $conn->prepare("UPDATE Product SET stock = stock - ? WHERE id = ?");
+                $update_stmt = $conn->prepare("UPDATE Product SET stock = stock - ? WHERE id = ? AND stock >= ?");
+                if (!$update_stmt) throw new Exception("Failed to prepare update stock statement");
+                $update_stmt->bind_param("iii", $item['quantity'], $item['product_id'], $item['quantity']);
+                $update_stmt->execute();
+                if ($update_stmt->affected_rows === 0) {
+                    throw new Exception("Race condition detected: Insufficient stock for product ID {$item['product_id']}");
+                }
             } else { // purchase
                 $update_stmt = $conn->prepare("UPDATE Product SET stock = stock + ? WHERE id = ?");
+                if (!$update_stmt) throw new Exception("Failed to prepare update stock statement");
+                $update_stmt->bind_param("ii", $item['quantity'], $item['product_id']);
+                $update_stmt->execute();
             }
-            if (!$update_stmt) {
-                throw new Exception("Failed to prepare update stock statement");
-            }
-            $update_stmt->bind_param("ii", $item['quantity'], $item['product_id']);
-            $update_stmt->execute();
             $update_stmt->close();
 
             // Log stock movement
