@@ -1,7 +1,35 @@
 <?php
+/**
+ * Basic sanitization for general text inputs.
+ */
 function sanitize_input($data)
 {
-    return htmlspecialchars(strip_tags(trim($data)));
+    return htmlspecialchars(strip_tags(trim($data)), ENT_QUOTES, 'UTF-8');
+}
+
+/**
+ * Strict sanitization for email addresses.
+ */
+function sanitize_email($email)
+{
+    $email = trim($email);
+    return filter_var($email, FILTER_SANITIZE_EMAIL);
+}
+
+/**
+ * Strict sanitization for phone numbers (keeps only digits, +, and spaces).
+ */
+function sanitize_phone($phone)
+{
+    return preg_replace('/[^0-9+\s-]/', '', trim($phone));
+}
+
+/**
+ * Strict sanitization for numeric IDs.
+ */
+function sanitize_id($id)
+{
+    return filter_var($id, FILTER_VALIDATE_INT) !== false ? (int)$id : 0;
 }
 
 function verify_login()
@@ -289,7 +317,8 @@ function create_order($conn, $staff_id, $items, $order_type = 'sale', $customer_
         return $order_id;
     } catch (Exception $e) {
         $conn->rollback();
-        error_log("create_order failed: " . $e->getMessage());
+        // Log the detailed error internally
+        error_log("CRITICAL ORDER ERROR: " . $e->getMessage());
         return false;
     }
 }
@@ -836,10 +865,10 @@ function get_customer_by_id($conn, $id)
  */
 function create_customer($conn, $name, $phone, $email, $address)
 {
-    $name = trim($name);
-    $phone = trim($phone);
-    $email = trim($email);
-    $address = trim($address);
+    $name = sanitize_input($name);
+    $phone = sanitize_phone($phone);
+    $email = sanitize_email($email);
+    $address = sanitize_input($address);
 
     if (empty($name)) {
         return false;
@@ -860,11 +889,11 @@ function create_customer($conn, $name, $phone, $email, $address)
  */
 function update_customer($conn, $id, $name, $phone, $email, $address)
 {
-    $id = (int)$id;
-    $name = trim($name);
-    $phone = trim($phone);
-    $email = trim($email);
-    $address = trim($address);
+    $id = sanitize_id($id);
+    $name = sanitize_input($name);
+    $phone = sanitize_phone($phone);
+    $email = sanitize_email($email);
+    $address = sanitize_input($address);
 
     if ($id <= 1 || empty($name)) {
         return false;
@@ -932,10 +961,10 @@ function get_supplier_by_id($conn, $id)
  */
 function create_supplier($conn, $name, $phone, $email, $address)
 {
-    $name = trim($name);
-    $phone = trim($phone);
-    $email = trim($email);
-    $address = trim($address);
+    $name = sanitize_input($name);
+    $phone = sanitize_phone($phone);
+    $email = sanitize_email($email);
+    $address = sanitize_input($address);
 
     if (empty($name)) {
         return false;
@@ -956,11 +985,11 @@ function create_supplier($conn, $name, $phone, $email, $address)
  */
 function update_supplier($conn, $id, $name, $phone, $email, $address)
 {
-    $id = (int)$id;
-    $name = trim($name);
-    $phone = trim($phone);
-    $email = trim($email);
-    $address = trim($address);
+    $id = sanitize_id($id);
+    $name = sanitize_input($name);
+    $phone = sanitize_phone($phone);
+    $email = sanitize_email($email);
+    $address = sanitize_input($address);
 
     if ($id <= 1 || empty($name)) {
         return false;

@@ -28,41 +28,72 @@ if (isset($_SESSION['staff_id'])) {
 $error = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $csrf_token = $_POST['csrf_token'] ?? '';
-    if (!verify_csrf_token($csrf_token)) {
-        $error = 'Security check failed. Invalid request token.';
-    } else {
-        $username = sanitize_input($_POST['username']);
-        $password = $_POST['password'];
+    // --- Brute Force Protection (Session-based) ---
+    if (!isset($_SESSION['login_attempts'])) {
+        $_SESSION['login_attempts'] = 0;
+        $_SESSION['last_attempt_time'] = time();
+    }
 
-        $stmt = $conn->prepare("SELECT id, password, full_name, role FROM Staff WHERE username = ?");
-        if (!$stmt) {
-            die("Database Error: " . $conn->error);
+    $lockout_time = 15 * 60; // 15 minutes
+    $max_attempts = 5;
+
+    if ($_SESSION['login_attempts'] >= $max_attempts) {
+        if (time() - $_SESSION['last_attempt_time'] < $lockout_time) {
+            $remaining = ceil(($lockout_time - (time() - $_SESSION['last_attempt_time'])) / 60);
+            $error = "Too many failed attempts. Please try again in {$remaining} minutes.";
+        } else {
+            // Reset after lockout expires
+            $_SESSION['login_attempts'] = 0;
+            $_SESSION['last_attempt_time'] = time();
         }
-        $stmt->bind_param("s", $username);
-        $stmt->execute();
-        $result = $stmt->get_result();
+    }
 
-        if ($result->num_rows === 1) {
-            $user = $result->fetch_assoc();
+    if (empty($error)) {
+        $csrf_token = $_POST['csrf_token'] ?? '';
+        if (!verify_csrf_token($csrf_token)) {
+            $error = 'Security check failed. Invalid request token.';
+        } else {
+            $username = sanitize_input($_POST['username']);
+            $password = $_POST['password'];
 
-            if (password_verify($password, $user['password'])) {
-                // Secure session regeneration
-                session_regenerate_id(true);
-                $_SESSION['staff_id'] = $user['id'];
-                $_SESSION['full_name'] = $user['full_name'];
-                $_SESSION['role'] = $user['role'];
-                
-                // Refresh CSRF token for the active session
-                unset($_SESSION['csrf_token']);
-                generate_csrf_token();
-                
-                redirect('index.php');
+            $stmt = $conn->prepare("SELECT id, password, full_name, role FROM Staff WHERE username = ?");
+            if (!$stmt) {
+                die("Database Error: " . $conn->error);
+            }
+            $stmt->bind_param("s", $username);
+            $stmt->execute();
+            $result = $stmt->get_result();
+
+            if ($result->num_rows === 1) {
+                $user = $result->fetch_assoc();
+
+                if (password_verify($password, $user['password'])) {
+                    // Secure session regeneration to prevent fixation
+                    session_regenerate_id(true);
+                    
+                    // Clear failed attempts
+                    unset($_SESSION['login_attempts']);
+                    unset($_SESSION['last_attempt_time']);
+
+                    $_SESSION['staff_id'] = $user['id'];
+                    $_SESSION['full_name'] = $user['full_name'];
+                    $_SESSION['role'] = $user['role'];
+                    
+                    // Refresh CSRF token for the active session
+                    unset($_SESSION['csrf_token']);
+                    generate_csrf_token();
+                    
+                    redirect('index.php');
+                } else {
+                    $_SESSION['login_attempts']++;
+                    $_SESSION['last_attempt_time'] = time();
+                    $error = 'Invalid credentials';
+                }
             } else {
+                $_SESSION['login_attempts']++;
+                $_SESSION['last_attempt_time'] = time();
                 $error = 'Invalid credentials';
             }
-        } else {
-            $error = 'Invalid credentials';
         }
     }
 }

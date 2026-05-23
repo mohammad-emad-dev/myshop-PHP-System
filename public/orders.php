@@ -10,17 +10,28 @@ $error = '';
 
 // Handle Order Submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['complete_order'])) {
-    $csrf_token = $_POST['csrf_token'] ?? '';
-    if (!verify_csrf_token($csrf_token)) {
-        $error = "Security check failed. Invalid request token.";
+    // --- POS Transaction Flood Protection ---
+    $current_time = time();
+    if (isset($_SESSION['last_order_time']) && ($current_time - $_SESSION['last_order_time']) < 3) {
+        // Prevent submissions faster than 3 seconds
+        $error = "Transaction processing. Please wait a moment before submitting another order.";
     } else {
-        $cart_json = $_POST['cart_data'] ?? '[]';
-        $cart_items = json_decode($cart_json, true);
-        
-        // Ensure valid JSON payload
-        if (json_last_error() !== JSON_ERROR_NONE || !is_array($cart_items)) {
-            $cart_items = [];
-        }
+        $csrf_token = $_POST['csrf_token'] ?? '';
+        if (!verify_csrf_token($csrf_token)) {
+            $error = "Security check failed. Invalid request token.";
+        } else {
+            $cart_json = $_POST['cart_data'] ?? '[]';
+            
+            // Defend against excessively large payloads
+            if (strlen($cart_json) > 50000) {
+                $error = "Payload too large. Request rejected.";
+            } else {
+                $cart_items = json_decode($cart_json, true);
+                
+                // Ensure valid JSON array structure
+                if (json_last_error() !== JSON_ERROR_NONE || !is_array($cart_items) || isset($cart_items['id'])) {
+                    $cart_items = [];
+                }
 
         $order_type = $_POST['order_type'] ?? 'sale';
         if (!in_array($order_type, ['sale', 'purchase'], true)) {
@@ -77,6 +88,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['complete_order'])) {
 
                 $order_id = create_order($conn, $_SESSION['staff_id'], $order_items, $order_type, $customer_id, $supplier_id);
                 if ($order_id) {
+                    $_SESSION['last_order_time'] = time(); // Record time to prevent flood
                     $success = "Order #$order_id completed successfully!";
                 } else {
                     $error = "Failed to process order transaction.";
@@ -84,6 +96,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['complete_order'])) {
             }
         }
     }
+}
+}
 }
 
 $products = get_products($conn);
