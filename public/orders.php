@@ -531,9 +531,21 @@ $extra_js = [
             icon: 'success',
             title: 'Order Completed!',
             text: <?php echo json_encode($success); ?>,
+            showCancelButton: true,
             confirmButtonColor: '#6366f1',
-            timer: 4000,
-            timerProgressBar: true
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: '<i class="fas fa-print me-1"></i> Print Receipt',
+            cancelButtonText: '<i class="fas fa-plus-circle me-1"></i> New Order',
+            allowOutsideClick: false
+        }).then((result) => {
+            if (result.isConfirmed) {
+                // Open print window
+                window.open('print_invoice.php?id=<?php echo $order_id; ?>', '_blank');
+                // Reload current page for new order
+                window.location.href = 'orders.php';
+            } else {
+                window.location.href = 'orders.php';
+            }
         });
     });
 </script>
