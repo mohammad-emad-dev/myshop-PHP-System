@@ -21,8 +21,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         if ($action === 'create') {
             $name = sanitize_input($_POST['name']);
             $description = sanitize_input($_POST['description']);
-            $price = floatval($_POST['price']);
-            $stock = intval($_POST['stock']);
+            $price = max(0.0, floatval($_POST['price']));
+            $stock = max(0, intval($_POST['stock']));
             $alert_threshold = isset($_POST['alert_threshold']) ? max(0, intval($_POST['alert_threshold'])) : 10;
             $category_id = isset($_POST['category_id']) ? intval($_POST['category_id']) : null;
 
@@ -45,8 +45,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $id = intval($_POST['id']);
             $name = sanitize_input($_POST['name']);
             $description = sanitize_input($_POST['description']);
-            $price = floatval($_POST['price']);
-            $stock = intval($_POST['stock']);
+            $price = max(0.0, floatval($_POST['price']));
+            $stock = max(0, intval($_POST['stock']));
             $alert_threshold = isset($_POST['alert_threshold']) ? max(0, intval($_POST['alert_threshold'])) : 10;
             $category_id = isset($_POST['category_id']) ? intval($_POST['category_id']) : null;
 
@@ -100,6 +100,7 @@ if ($filter === 'low_stock') {
 $categories = get_categories($conn);
 $page_title = 'Products';
 $active_page = 'products';
+$extra_css = ['https://cdn.jsdelivr.net/npm/sweetalert2@11.10.0/dist/sweetalert2.min.css'];
 
 
 require_once '../includes/layouts/header.php';
@@ -111,28 +112,19 @@ require_once '../includes/layouts/header.php';
 
     <div class="container-fluid px-4 py-5">
 
-        <?php if ($success): ?>
-            <div class="alert alert-success alert-dismissible fade show" role="alert">
-                <i class="fas fa-check-circle me-2"></i> <?php echo htmlspecialchars($success); ?>
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            </div>
-        <?php endif; ?>
-
-        <?php if ($error): ?>
-            <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                <i class="fas fa-exclamation-circle me-2"></i> <?php echo htmlspecialchars($error); ?>
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            </div>
-        <?php endif; ?>
-
         <div class="row my-2">
             <div class="col-md-12">
                 <div class="card shadow-sm border-0 rounded-4">
                     <div class="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center">
-                        <h4 class="mb-0 text-secondary fw-bold">All Products</h4>
+                        <div class="d-flex align-items-center">
+                            <h4 class="mb-0 text-secondary fw-bold me-3" style="font-family: var(--font-heading);">All Products</h4>
+                            <span class="badge bg-primary-subtle text-primary rounded-pill px-3 py-2 fw-bold fs-6 shadow-sm border border-primary-subtle">
+                                <i class="fas fa-box me-1"></i> <?php echo count($products); ?> Items
+                            </span>
+                        </div>
                         <?php if (is_admin()): ?>
-                        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addProductModal">
-                            <i class="fas fa-plus me-2"></i>Add Product
+                        <button class="btn btn-primary shadow-sm fw-bold px-4 rounded-pill pulse-btn" data-bs-toggle="modal" data-bs-target="#addProductModal" style="transition: all 0.3s ease;">
+                            <i class="fas fa-plus-circle me-2 fs-5 align-middle"></i>Add Product
                         </button>
                         <?php endif; ?>
                     </div>
@@ -196,9 +188,13 @@ require_once '../includes/layouts/header.php';
                                             </td>
                                             <td>
                                                 <?php if ($product['image_path']): ?>
-                                                    <img src="<?php echo htmlspecialchars($product['image_path']); ?>" alt="Product" class="rounded" style="width: 50px; height: 50px; object-fit: cover;">
+                                                    <div class="product-img-wrapper" style="width: 55px; height: 55px; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.1); border: 2px solid #fff;">
+                                                        <img src="<?php echo htmlspecialchars($product['image_path']); ?>" alt="Product" style="width: 100%; height: 100%; object-fit: cover; transition: transform 0.3s ease;" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'">
+                                                    </div>
                                                 <?php else: ?>
-                                                    <span class="text-muted fst-italic small">No Image</span>
+                                                    <div class="d-flex align-items-center justify-content-center bg-light text-muted" style="width: 55px; height: 55px; border-radius: 12px; border: 1px dashed #cbd5e1;">
+                                                        <i class="fas fa-image fs-5 opacity-50"></i>
+                                                    </div>
                                                 <?php endif; ?>
                                             </td>
                                              <td>
@@ -340,7 +336,10 @@ require_once '../includes/layouts/header.php';
     </div>
 
 <?php
-$extra_js = ['assets/js/script.js'];
+$extra_js = [
+    'assets/js/script.js',
+    'https://cdn.jsdelivr.net/npm/sweetalert2@11.10.0/dist/sweetalert2.all.min.js'
+];
 ?>
 <script>
     // Custom function to open Bootstrap modal and populate data
@@ -356,7 +355,46 @@ $extra_js = ['assets/js/script.js'];
         var editModal = new bootstrap.Modal(document.getElementById('editProductModal'));
         editModal.show();
     }
+
+    // Client-side search filtering
+    document.getElementById('searchProduct').addEventListener('keyup', function() {
+        let filter = this.value.toLowerCase();
+        let rows = document.querySelectorAll('#productsTable tbody tr');
+        
+        rows.forEach(row => {
+            let text = row.innerText.toLowerCase();
+            row.style.display = text.includes(filter) ? '' : 'none';
+        });
+    });
 </script>
+
+<?php if (!empty($success)): ?>
+<script>
+    window.addEventListener('load', function() {
+        Swal.fire({
+            icon: 'success',
+            title: 'Success!',
+            text: <?php echo json_encode($success); ?>,
+            confirmButtonColor: '#10b981',
+            timer: 3000,
+            timerProgressBar: true
+        });
+    });
+</script>
+<?php endif; ?>
+
+<?php if (!empty($error)): ?>
+<script>
+    window.addEventListener('load', function() {
+        Swal.fire({
+            icon: 'error',
+            title: 'Error',
+            text: <?php echo json_encode($error); ?>,
+            confirmButtonColor: '#ef4444'
+        });
+    });
+</script>
+<?php endif; ?>
 <?php
 require_once '../includes/layouts/footer.php';
 ?>
