@@ -32,7 +32,7 @@ require_once '../includes/layouts/header.php';
                         <p class="fs-6 text-muted mb-0 fw-medium">Products</p>
                     </div>
                     <div class="rounded-full primary-bg p-3 d-flex align-items-center justify-content-center" style="width: 52px; height: 52px;">
-                        <i class="fas fa-boxes fs-4 primary-text"></i>
+                        <i class="fas fa-box-archive fs-4 primary-text"></i>
                     </div>
                 </div>
             </div>
@@ -56,7 +56,7 @@ require_once '../includes/layouts/header.php';
                         <p class="fs-6 text-muted mb-0 fw-medium">Sales</p>
                     </div>
                     <div class="rounded-full info-bg p-3 d-flex align-items-center justify-content-center" style="width: 52px; height: 52px;">
-                        <i class="fas fa-hand-holding-usd fs-4 info-text"></i>
+                        <i class="fas fa-dollar-sign fs-4 info-text"></i>
                     </div>
                 </div>
             </div>
@@ -96,7 +96,7 @@ require_once '../includes/layouts/header.php';
                                 <i class="fas fa-chart-line me-2 text-primary"></i>Sales & Purchases Flow (Last 7 Days)
                             </h5>
                             <span class="badge bg-light text-dark border">
-                                <i class="fas fa-calendar-alt me-1 text-primary"></i> 7-Day Performance
+                                <i class="fas fa-calendar-days me-1 text-primary"></i> 7-Day Performance
                             </span>
                         </div>
                         <div style="position: relative; height: 350px;">
@@ -181,7 +181,7 @@ require_once '../includes/layouts/header.php';
                 <div class="card shadow-sm border-0 rounded-4">
                     <div class="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center">
                         <h5 class="mb-0 text-secondary fw-bold">
-                            <i class="fas fa-exclamation-triangle text-danger me-2"></i>Low Stock Inventory Alerts
+                            <i class="fas fa-triangle-exclamation text-danger me-2"></i>Low Stock Inventory Alerts
                         </h5>
                         <?php if ($total_low_stock > 0): ?>
                             <span class="badge bg-danger rounded-pill px-3 py-2"><?php echo $total_low_stock; ?> Action Required</span>
@@ -252,7 +252,7 @@ require_once '../includes/layouts/header.php';
                         <div class="card-body p-4 text-white">
                             <div class="d-flex align-items-center mb-3">
                                 <div class="rounded-circle d-flex align-items-center justify-content-center" style="width:48px;height:48px;background:rgba(255,255,255,0.2);">
-                                    <i class="fas fa-box-open fs-5"></i>
+                                    <i class="fas fa-box fs-5"></i>
                                 </div>
                             </div>
                             <h5 class="fw-bold mb-1" style="font-family:var(--font-heading);color:#fff;">Products</h5>
@@ -282,7 +282,7 @@ require_once '../includes/layouts/header.php';
                         <div class="card-body p-4 text-white">
                             <div class="d-flex align-items-center mb-3">
                                 <div class="rounded-circle d-flex align-items-center justify-content-center" style="width:48px;height:48px;background:rgba(255,255,255,0.2);">
-                                    <i class="fas fa-user-friends fs-5"></i>
+                                    <i class="fas fa-users fs-5"></i>
                                 </div>
                             </div>
                             <h5 class="fw-bold mb-1" style="font-family:var(--font-heading);color:#fff;">Customers</h5>

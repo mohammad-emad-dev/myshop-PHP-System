@@ -66,6 +66,7 @@ if (isset($_GET['delete'])) {
 $categories = get_categories($conn);
 $page_title = 'Categories';
 $active_page = 'categories';
+$header_title = 'Categories';
 
 require_once '../includes/layouts/header.php';
 ?>
@@ -74,7 +75,7 @@ require_once '../includes/layouts/header.php';
     <?php require_once '../includes/layouts/sidebar.php'; ?>
     <?php require_once '../includes/layouts/navbar.php'; ?>
 
-    <div class="container-fluid px-4 py-5">
+    <div class="container-fluid px-4 py-4">
 
         <?php if ($success): ?>
             <div class="alert alert-success alert-dismissible fade show" role="alert">
@@ -94,7 +95,10 @@ require_once '../includes/layouts/header.php';
             <div class="col-md-12">
                 <div class="card shadow-sm border-0 rounded-4">
                     <div class="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center">
-                        <h4 class="mb-0 text-secondary fw-bold">Product Categories</h4>
+                        <h4 class="mb-0 fw-bold" style="color: var(--slate-700); font-family: var(--font-heading);">
+                            <i class="fas fa-tags me-2 text-primary"></i>Product Categories
+                            <span class="badge bg-primary rounded-pill ms-2" style="font-size: 0.7rem;"><?php echo count($categories); ?></span>
+                        </h4>
                         <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addCategoryModal">
                             <i class="fas fa-plus me-2"></i>Add Category
                         </button>
@@ -109,7 +113,7 @@ require_once '../includes/layouts/header.php';
                             </div>
                         </div>
                         <div class="table-responsive">
-                            <table class="table table-hover align-middle" id="categoriesTable">
+                            <table class="table table-hover table-striped align-middle" id="categoriesTable">
                                 <thead class="bg-light text-secondary">
                                     <tr>
                                         <th scope="col">ID</th>
@@ -165,7 +169,10 @@ require_once '../includes/layouts/header.php';
                                     <?php endforeach; ?>
                                     <?php if (empty($categories)): ?>
                                         <tr>
-                                            <td colspan="6" class="text-center text-muted py-4">No categories found.</td>
+                                            <td colspan="6" class="text-center text-muted py-5">
+                                                <i class="fas fa-tags fa-3x mb-3 text-secondary opacity-25 d-block"></i>
+                                                <p class="mb-0">No categories found. Click "Add Category" to create one.</p>
+                                            </td>
                                         </tr>
                                     <?php endif; ?>
                                 </tbody>
@@ -176,7 +183,6 @@ require_once '../includes/layouts/header.php';
             </div>
         </div>
     </div>
-</div>
 
 <!-- Add Category Modal -->
 <div class="modal fade" id="addCategoryModal" tabindex="-1" aria-labelledby="addCategoryModalLabel" aria-hidden="true">
@@ -184,7 +190,7 @@ require_once '../includes/layouts/header.php';
         <div class="modal-content border-0 rounded-4">
             <div class="modal-header py-3">
                 <h5 class="modal-title fw-bold" id="addCategoryModalLabel" style="font-family: var(--font-heading); color: var(--slate-900);"><i class="fas fa-plus me-2 text-primary"></i>Add Category</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form action="categories.php" method="POST">
                 <input type="hidden" name="action" value="create">
@@ -214,7 +220,7 @@ require_once '../includes/layouts/header.php';
         <div class="modal-content border-0 rounded-4">
             <div class="modal-header py-3">
                 <h5 class="modal-title fw-bold" id="editCategoryModalLabel" style="font-family: var(--font-heading); color: var(--slate-900);"><i class="fas fa-edit me-2 text-primary"></i>Edit Category Details</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form action="categories.php" method="POST">
                 <input type="hidden" name="action" value="update">
@@ -241,22 +247,16 @@ require_once '../includes/layouts/header.php';
 
 <script>
 document.addEventListener("DOMContentLoaded", function() {
-    // Client-side search filtering
     const searchInput = document.getElementById("searchCategory");
     if (searchInput) {
         searchInput.addEventListener("keyup", function() {
             const value = this.value.toLowerCase().trim();
             const rows = document.querySelectorAll("#categoriesTable tbody tr");
-            
             rows.forEach(row => {
-                if (row.cells.length > 1) { // Skip empty state row
+                if (row.cells.length > 1) {
                     const name = row.cells[1].textContent.toLowerCase();
                     const desc = row.cells[2].textContent.toLowerCase();
-                    if (name.includes(value) || desc.includes(value)) {
-                        row.style.display = "";
-                    } else {
-                        row.style.display = "none";
-                    }
+                    row.style.display = (name.includes(value) || desc.includes(value)) ? "" : "none";
                 }
             });
         });
@@ -267,7 +267,6 @@ function openEditModal(category) {
     document.getElementById('edit_id').value = category.id;
     document.getElementById('edit_name').value = category.name;
     document.getElementById('edit_description').value = category.description || '';
-    
     var editModal = new bootstrap.Modal(document.getElementById('editCategoryModal'));
     editModal.show();
 }

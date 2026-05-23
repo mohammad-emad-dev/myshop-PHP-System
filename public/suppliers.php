@@ -76,6 +76,7 @@ if (isset($_GET['delete'])) {
 $suppliers = get_suppliers($conn);
 $page_title = 'Suppliers Management';
 $active_page = 'suppliers';
+$header_title = 'Suppliers';
 
 require_once '../includes/layouts/header.php';
 ?>
@@ -84,7 +85,7 @@ require_once '../includes/layouts/header.php';
     <?php require_once '../includes/layouts/sidebar.php'; ?>
     <?php require_once '../includes/layouts/navbar.php'; ?>
 
-    <div class="container-fluid px-4 py-5">
+    <div class="container-fluid px-4 py-4">
         <?php if ($success): ?>
             <div class="alert alert-success alert-dismissible fade show" role="alert">
                 <i class="fas fa-check-circle me-2"></i> <?php echo htmlspecialchars($success); ?>
@@ -103,7 +104,10 @@ require_once '../includes/layouts/header.php';
             <div class="col-md-12">
                 <div class="card shadow-sm border-0 rounded-4">
                     <div class="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center">
-                        <h4 class="mb-0 text-secondary fw-bold">Suppliers Management</h4>
+                        <h4 class="mb-0 fw-bold" style="color: var(--slate-700); font-family: var(--font-heading);">
+                            <i class="fas fa-truck me-2 text-success"></i>Suppliers
+                            <span class="badge bg-success rounded-pill ms-2" style="font-size: 0.7rem;"><?php echo count($suppliers); ?></span>
+                        </h4>
                         <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addSupplierModal">
                             <i class="fas fa-plus me-2"></i>Add Supplier
                         </button>
@@ -118,7 +122,7 @@ require_once '../includes/layouts/header.php';
                             </div>
                         </div>
                         <div class="table-responsive">
-                            <table class="table table-hover align-middle" id="suppliersTable">
+                            <table class="table table-hover table-striped align-middle" id="suppliersTable">
                                 <thead class="bg-light text-secondary">
                                     <tr>
                                         <th scope="col" style="width: 80px;">ID</th>
@@ -168,7 +172,10 @@ require_once '../includes/layouts/header.php';
                                     <?php endforeach; ?>
                                     <?php if (empty($suppliers)): ?>
                                         <tr>
-                                            <td colspan="7" class="text-center text-muted py-4">No suppliers found.</td>
+                                            <td colspan="7" class="text-center text-muted py-5">
+                                                <i class="fas fa-truck fa-3x mb-3 text-secondary opacity-25 d-block"></i>
+                                                <p class="mb-0">No suppliers found. Click "Add Supplier" to create one.</p>
+                                            </td>
                                         </tr>
                                     <?php endif; ?>
                                 </tbody>
@@ -179,15 +186,14 @@ require_once '../includes/layouts/header.php';
             </div>
         </div>
     </div>
-</div>
 
 <!-- Add Supplier Modal -->
 <div class="modal fade" id="addSupplierModal" tabindex="-1" aria-labelledby="addSupplierModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 rounded-4">
             <div class="modal-header py-3">
-                <h5 class="modal-title fw-bold" id="addSupplierModalLabel" style="font-family: var(--font-heading); color: var(--slate-900);"><i class="fas fa-truck-loading me-2 text-primary"></i>Add Supplier</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                <h5 class="modal-title fw-bold" id="addSupplierModalLabel" style="font-family: var(--font-heading); color: var(--slate-900);"><i class="fas fa-truck me-2 text-success"></i>Add Supplier</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form action="suppliers.php" method="POST">
                 <input type="hidden" name="action" value="create">
@@ -225,7 +231,7 @@ require_once '../includes/layouts/header.php';
         <div class="modal-content border-0 rounded-4">
             <div class="modal-header py-3">
                 <h5 class="modal-title fw-bold" id="editSupplierModalLabel" style="font-family: var(--font-heading); color: var(--slate-900);"><i class="fas fa-edit me-2 text-primary"></i>Edit Supplier Details</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form action="suppliers.php" method="POST">
                 <input type="hidden" name="action" value="update">
@@ -234,7 +240,7 @@ require_once '../includes/layouts/header.php';
                 <div class="modal-body p-4">
                     <div class="mb-3">
                         <label for="edit_name" class="form-label fw-bold">Supplier Name <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control rounded-3" id="edit_id_name" name="name" required>
+                        <input type="text" class="form-control rounded-3" id="edit_name" name="name" required>
                     </div>
                     <div class="mb-3">
                         <label for="edit_phone" class="form-label fw-bold">Phone Number</label>
@@ -265,17 +271,12 @@ document.addEventListener("DOMContentLoaded", function() {
         searchInput.addEventListener("keyup", function() {
             const value = this.value.toLowerCase().trim();
             const rows = document.querySelectorAll("#suppliersTable tbody tr");
-            
             rows.forEach(row => {
-                if (row.cells.length > 1) { // Skip empty state row
+                if (row.cells.length > 1) {
                     const name = row.cells[1].textContent.toLowerCase();
                     const phone = row.cells[2].textContent.toLowerCase();
                     const email = row.cells[3].textContent.toLowerCase();
-                    if (name.includes(value) || phone.includes(value) || email.includes(value)) {
-                        row.style.display = "";
-                    } else {
-                        row.style.display = "none";
-                    }
+                    row.style.display = (name.includes(value) || phone.includes(value) || email.includes(value)) ? "" : "none";
                 }
             });
         });
@@ -284,11 +285,10 @@ document.addEventListener("DOMContentLoaded", function() {
 
 function openEditModal(supplier) {
     document.getElementById('edit_id').value = supplier.id;
-    document.getElementById('edit_id_name').value = supplier.name;
+    document.getElementById('edit_name').value = supplier.name;
     document.getElementById('edit_phone').value = supplier.phone || '';
     document.getElementById('edit_email').value = supplier.email || '';
     document.getElementById('edit_address').value = supplier.address || '';
-    
     var editModal = new bootstrap.Modal(document.getElementById('editSupplierModal'));
     editModal.show();
 }

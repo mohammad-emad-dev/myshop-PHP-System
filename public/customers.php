@@ -76,6 +76,7 @@ if (isset($_GET['delete'])) {
 $customers = get_customers($conn);
 $page_title = 'Customers Management';
 $active_page = 'customers';
+$header_title = 'Customers';
 
 require_once '../includes/layouts/header.php';
 ?>
@@ -84,7 +85,7 @@ require_once '../includes/layouts/header.php';
     <?php require_once '../includes/layouts/sidebar.php'; ?>
     <?php require_once '../includes/layouts/navbar.php'; ?>
 
-    <div class="container-fluid px-4 py-5">
+    <div class="container-fluid px-4 py-4">
         <?php if ($success): ?>
             <div class="alert alert-success alert-dismissible fade show" role="alert">
                 <i class="fas fa-check-circle me-2"></i> <?php echo htmlspecialchars($success); ?>
@@ -103,7 +104,10 @@ require_once '../includes/layouts/header.php';
             <div class="col-md-12">
                 <div class="card shadow-sm border-0 rounded-4">
                     <div class="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center">
-                        <h4 class="mb-0 text-secondary fw-bold">Customers Management</h4>
+                        <h4 class="mb-0 fw-bold" style="color: var(--slate-700); font-family: var(--font-heading);">
+                            <i class="fas fa-users me-2 text-primary"></i>Customers
+                            <span class="badge bg-primary rounded-pill ms-2" style="font-size: 0.7rem;"><?php echo count($customers); ?></span>
+                        </h4>
                         <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addCustomerModal">
                             <i class="fas fa-plus me-2"></i>Add Customer
                         </button>
@@ -118,7 +122,7 @@ require_once '../includes/layouts/header.php';
                             </div>
                         </div>
                         <div class="table-responsive">
-                            <table class="table table-hover align-middle" id="customersTable">
+                            <table class="table table-hover table-striped align-middle" id="customersTable">
                                 <thead class="bg-light text-secondary">
                                     <tr>
                                         <th scope="col" style="width: 80px;">ID</th>
@@ -168,7 +172,10 @@ require_once '../includes/layouts/header.php';
                                     <?php endforeach; ?>
                                     <?php if (empty($customers)): ?>
                                         <tr>
-                                            <td colspan="7" class="text-center text-muted py-4">No customers found.</td>
+                                            <td colspan="7" class="text-center text-muted py-5">
+                                                <i class="fas fa-users fa-3x mb-3 text-secondary opacity-25 d-block"></i>
+                                                <p class="mb-0">No customers found. Click "Add Customer" to create one.</p>
+                                            </td>
                                         </tr>
                                     <?php endif; ?>
                                 </tbody>
@@ -179,7 +186,6 @@ require_once '../includes/layouts/header.php';
             </div>
         </div>
     </div>
-</div>
 
 <!-- Add Customer Modal -->
 <div class="modal fade" id="addCustomerModal" tabindex="-1" aria-labelledby="addCustomerModalLabel" aria-hidden="true">
@@ -187,7 +193,7 @@ require_once '../includes/layouts/header.php';
         <div class="modal-content border-0 rounded-4">
             <div class="modal-header py-3">
                 <h5 class="modal-title fw-bold" id="addCustomerModalLabel" style="font-family: var(--font-heading); color: var(--slate-900);"><i class="fas fa-user-plus me-2 text-primary"></i>Add Customer</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form action="customers.php" method="POST">
                 <input type="hidden" name="action" value="create">
@@ -225,7 +231,7 @@ require_once '../includes/layouts/header.php';
         <div class="modal-content border-0 rounded-4">
             <div class="modal-header py-3">
                 <h5 class="modal-title fw-bold" id="editCustomerModalLabel" style="font-family: var(--font-heading); color: var(--slate-900);"><i class="fas fa-user-edit me-2 text-primary"></i>Edit Customer Details</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form action="customers.php" method="POST">
                 <input type="hidden" name="action" value="update">
@@ -265,17 +271,12 @@ document.addEventListener("DOMContentLoaded", function() {
         searchInput.addEventListener("keyup", function() {
             const value = this.value.toLowerCase().trim();
             const rows = document.querySelectorAll("#customersTable tbody tr");
-            
             rows.forEach(row => {
-                if (row.cells.length > 1) { // Skip empty state row
+                if (row.cells.length > 1) {
                     const name = row.cells[1].textContent.toLowerCase();
                     const phone = row.cells[2].textContent.toLowerCase();
                     const email = row.cells[3].textContent.toLowerCase();
-                    if (name.includes(value) || phone.includes(value) || email.includes(value)) {
-                        row.style.display = "";
-                    } else {
-                        row.style.display = "none";
-                    }
+                    row.style.display = (name.includes(value) || phone.includes(value) || email.includes(value)) ? "" : "none";
                 }
             });
         });
@@ -288,7 +289,6 @@ function openEditModal(customer) {
     document.getElementById('edit_phone').value = customer.phone || '';
     document.getElementById('edit_email').value = customer.email || '';
     document.getElementById('edit_address').value = customer.address || '';
-    
     var editModal = new bootstrap.Modal(document.getElementById('editCustomerModal'));
     editModal.show();
 }
