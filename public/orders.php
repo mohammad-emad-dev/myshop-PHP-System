@@ -135,7 +135,7 @@ require_once '../includes/layouts/header.php';
                 <!-- Category Navigation Pills -->
                 <div class="mb-3 d-flex overflow-x-auto pb-2" style="gap: 8px; scrollbar-width: thin; -ms-overflow-style: none;">
                     <button class="btn btn-sm btn-primary category-pill rounded-pill px-3 fw-bold" data-category-id="all" onclick="selectCategory(this, 'all')">
-                        All (الكل)
+                        All
                     </button>
                     <?php foreach ($categories as $cat): ?>
                         <button class="btn btn-sm btn-outline-secondary category-pill rounded-pill px-3" data-category-id="<?php echo $cat['id']; ?>" onclick="selectCategory(this, <?php echo $cat['id']; ?>)">

@@ -39,7 +39,7 @@ require_once '../includes/layouts/header.php';
         <div class="d-flex justify-content-between align-items-center mb-4">
             <div>
                 <h1 class="h3 mb-0 fw-bold" style="color: var(--slate-700); font-family: var(--font-heading);">
-                    Stock Ledger (سجل حركة المخزون)
+                    Stock Ledger
                     <span class="badge bg-primary rounded-pill ms-2 align-middle" style="font-size: 0.75rem;"><?php echo count($movements); ?> Records</span>
                 </h1>
                 <p class="text-muted mb-0 mt-1">Detailed history of all inventory stock updates, additions, and manual corrections.</p>
