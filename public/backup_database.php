@@ -1,5 +1,6 @@
 <?php
 require_once '../includes/functions.php';
+require_once '../includes/backup.php';
 start_secure_session();
 require_once '../config/db.php';
 
@@ -42,53 +43,6 @@ function abort_backup_request($staff_id, $reason, $status_code)
 }
 
 /**
- * Return the complete canonical project table allow-list.
- */
-function get_backup_table_allowlist()
-{
-    return [
-        'Staff',
-        'Category',
-        'Customer',
-        'Supplier',
-        'Product',
-        'Order',
-        'OrderDetail',
-        'StockMovement',
-        'AuditLog'
-    ];
-}
-
-/**
- * Quote one of the explicitly supported project table identifiers.
- */
-function quote_backup_table($table)
-{
-    if (!in_array($table, get_backup_table_allowlist(), true)) {
-        return false;
-    }
-
-    return '`' . str_replace('`', '``', $table) . '`';
-}
-
-/**
- * Write all bytes in a chunk to the output stream.
- */
-function write_backup_chunk($output, $chunk)
-{
-    $length = strlen($chunk);
-    $offset = 0;
-
-    while ($offset < $length) {
-        $written = fwrite($output, substr($chunk, $offset));
-        if ($written === false || $written === 0) {
-            throw new RuntimeException('Backup output failed.');
-        }
-        $offset += $written;
-    }
-}
-
-/**
  * Close a failed streamed response without exposing technical details.
  */
 function finish_failed_backup_response($output)
@@ -99,7 +53,9 @@ function finish_failed_backup_response($output)
         if ($written === false || $written !== strlen($message)) {
             error_log('Database backup failure marker could not be written.');
         }
-        @fclose($output);
+        if (!@fclose($output)) {
+            error_log('Database backup failed output stream could not be closed.');
+        }
         return;
     }
 
@@ -209,28 +165,18 @@ if (!$password_valid) {
 
 // This is the complete canonical table allow-list. No table discovery is used.
 $backup_tables = get_backup_table_allowlist();
-$drop_tables = array_reverse($backup_tables);
 
-foreach (array_merge($backup_tables, $drop_tables) as $table) {
-    if (quote_backup_table($table) === false) {
+foreach ($backup_tables as $table) {
+    if (quote_backup_table($table) === null) {
         abort_backup_request($staff_id, 'invalid_backup_table_configuration', 500);
     }
 }
 
 set_time_limit(0);
 
-$transaction_started = false;
 $output = null;
-$active_result = null;
 
 try {
-    // The canonical schema uses InnoDB. This snapshot remains consistent while rows stream.
-    if (!$conn->begin_transaction(MYSQLI_TRANS_START_READ_ONLY | MYSQLI_TRANS_START_WITH_CONSISTENT_SNAPSHOT)) {
-        error_log('Database backup transaction start failed: ' . $conn->error);
-        throw new RuntimeException('Backup transaction could not start.');
-    }
-    $transaction_started = true;
-
     $output = fopen('php://output', 'wb');
     if ($output === false) {
         throw new RuntimeException('Backup output stream could not be opened.');
@@ -243,91 +189,10 @@ try {
     header('Pragma: no-cache');
     header('Expires: 0');
 
-    write_backup_chunk($output, "-- MyShop Inventory, POS, and Order Management System\n");
-    write_backup_chunk($output, "-- Database Backup\n");
-    write_backup_chunk($output, '-- Generated on: ' . gmdate('Y-m-d H:i:s') . " UTC\n");
-    write_backup_chunk($output, "-- Staff.password contains one-way password hashes for restore integrity.\n");
-    write_backup_chunk($output, "-- This file is highly sensitive and must be protected as a credential-bearing backup.\n\n");
-    write_backup_chunk($output, "SET NAMES utf8mb4;\n");
-    write_backup_chunk($output, "SET FOREIGN_KEY_CHECKS=0;\n\n");
-
-    // Drop dependants first, then recreate and populate parents before dependants.
-    foreach ($drop_tables as $table) {
-        $quoted_table = quote_backup_table($table);
-        write_backup_chunk($output, 'DROP TABLE IF EXISTS ' . $quoted_table . ";\n");
-    }
-    write_backup_chunk($output, "\n");
-
-    foreach ($backup_tables as $table) {
-        $quoted_table = quote_backup_table($table);
-
-        $create_result = $conn->query('SHOW CREATE TABLE ' . $quoted_table);
-        if (!$create_result) {
-            error_log('Backup table definition query failed for ' . $table . ': ' . $conn->error);
-            throw new RuntimeException('Backup table definition query failed.');
-        }
-
-        $create_row = $create_result->fetch_row();
-        $create_result->free();
-        if (!is_array($create_row) || !isset($create_row[1]) || !is_string($create_row[1])) {
-            error_log('Backup table definition was empty for ' . $table . '.');
-            throw new RuntimeException('Backup table definition was empty.');
-        }
-
-        write_backup_chunk($output, "--\n-- Table structure for table " . $quoted_table . "\n--\n\n");
-        write_backup_chunk($output, $create_row[1] . ";\n\n");
-
-        $active_result = $conn->query('SELECT * FROM ' . $quoted_table, MYSQLI_USE_RESULT);
-        if (!$active_result) {
-            error_log('Backup table data query failed for ' . $table . ': ' . $conn->error);
-            throw new RuntimeException('Backup table data query failed.');
-        }
-
-        $has_rows = false;
-        while ($row = $active_result->fetch_assoc()) {
-            if (!$has_rows) {
-                write_backup_chunk($output, "--\n-- Dumping data for table " . $quoted_table . "\n--\n\n");
-                $has_rows = true;
-            }
-
-            $values = [];
-            foreach ($row as $value) {
-                if ($value === null) {
-                    $values[] = 'NULL';
-                } else {
-                    $values[] = "'" . $conn->real_escape_string((string)$value) . "'";
-                }
-            }
-
-            write_backup_chunk(
-                $output,
-                'INSERT INTO ' . $quoted_table . ' VALUES (' . implode(',', $values) . ");\n"
-            );
-        }
-
-        if ($conn->errno !== 0) {
-            error_log('Backup table data stream failed for ' . $table . ': ' . $conn->error);
-            throw new RuntimeException('Backup table data stream failed.');
-        }
-
-        $active_result->free();
-        $active_result = null;
-        if ($has_rows) {
-            write_backup_chunk($output, "\n");
-        }
-    }
-
-    write_backup_chunk($output, "SET FOREIGN_KEY_CHECKS=1;\n");
-
-    if (!$conn->commit()) {
-        error_log('Database backup transaction commit failed: ' . $conn->error);
-        throw new RuntimeException('Backup transaction commit failed.');
-    }
-    $transaction_started = false;
+    stream_database_backup($conn, $output, $backup_tables);
 
     if (!fclose($output)) {
         error_log('Database backup output stream close failed.');
-        $output = null;
         throw new RuntimeException('Backup output stream close failed.');
     }
     $output = null;
@@ -341,18 +206,6 @@ try {
     log_backup_attempt($staff_id, true, 'completed');
     exit();
 } catch (Throwable $exception) {
-    if ($active_result instanceof mysqli_result) {
-        $active_result->free();
-        $active_result = null;
-    }
-
-    if ($transaction_started) {
-        if (!$conn->rollback()) {
-            error_log('Database backup rollback failed: ' . $conn->error);
-        }
-        $transaction_started = false;
-    }
-
     error_log('Database backup generation failed: ' . $exception->getMessage());
     log_backup_attempt($staff_id, false, 'generation_failed');
     audit_backup_attempt($staff_id, false, 'generation_failed');

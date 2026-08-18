@@ -183,18 +183,52 @@ Fresh databases receive `AuditLog` from `database/schema.sql`; the migration is 
 
 Transactional product, stock, and order writes insert their success audit event before commit and roll back when that audit insert fails. Authentication, non-transactional CRUD/settings, authorization-denial, and backup-attempt entries use bounded best-effort logging: an audit insert failure is logged server-side and does not falsely report an audit event as successful or expose a database error to the user. Audit retention and deletion are deployment responsibilities and must follow the organization’s legal and operational requirements.
 
-Administrators can review the bounded log at `public/audit_log.php`. Cashiers have no route access to this page. The application has no web restore endpoint; database restores are deployment/schema-account operations and must be recorded in the deployment change/operations log until a controlled restore workflow is added.
+Administrators can review the bounded log at `public/audit_log.php`. Cashiers have no route access to this page. The application has no web restore endpoint; database restores are deployment/schema-account operations and must be recorded in the deployment change/operations log. The controlled CLI/test restore verification workflow is documented below.
 
 ## Backups and recovery
 
-Backups are generated only by an authenticated administrator and contain one-way staff password hashes and the audit history. Treat every backup as sensitive credential-bearing data. Backup attempts are recorded in `AuditLog` without passwords or dump contents.
+The application backup endpoint is a download-only operation. It has no web restore endpoint and does not write a backup file to the server. An active administrator must submit a `POST` request from the existing Settings UI with a valid CSRF token and current-password re-authentication. The response uses a fixed filename, no-cache headers, and streams the SQL dump through `php://output`.
 
-The local workflow has verified backup restoration into an isolated temporary database. A real deployment still needs:
+The backup allow-list is explicit and ordered for foreign-key-safe restore:
 
-- Encrypted and access-controlled backup storage.
-- Off-site or independent backup copies.
-- Defined retention, RPO, and RTO values.
-- A scheduled restore drill against the target deployment environment.
+`Staff`, `Category`, `Customer`, `Supplier`, `Product`, `Order`, `OrderDetail`, `StockMovement`, and `AuditLog`.
+
+`LoginRateLimit` is intentionally excluded. It contains ephemeral account/IP failure state, not business history; restoring it could reintroduce expired blocks. A fresh target must receive `LoginRateLimit` from the canonical schema and `database/batch17_login_rate_limit.sql`, rather than from a business backup. Staff password fields contain one-way hashes because they are required for restore integrity; plaintext passwords are never stored or emitted. Treat every backup as highly sensitive credential-bearing data.
+
+The stream ends with `-- MYSHOP_BACKUP_COMPLETE`, written only after the consistent read-only snapshot commits. Operators and restore tooling must reject a file without this marker. A failure after streaming begins may leave an incomplete download; the endpoint records the failure server-side, appends a non-technical failure marker when possible, and the incomplete file must be deleted rather than restored.
+
+#### Local isolated restore verification
+
+Run the existing CLI regression harness after the stack is running. It creates a unique `myshop_test_*` source database, applies `database/schema.sql` and all migrations in the documented order, generates a backup outside the repository, initializes a separate unique `myshop_restore_qa_*` database with the canonical schema and all migrations, loads the backup with a controlled root/schema connection, verifies tables, columns, indexes, foreign keys, row counts, and representative relationships, confirms that the excluded `LoginRateLimit` table is fresh, tests a restricted CRUD-only runtime account, and removes both databases, the temporary account, and files in a `finally` cleanup path:
+
+~~~powershell
+# Supply TEST_DB_ROOT_PASSWORD from a private deployment environment; never paste it into source or logs.
+docker compose --env-file .env exec -T `
+  -e TEST_DB_HOST=db -e TEST_DB_PORT=3306 -e TEST_DB_ROOT_USER=root `
+  -e TEST_DB_ROOT_PASSWORD="$env:TEST_DB_ROOT_PASSWORD" app php tests/run.php
+~~~
+
+The verifier refuses `ioms_db` and the configured `DB_NAME` as source or restore targets. It uses the root/schema account only for disposable schema setup, restore, metadata checks, grants, and cleanup. The restored application connection is tested with a temporary restricted account; it is not granted DDL or `GRANT OPTION`. The normal local database and Docker volume are not selected by this workflow.
+
+#### Production backup procedure and responsibilities
+
+1. Configure the application `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, and `DB_PASSWORD` values from the production secret manager. Keep the runtime account CRUD-only. Keep schema/root credentials in a separate deployment secret, never in the web service environment or repository.
+2. An active administrator downloads a backup through Settings after current-password re-authentication. Save it only to a protected path outside `public/`, the repository, and Docker bind mounts that serve the application.
+3. Verify the completion marker and run the isolated restore verification before accepting the artifact into retention storage.
+4. Encrypt the verified artifact at rest using the deployment-approved KMS/key-management process before it leaves the operator workstation or enters backup storage. Encryption is an operational requirement; this PHP endpoint intentionally streams plaintext SQL to the authenticated administrator and does not hold an encryption key.
+5. Keep encryption keys outside `.env`, Git, backups, and the web container. For key rotation, re-encrypt retained artifacts with the new key and retain the old key only until all artifacts encrypted with it expire. If the encryption key or KMS is unavailable, fail the storage job and do not retain an unencrypted backup.
+6. Keep at least one independent/off-site copy in storage controlled separately from the application host. Off-site replication is not configured by this repository and must not be assumed.
+
+Deployment-owned variables should be defined in the secret manager or backup scheduler, not committed here:
+
+- `BACKUP_STORAGE_PATH` — protected path outside the document root.
+- `BACKUP_ENCRYPTION_KEY_ID` — KMS/key identifier; no key material belongs in the repository.
+- `BACKUP_RETENTION_DAYS` — operator-approved retention value.
+- `BACKUP_RPO` and `BACKUP_RTO` — documented service objectives.
+
+Suggested starting values such as daily backups retained for 35 days, weekly copies for 12 weeks, and monthly copies for 12 months are policy placeholders only. Operators must choose values based on legal, business, storage, and recovery requirements. Define the actual RPO (`[deployment decision]`) and RTO (`[deployment decision]`) before production use, and schedule restore drills against the real deployment environment.
+
+For a manual restore, stop application writes, create a uniquely named target database, apply `database/schema.sql` and the documented migrations first, and use a controlled schema/deployment account—not `DB_USER`—to load only a verified file whose completion marker is present. This preserves a fresh `LoginRateLimit` table while the backup replaces the allow-listed business and audit tables. Validate the schema, constraints, indexes, row counts, and application read access before any controlled cutover. There is deliberately no browser-accessible restore route.
 
 Never place backups inside the document root, repository, or a public download directory.
 
