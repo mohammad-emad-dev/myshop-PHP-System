@@ -14,9 +14,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     $csrf_token = $_POST['csrf_token'] ?? '';
     if (!verify_csrf_token($csrf_token)) {
         http_response_code(403);
+        audit_log_current_actor($conn, 'supplier_mutation', 'Supplier', null, false, ['reason' => 'csrf_validation_failed']);
         $error = 'Security check failed. Invalid request token.';
     } elseif (!is_admin()) {
         http_response_code(403);
+        audit_log_denied($conn, 'supplier_mutation', 'Supplier', null);
         $error = 'Access denied. Administrator privileges are required for supplier changes.';
     } else {
         $action = $_POST['action'];
@@ -28,9 +30,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $address = sanitize_input($_POST['address']);
 
             if (empty($name)) {
+                audit_log_current_actor($conn, 'supplier_create', 'Supplier', null, false, ['reason' => 'validation_failed']);
                 $error = 'Supplier name is required.';
             } else {
-                if (create_supplier($conn, $name, $phone, $email, $address)) {
+                $operation_success = create_supplier($conn, $name, $phone, $email, $address);
+                audit_log_current_actor($conn, 'supplier_create', 'Supplier', null, $operation_success);
+                if ($operation_success) {
                     $success = 'Supplier added successfully.';
                 } else {
                     $error = 'Failed to add supplier. Please check your data.';
@@ -44,11 +49,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $address = sanitize_input($_POST['address']);
 
             if ($id <= 1) {
+                audit_log_current_actor($conn, 'supplier_update', 'Supplier', $id, false, ['reason' => 'protected_record']);
                 $error = 'Modifying the default General Supplier is prohibited.';
             } elseif (empty($name)) {
+                audit_log_current_actor($conn, 'supplier_update', 'Supplier', $id, false, ['reason' => 'validation_failed']);
                 $error = 'Supplier name is required.';
             } else {
-                if (update_supplier($conn, $id, $name, $phone, $email, $address)) {
+                $operation_success = update_supplier($conn, $id, $name, $phone, $email, $address);
+                audit_log_current_actor($conn, 'supplier_update', 'Supplier', $id, $operation_success);
+                if ($operation_success) {
                     $success = 'Supplier updated successfully.';
                 } else {
                     $error = 'Failed to update supplier details.';
@@ -57,11 +66,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         } elseif ($action === 'delete') {
             $id = intval($_POST['id'] ?? 0);
             if ($id <= 1) {
+                audit_log_current_actor($conn, 'supplier_delete', 'Supplier', $id, false, ['reason' => 'protected_record']);
                 $error = 'Deleting the default General Supplier is prohibited.';
-            } elseif (delete_supplier($conn, $id)) {
-                $success = 'Supplier deleted successfully. Past orders from this supplier will show as general supplier purchases.';
             } else {
-                $error = 'Failed to delete supplier.';
+                $operation_success = delete_supplier($conn, $id);
+                audit_log_current_actor($conn, 'supplier_delete', 'Supplier', $id, $operation_success);
+                if ($operation_success) {
+                    $success = 'Supplier deleted successfully. Past orders from this supplier will show as general supplier purchases.';
+                } else {
+                    $error = 'Failed to delete supplier.';
+                }
             }
         }
     }

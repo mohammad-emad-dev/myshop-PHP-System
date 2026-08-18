@@ -43,6 +43,11 @@ $current_page = $active_page ?? 'dashboard';
         <a href="settings.php" class="list-group-item <?php echo $current_page === 'settings' ? 'active' : ''; ?>">
             <i class="fas fa-gear"></i>Settings
         </a>
+        <?php if (is_admin()): ?>
+        <a href="audit_log.php" class="list-group-item <?php echo $current_page === 'audit_log' ? 'active' : ''; ?>">
+            <i class="fas fa-shield-halved"></i>Audit Log
+        </a>
+        <?php endif; ?>
         <form method="POST" action="login.php" class="mt-auto" data-confirm-logout>
             <input type="hidden" name="action" value="logout">
             <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(generate_csrf_token()); ?>">

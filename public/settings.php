@@ -48,6 +48,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $csrf_token = $_POST['csrf_token'] ?? '';
     if (!verify_csrf_token($csrf_token)) {
         http_response_code(403);
+        audit_log_current_actor($conn, 'settings_change', 'Settings', null, false, ['reason' => 'csrf_validation_failed']);
         $error = 'Security check failed. Invalid request token.';
     } else {
         $action = $_POST['action'] ?? 'update_profile';
@@ -63,9 +64,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $confirm_password = $_POST['confirm_password'];
 
             if (empty($full_name) || empty($username)) {
+                audit_log_current_actor($conn, 'settings_change', 'Staff', $staff_id, false, ['reason' => 'validation_failed']);
                 $error = 'Full Name and Username cannot be empty.';
             } elseif ($new_password !== '' && !password_meets_policy($new_password)) {
                 http_response_code(400);
+                audit_log_current_actor($conn, 'settings_change', 'Staff', $staff_id, false, ['reason' => 'password_policy_failed']);
                 $error = 'Password does not meet the minimum security requirements.';
             } else {
                 // Check for duplicate username
@@ -104,6 +107,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 } else {
                     // Verify current password
                     if (!password_verify($current_password, $staff['password'])) {
+                        audit_log_current_actor($conn, 'settings_change', 'Staff', $staff_id, false, ['reason' => 'current_password_invalid']);
                         $error = 'Incorrect current password. Verification failed.';
                     } else {
                         // Process update inside a safe database transaction
@@ -156,6 +160,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             if ($hashed_pass !== null) {
                                 $staff['password'] = $hashed_pass;
                             }
+                            audit_log_current_actor($conn, 'settings_change', 'Staff', $staff_id, true, [
+                                'profile_updated' => true,
+                                'password_changed' => $hashed_pass !== null,
+                            ]);
                             $success = 'Profile and settings updated successfully!';
                         } catch (Throwable $e) {
                             if ($update_stmt instanceof mysqli_stmt) {
@@ -175,6 +183,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 $error = 'New password and confirmation do not match.';
                             } else {
                                 error_log('Profile update failed: ' . $e->getMessage());
+                                audit_log_current_actor($conn, 'settings_change', 'Staff', $staff_id, false, [
+                                    'reason' => 'database_operation_failed',
+                                ]);
                                 $error = 'Unable to update profile settings right now.';
                             }
                         } finally {
@@ -193,10 +204,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             if (!password_meets_policy($new_pass)) {
                 http_response_code(400);
+                audit_log_current_actor($conn, 'staff_create', 'Staff', null, false, ['reason' => 'password_policy_failed']);
                 $error = 'Password does not meet the minimum security requirements.';
             } elseif (create_staff_member($conn, $new_username, $new_pass, $new_full_name, $new_role)) {
+                audit_log_current_actor($conn, 'staff_create', 'Staff', null, true, ['role' => $new_role]);
                 $success = 'Staff account registered successfully!';
             } else {
+                audit_log_current_actor($conn, 'staff_create', 'Staff', null, false, ['reason' => 'database_operation_failed']);
                 $error = 'Failed to create staff account. The username may already be in use.';
             }
         } elseif ($action === 'update_staff') {
@@ -208,18 +222,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             if ($target_pass !== '' && !password_meets_policy($target_pass)) {
                 http_response_code(400);
+                audit_log_current_actor($conn, 'staff_update', 'Staff', $target_id, false, ['reason' => 'password_policy_failed']);
                 $error = 'Password does not meet the minimum security requirements.';
             } elseif (update_staff_member($conn, $target_id, $target_username, $target_full_name, $target_role, $target_pass)) {
+                audit_log_current_actor($conn, 'staff_update', 'Staff', $target_id, true, ['role' => $target_role]);
                 $success = 'Staff member updated successfully!';
             } else {
+                audit_log_current_actor($conn, 'staff_update', 'Staff', $target_id, false, ['reason' => 'database_operation_failed']);
                 $error = 'Failed to update staff member. Ensure you are not attempting to demote the sole active administrator.';
             }
         } elseif ($action === 'delete_staff') {
             $target_id = (int)($_POST['staff_id'] ?? 0);
 
             if (delete_staff_member($conn, $target_id, $_SESSION['staff_id'])) {
+                audit_log_current_actor($conn, 'staff_deactivate', 'Staff', $target_id, true);
                 $success = 'Staff account deactivated successfully.';
             } else {
+                audit_log_current_actor($conn, 'staff_deactivate', 'Staff', $target_id, false, ['reason' => 'account_integrity_check_failed']);
                 $error = 'Failed to deactivate staff account. Self-deactivation and deactivation of the last active administrator are blocked.';
             }
         } elseif ($action === 'set_staff_active') {
@@ -227,12 +246,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $requested_active = filter_var($_POST['is_active'] ?? null, FILTER_VALIDATE_INT);
 
             if (!in_array($requested_active, [0, 1], true)) {
+                audit_log_current_actor($conn, 'staff_status_change', 'Staff', $target_id, false, ['reason' => 'invalid_status']);
                 $error = 'Unable to change the staff account status.';
             } elseif (set_staff_active($conn, $target_id, $requested_active, $_SESSION['staff_id'])) {
+                audit_log_current_actor($conn, $requested_active === 1 ? 'staff_activate' : 'staff_deactivate', 'Staff', $target_id, true);
                 $success = $requested_active === 1
                     ? 'Staff account enabled successfully.'
                     : 'Staff account disabled successfully.';
             } else {
+                audit_log_current_actor($conn, $requested_active === 1 ? 'staff_activate' : 'staff_deactivate', 'Staff', $target_id, false, ['reason' => 'account_integrity_check_failed']);
                 $error = 'Unable to change the staff account status. Self-deactivation and disabling the last active administrator are blocked.';
             }
         }

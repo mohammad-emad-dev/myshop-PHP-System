@@ -15,9 +15,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     $csrf_token = $_POST['csrf_token'] ?? '';
     if (!verify_csrf_token($csrf_token)) {
         http_response_code(403);
+        audit_log_current_actor($conn, 'category_mutation', 'Category', null, false, ['reason' => 'csrf_validation_failed']);
         $error = 'Security check failed. Invalid request token.';
     } elseif (!is_admin()) {
         http_response_code(403);
+        audit_log_denied($conn, 'category_mutation', 'Category', null);
         $error = 'Access denied. Administrator privileges are required for category changes.';
     } else {
         $action = $_POST['action'];
@@ -27,9 +29,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $description = sanitize_input($_POST['description']);
 
             if (empty($name)) {
+                audit_log_current_actor($conn, 'category_create', 'Category', null, false, ['reason' => 'validation_failed']);
                 $error = 'Category name is required.';
             } else {
-                if (create_category($conn, $name, $description)) {
+                $operation_success = create_category($conn, $name, $description);
+                audit_log_current_actor($conn, 'category_create', 'Category', null, $operation_success);
+                if ($operation_success) {
                     $success = 'Category created successfully.';
                 } else {
                     $error = 'Failed to create category. A category with this name might already exist.';
@@ -41,9 +46,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $description = sanitize_input($_POST['description']);
 
             if ($id <= 0 || empty($name)) {
+                audit_log_current_actor($conn, 'category_update', 'Category', $id, false, ['reason' => 'validation_failed']);
                 $error = 'Category ID and name are required.';
             } else {
-                if (update_category($conn, $id, $name, $description)) {
+                $operation_success = update_category($conn, $id, $name, $description);
+                audit_log_current_actor($conn, 'category_update', 'Category', $id, $operation_success);
+                if ($operation_success) {
                     $success = 'Category updated successfully.';
                 } else {
                     $error = 'Failed to update category. The name might be taken or it is the default category.';
@@ -51,7 +59,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             }
         } elseif ($action === 'delete') {
             $id = intval($_POST['id'] ?? 0);
-            if (delete_category($conn, $id)) {
+            $operation_success = $id > 0 && delete_category($conn, $id);
+            audit_log_current_actor($conn, 'category_delete', 'Category', $id, $operation_success);
+            if ($operation_success) {
                 $success = 'Category deleted successfully. Associated products have been moved to General.';
             } else {
                 $error = 'Failed to delete category. The default category "General" cannot be deleted.';

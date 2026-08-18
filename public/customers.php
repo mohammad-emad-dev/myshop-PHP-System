@@ -14,9 +14,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     $csrf_token = $_POST['csrf_token'] ?? '';
     if (!verify_csrf_token($csrf_token)) {
         http_response_code(403);
+        audit_log_current_actor($conn, 'customer_mutation', 'Customer', null, false, ['reason' => 'csrf_validation_failed']);
         $error = 'Security check failed. Invalid request token.';
     } elseif (!is_admin()) {
         http_response_code(403);
+        audit_log_denied($conn, 'customer_mutation', 'Customer', null);
         $error = 'Access denied. Administrator privileges are required for customer changes.';
     } else {
         $action = $_POST['action'];
@@ -28,9 +30,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $address = sanitize_input($_POST['address']);
 
             if (empty($name)) {
+                audit_log_current_actor($conn, 'customer_create', 'Customer', null, false, ['reason' => 'validation_failed']);
                 $error = 'Customer name is required.';
             } else {
-                if (create_customer($conn, $name, $phone, $email, $address)) {
+                $operation_success = create_customer($conn, $name, $phone, $email, $address);
+                audit_log_current_actor($conn, 'customer_create', 'Customer', null, $operation_success);
+                if ($operation_success) {
                     $success = 'Customer added successfully.';
                 } else {
                     $error = 'Failed to add customer. Please check your data.';
@@ -44,11 +49,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $address = sanitize_input($_POST['address']);
 
             if ($id <= 1) {
+                audit_log_current_actor($conn, 'customer_update', 'Customer', $id, false, ['reason' => 'protected_record']);
                 $error = 'Modifying the default Walk-in Customer is prohibited.';
             } elseif (empty($name)) {
+                audit_log_current_actor($conn, 'customer_update', 'Customer', $id, false, ['reason' => 'validation_failed']);
                 $error = 'Customer name is required.';
             } else {
-                if (update_customer($conn, $id, $name, $phone, $email, $address)) {
+                $operation_success = update_customer($conn, $id, $name, $phone, $email, $address);
+                audit_log_current_actor($conn, 'customer_update', 'Customer', $id, $operation_success);
+                if ($operation_success) {
                     $success = 'Customer updated successfully.';
                 } else {
                     $error = 'Failed to update customer details.';
@@ -57,11 +66,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         } elseif ($action === 'delete') {
             $id = intval($_POST['id'] ?? 0);
             if ($id <= 1) {
+                audit_log_current_actor($conn, 'customer_delete', 'Customer', $id, false, ['reason' => 'protected_record']);
                 $error = 'Deleting the default Walk-in Customer is prohibited.';
-            } elseif (delete_customer($conn, $id)) {
-                $success = 'Customer deleted successfully. Past orders for this customer will show as walk-in orders.';
             } else {
-                $error = 'Failed to delete customer.';
+                $operation_success = delete_customer($conn, $id);
+                audit_log_current_actor($conn, 'customer_delete', 'Customer', $id, $operation_success);
+                if ($operation_success) {
+                    $success = 'Customer deleted successfully. Past orders for this customer will show as walk-in orders.';
+                } else {
+                    $error = 'Failed to delete customer.';
+                }
             }
         }
     }

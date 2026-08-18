@@ -256,6 +256,8 @@ final class DisposableDatabase
         );
         test_load_sql_file($this->schemaConnection, $databaseDirectory . '/database/batch14_runtime_privileges.sql');
         test_load_sql_file($this->schemaConnection, $databaseDirectory . '/database/batch17_login_rate_limit.sql');
+        test_load_sql_file($this->schemaConnection, $databaseDirectory . '/database/batch22_audit_log.sql');
+        test_load_sql_file($this->schemaConnection, $databaseDirectory . '/database/batch22_audit_log.sql');
 
         $this->runtime = new mysqli(
             $this->host,

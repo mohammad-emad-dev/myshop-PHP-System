@@ -22,12 +22,21 @@ function log_backup_attempt($staff_id, $success, $reason)
     ));
 }
 
+function audit_backup_attempt($staff_id, $success, $reason)
+{
+    global $conn;
+    if (isset($conn) && $conn instanceof mysqli) {
+        audit_log($conn, $staff_id, 'database_backup', 'Database', null, $success, ['reason' => $reason]);
+    }
+}
+
 /**
  * Send a generic error and stop before a backup response has started.
  */
 function abort_backup_request($staff_id, $reason, $status_code)
 {
     log_backup_attempt($staff_id, false, $reason);
+    audit_backup_attempt($staff_id, false, $reason);
     http_response_code($status_code);
     exit('Backup is temporarily unavailable.');
 }
@@ -45,7 +54,8 @@ function get_backup_table_allowlist()
         'Product',
         'Order',
         'OrderDetail',
-        'StockMovement'
+        'StockMovement',
+        'AuditLog'
     ];
 }
 
@@ -322,6 +332,12 @@ try {
     }
     $output = null;
 
+    // The snapshot transaction is read-only, so record success only after it
+    // commits. Audit failure is logged by audit_log() but cannot invalidate a
+    // backup that has already been streamed and closed.
+    audit_log($conn, $staff_id, 'database_backup', 'Database', null, true, [
+        'table_count' => count($backup_tables),
+    ]);
     log_backup_attempt($staff_id, true, 'completed');
     exit();
 } catch (Throwable $exception) {
@@ -339,6 +355,7 @@ try {
 
     error_log('Database backup generation failed: ' . $exception->getMessage());
     log_backup_attempt($staff_id, false, 'generation_failed');
+    audit_backup_attempt($staff_id, false, 'generation_failed');
     finish_failed_backup_response($output);
     exit();
 }

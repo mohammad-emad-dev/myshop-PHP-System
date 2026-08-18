@@ -12,8 +12,10 @@ if ($is_logout_request) {
     $token = $_POST['csrf_token'] ?? '';
     if (!verify_csrf_token($token)) {
         http_response_code(403);
+        audit_log_current_actor($conn, 'logout', 'Session', null, false, ['reason' => 'csrf_validation_failed']);
         $error = 'Security check failed. Invalid request token.';
     } else {
+        audit_log_current_actor($conn, 'logout', 'Session', null, true);
         destroy_current_session();
         redirect('login.php');
     }
@@ -29,6 +31,7 @@ if (!$is_logout_request && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $csrf_token = $_POST['csrf_token'] ?? '';
     if (!verify_csrf_token($csrf_token)) {
         http_response_code(403);
+        audit_log_current_actor($conn, 'login_failure', 'Staff', null, false, ['reason' => 'csrf_validation_failed']);
         $error = 'Security check failed. Invalid request token.';
     } else {
         $submitted_username = $_POST['username'] ?? '';
@@ -39,16 +42,19 @@ if (!$is_logout_request && $_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($rate_limit_key === false) {
             http_response_code(503);
+            audit_log_current_actor($conn, 'login_failure', 'Staff', null, false, ['reason' => 'source_ip_unavailable']);
             $error = 'Unable to process the login request right now.';
         } else {
             $rate_limit_state = login_rate_limit_check($conn, $rate_limit_key);
 
             if ($rate_limit_state['status'] === 'error') {
                 http_response_code(503);
+                audit_log_current_actor($conn, 'login_failure', 'Staff', null, false, ['reason' => 'rate_limit_unavailable']);
                 $error = 'Unable to process the login request right now.';
             } elseif ($rate_limit_state['status'] === 'blocked') {
                 http_response_code(429);
                 header('Retry-After: ' . (int)$rate_limit_state['retry_after']);
+                audit_log_current_actor($conn, 'login_failure', 'Staff', null, false, ['reason' => 'rate_limited']);
                 $error = 'Too many login attempts. Please try again later.';
             } else {
                 try {
@@ -111,18 +117,24 @@ if (!$is_logout_request && $_SERVER['REQUEST_METHOD'] === 'POST') {
                                     unset($_SESSION['csrf_token']);
                                     generate_csrf_token();
 
+                                    audit_log($conn, (int)$user['id'], 'login_success', 'Staff', (int)$user['id'], true, [
+                                        'role' => $user['role'],
+                                    ]);
                                     redirect('index.php');
                                 }
                             } else {
                                 $failure_state = login_rate_limit_record_failure($conn, $rate_limit_key);
                                 if ($failure_state['status'] === 'error') {
                                     http_response_code(503);
+                                    audit_log_current_actor($conn, 'login_failure', 'Staff', null, false, ['reason' => 'rate_limit_unavailable']);
                                     $error = 'Unable to process the login request right now.';
                                 } elseif ($failure_state['status'] === 'blocked') {
                                     http_response_code(429);
                                     header('Retry-After: ' . (int)$failure_state['retry_after']);
+                                    audit_log_current_actor($conn, 'login_failure', 'Staff', null, false, ['reason' => 'rate_limited']);
                                     $error = 'Too many login attempts. Please try again later.';
                                 } else {
+                                    audit_log_current_actor($conn, 'login_failure', 'Staff', null, false, ['reason' => 'invalid_credentials']);
                                     $error = 'Invalid credentials';
                                 }
                             }
@@ -134,6 +146,7 @@ if (!$is_logout_request && $_SERVER['REQUEST_METHOD'] === 'POST') {
                         $stmt->close();
                     }
                     http_response_code(503);
+                    audit_log_current_actor($conn, 'login_failure', 'Staff', null, false, ['reason' => 'database_operation_failed']);
                     $error = 'Unable to process the login request right now.';
                 }
             }

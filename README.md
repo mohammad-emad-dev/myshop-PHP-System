@@ -16,6 +16,7 @@ It is built as a portfolio-grade software engineering project with a focus on se
 - Dashboard metrics, reports, CSV export, invoices, and protected database backups.
 - Password hashing, password policy enforcement, CSRF protection, secure sessions, and generic database errors.
 - Account/IP-aware login rate limiting with fail-closed behavior when its database control is unavailable.
+- Queryable audit logging for authentication, authorization denials, staff, inventory, orders, settings, and backup operations.
 - Restricted runtime database privileges: SELECT, INSERT, UPDATE, and DELETE only.
 - Hardened uploads, CSV formula protection, security headers, and a nonce-based Content Security Policy.
 - Docker-based local runtime with a dedicated schema/migration workflow.
@@ -160,6 +161,7 @@ The GitHub Actions regression job creates its own disposable MySQL container wit
 - Uploaded files are validated and served from a protected upload directory.
 - Database errors are logged server-side; SQL details and stack traces are not shown to users.
 - Security headers and a nonce-based CSP protect the browser boundary.
+- Audit-log reads are administrator-only and paginated; audit metadata is bounded and excludes passwords, CSRF tokens, session IDs, credentials, request bodies, and dump contents.
 
 ## Database migrations
 
@@ -171,12 +173,21 @@ For a database created from the original Batch 1 schema, run these migrations in
 2. database/batch3_product_history.sql
 3. database/batch14_runtime_privileges.sql
 4. database/batch17_login_rate_limit.sql
+5. database/batch22_audit_log.sql
 
 Take and verify a backup before upgrading an existing database. Stop on the first migration error and inspect the database before retrying. Do not blindly import database/schema.sql into an existing database.
 
+Batch 22 records security-sensitive and business-critical events in `AuditLog`. The migration is idempotent when the table is absent or already matches the canonical schema, but it deliberately fails on a partial or incompatible table so unrelated schema problems are not hidden. Execute migrations with a controlled deployment/schema account only; never run them from a web request or application startup. Databases created by pre-Batch-1 versions may require manual inspection before applying this order.
+
+Fresh databases receive `AuditLog` from `database/schema.sql`; the migration is still required for existing databases and is safe to re-run against the canonical table.
+
+Transactional product, stock, and order writes insert their success audit event before commit and roll back when that audit insert fails. Authentication, non-transactional CRUD/settings, authorization-denial, and backup-attempt entries use bounded best-effort logging: an audit insert failure is logged server-side and does not falsely report an audit event as successful or expose a database error to the user. Audit retention and deletion are deployment responsibilities and must follow the organization’s legal and operational requirements.
+
+Administrators can review the bounded log at `public/audit_log.php`. Cashiers have no route access to this page. The application has no web restore endpoint; database restores are deployment/schema-account operations and must be recorded in the deployment change/operations log until a controlled restore workflow is added.
+
 ## Backups and recovery
 
-Backups are generated only by an authenticated administrator and contain one-way staff password hashes. Treat every backup as sensitive credential-bearing data.
+Backups are generated only by an authenticated administrator and contain one-way staff password hashes and the audit history. Treat every backup as sensitive credential-bearing data. Backup attempts are recorded in `AuditLog` without passwords or dump contents.
 
 The local workflow has verified backup restoration into an isolated temporary database. A real deployment still needs:
 

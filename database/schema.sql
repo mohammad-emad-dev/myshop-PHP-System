@@ -34,6 +34,27 @@ CREATE TABLE Staff (
   DEFAULT CHARACTER SET utf8mb4
   COLLATE = utf8mb4_unicode_ci;
 
+CREATE TABLE AuditLog (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    actor_staff_id INT UNSIGNED NULL,
+    action VARCHAR(80) NOT NULL,
+    entity_type VARCHAR(50) NOT NULL,
+    entity_id INT UNSIGNED NULL,
+    outcome ENUM('success', 'failure') NOT NULL,
+    source_ip VARCHAR(45) CHARACTER SET ascii COLLATE ascii_bin NULL,
+    metadata JSON NULL,
+    CONSTRAINT fk_audit_actor
+        FOREIGN KEY (actor_staff_id) REFERENCES Staff(id) ON DELETE SET NULL,
+    INDEX idx_audit_created_at (created_at, id),
+    INDEX idx_audit_actor_created (actor_staff_id, created_at, id),
+    INDEX idx_audit_action_created (action, created_at, id),
+    INDEX idx_audit_entity_created (entity_type, entity_id, created_at, id),
+    INDEX idx_audit_outcome_created (outcome, created_at, id)
+) ENGINE = InnoDB
+  DEFAULT CHARACTER SET utf8mb4
+  COLLATE = utf8mb4_unicode_ci;
+
 CREATE TABLE LoginRateLimit (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     username_hash CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,

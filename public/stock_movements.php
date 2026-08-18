@@ -12,9 +12,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     $csrf_token = $_POST['csrf_token'] ?? '';
     if (!verify_csrf_token($csrf_token)) {
         http_response_code(403);
+        audit_log_current_actor($conn, 'stock_adjustment', 'Product', null, false, ['reason' => 'csrf_validation_failed']);
         $error = 'Security check failed. Invalid request token.';
     } elseif (!is_admin()) {
         http_response_code(403);
+        audit_log_denied($conn, 'stock_adjustment', 'Product', null);
         $error = 'Access denied. You do not have permission to adjust stock directly.';
     } else {
         $adj_product_id = filter_var($_POST['product_id'] ?? null, FILTER_VALIDATE_INT, [
@@ -32,8 +34,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         } else {
             if (!$conn->begin_transaction()) {
                 error_log('Stock adjustment failed: unable to start transaction.');
+                audit_log_current_actor($conn, 'stock_adjustment', 'Product', $adj_product_id, false, ['reason' => 'transaction_start_failed']);
                 $error = 'Unable to complete the stock adjustment right now.';
             } else {
+                $product_stmt = null;
+                $update_stmt = null;
                 try {
                     $product_stmt = $conn->prepare("SELECT stock FROM Product WHERE id = ? FOR UPDATE");
                     if (!$product_stmt) {
@@ -52,6 +57,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                     }
                     $product = $product_result->fetch_assoc();
                     $product_stmt->close();
+                    $product_stmt = null;
 
                     if (!$product) {
                         throw new Exception("Product not found.");
@@ -85,9 +91,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                         throw new Exception("Stock update affected an unexpected number of rows.");
                     }
                     $update_stmt->close();
+                    $update_stmt = null;
 
                     if (!log_stock_movement($conn, $adj_product_id, $_SESSION['staff_id'], $adj_quantity, 'manual_adjustment', $adj_reason)) {
                         throw new Exception("Failed to log stock movement.");
+                    }
+
+                    if (!audit_log_current_actor($conn, 'stock_adjustment', 'Product', $adj_product_id, true, [
+                        'quantity' => (int)$adj_quantity,
+                        'new_stock' => (int)$new_stock,
+                    ])) {
+                        throw new Exception('Failed to log stock adjustment audit event.');
                     }
 
                     if (!$conn->commit()) {
@@ -95,10 +109,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                     }
                     $success = 'Stock adjusted successfully.';
                 } catch (Throwable $e) {
+                    if ($product_stmt instanceof mysqli_stmt) {
+                        $product_stmt->close();
+                    }
+                    if ($update_stmt instanceof mysqli_stmt) {
+                        $update_stmt->close();
+                    }
                     if (!$conn->rollback()) {
                         error_log('Stock adjustment rollback failed: ' . $conn->error);
                     }
                     error_log('Stock adjustment failed: ' . $e->getMessage());
+                    audit_log_current_actor($conn, 'stock_adjustment', 'Product', $adj_product_id, false, [
+                        'reason' => 'database_operation_failed',
+                    ]);
                     $error = 'Unable to complete the stock adjustment right now.';
                 }
             }

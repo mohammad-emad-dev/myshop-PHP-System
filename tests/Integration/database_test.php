@@ -18,7 +18,7 @@ function run_integration_tests(): int
 
         $expectedTables = [
             'Staff', 'Category', 'Customer', 'Supplier', 'Product',
-            'Order', 'OrderDetail', 'StockMovement', 'LoginRateLimit'
+            'Order', 'OrderDetail', 'StockMovement', 'LoginRateLimit', 'AuditLog'
         ];
         $tableRows = test_fetch_all(
             $schema,
@@ -38,6 +38,40 @@ function run_integration_tests(): int
                AND column_name LIKE '%password%'"
         );
         $tests->assertSame(0, $rateLimitPasswordColumns, 'The rate-limit table must not contain password fields.');
+        $auditPasswordColumns = (int)test_scalar(
+            $schema,
+            "SELECT COUNT(*) FROM information_schema.columns
+             WHERE table_schema = DATABASE() AND table_name = 'AuditLog'
+               AND column_name LIKE '%password%'"
+        );
+        $tests->assertSame(0, $auditPasswordColumns, 'The audit table must not contain password fields.');
+        $auditIndexes = array_map(
+            static fn(array $row): string => (string)$row['audit_index_name'],
+            test_fetch_all(
+                $schema,
+                "SELECT DISTINCT index_name AS audit_index_name FROM information_schema.statistics
+                 WHERE table_schema = DATABASE() AND table_name = 'AuditLog'
+                 ORDER BY audit_index_name"
+            )
+        );
+        sort($auditIndexes);
+        $expectedAuditIndexes = ['PRIMARY', 'idx_audit_action_created', 'idx_audit_actor_created', 'idx_audit_created_at', 'idx_audit_entity_created', 'idx_audit_outcome_created'];
+        sort($expectedAuditIndexes);
+        $tests->assertSame(
+            $expectedAuditIndexes,
+            $auditIndexes,
+            'Audit table indexes are incomplete or incorrectly named.'
+        );
+        $tests->assertSame(
+            1,
+            (int)test_scalar(
+                $schema,
+                "SELECT COUNT(*) FROM information_schema.referential_constraints
+                 WHERE constraint_schema = DATABASE() AND table_name = 'AuditLog'
+                   AND constraint_name = 'fk_audit_actor'"
+            ),
+            'Audit actor foreign-key protection is missing.'
+        );
 
         $grantResult = $schema->query(
             "SHOW GRANTS FOR " . test_sql_string($schema, $database->runtimeUsername) . "@'%'"
@@ -115,6 +149,53 @@ function run_integration_tests(): int
         $tests->assertTrue($historyProductId > 0, 'Historical product ID was not found.');
         $tests->assertTrue(update_product($conn, $adminId, $historyProductId, $prefix . '_HISTORY_PRODUCT_UPDATED', 'Updated history product', 13.34, 22, null, 6, $categoryId, $historyBarcode), 'Product update failed.');
         $tests->assertSame(22, (int)test_scalar($conn, 'SELECT stock FROM Product WHERE id = ?', 'i', [$historyProductId]), 'Product stock update was not persisted.');
+
+        $_SERVER['REMOTE_ADDR'] = '127.0.0.1';
+        $_SESSION = ['staff_id' => $adminId];
+        $tests->assertTrue(
+            audit_log_current_actor($conn, 'qa_audit_success', 'Product', $historyProductId, true, [
+                'safe_reason' => 'test-success',
+                'password' => 'must-not-be-stored',
+                'csrf_token' => 'must-not-be-stored',
+                'session_id' => 'must-not-be-stored',
+            ]),
+            'Successful audit insertion failed.'
+        );
+        $tests->assertTrue(
+            audit_log($conn, $cashierId, 'qa_audit_failure', 'Order', null, false, ['reason' => 'test-failure']),
+            'Failed audit insertion failed.'
+        );
+        $auditSuccess = get_audit_logs_page($conn, ['action' => 'qa_audit_success'], 10, 0);
+        $tests->assertCount(1, $auditSuccess, 'Audit success filter did not return one event.');
+        $tests->assertSame($adminId, (int)$auditSuccess[0]['actor_staff_id'], 'Audit actor was not sourced from the authenticated staff ID.');
+        $tests->assertSame('success', $auditSuccess[0]['outcome'], 'Audit success outcome is incorrect.');
+        $tests->assertContains('safe_reason', (string)$auditSuccess[0]['metadata'], 'Safe audit metadata was not stored.');
+        $tests->assertFalse(
+            preg_match('/password|csrf|token|session/i', (string)$auditSuccess[0]['metadata']) === 1,
+            'Sensitive audit metadata was stored.'
+        );
+        $auditDate = substr((string)$auditSuccess[0]['created_at'], 0, 10);
+        $tests->assertSame(
+            1,
+            count_audit_logs($conn, [
+                'action' => 'qa_audit_success',
+                'actor_staff_id' => $adminId,
+                'entity_type' => 'Product',
+                'outcome' => 'success',
+                'date_from' => $auditDate,
+                'date_to' => $auditDate,
+            ]),
+            'Audit action, actor, entity, outcome, and date filters are inconsistent.'
+        );
+        $tests->assertSame(1, count_audit_logs($conn, ['action' => 'qa_audit_failure', 'outcome' => 'failure']), 'Audit failure filter is incorrect.');
+        $GLOBALS['current_staff_record'] = ['role' => 'cashier'];
+        $_SESSION['staff_id'] = $cashierId;
+        $tests->assertFalse(is_admin(), 'Cashiers must not satisfy the admin audit-log authorization check.');
+        $GLOBALS['current_staff_record'] = ['role' => 'admin'];
+        $_SESSION['staff_id'] = $adminId;
+        $tests->assertTrue(is_admin(), 'Admins must satisfy the admin audit-log authorization check.');
+        $tests->assertTrue(count(get_audit_logs_page($conn, [], 100, 0)) <= 100, 'Audit log page must be bounded.');
+        $tests->assertCount(0, get_audit_logs_page($conn, [], 999999, 999999), 'Empty audit log pages must return an empty list.');
 
         $reassignmentProductId = $historyProductId;
         $tests->assertTrue(delete_category($conn, $categoryId), 'Category deletion/reassignment failed.');
@@ -280,6 +361,17 @@ function run_integration_tests(): int
         $rollbackBarcode = $prefix . '-ROLLBACK';
         $tests->assertFalse(create_product($conn, 999999999, $prefix . '_ROLLBACK_PRODUCT', 'Rollback', 3.00, 4, null, 5, null, $rollbackBarcode), 'A stock-ledger failure must fail product creation.');
         $tests->assertSame(null, test_scalar($conn, 'SELECT id FROM Product WHERE barcode = ?', 's', [$rollbackBarcode]), 'Failed product creation left a partial product row.');
+
+        $auditRollbackBarcode = $prefix . '-AUDIT-ROLLBACK';
+        $productCountBeforeAuditFailure = (int)test_scalar($conn, 'SELECT COUNT(*) FROM Product');
+        $schema->query('DROP TABLE AuditLog');
+        $tests->assertFalse(
+            create_product($conn, $adminId, $prefix . '_AUDIT_ROLLBACK_PRODUCT', 'Audit rollback', 3.00, 4, null, 5, null, $auditRollbackBarcode),
+            'A failed audit insert must fail the transactional product operation.'
+        );
+        $tests->assertSame($productCountBeforeAuditFailure, (int)test_scalar($conn, 'SELECT COUNT(*) FROM Product'), 'Audit failure left a partial product row.');
+        test_load_sql_file($schema, dirname(__DIR__, 2) . '/database/batch22_audit_log.sql');
+        $tests->assertSame(1, (int)test_scalar($schema, "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'AuditLog'"), 'Audit migration did not restore the disposable table.');
 
         return $tests->assertions();
     } finally {

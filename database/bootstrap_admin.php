@@ -15,17 +15,20 @@ $full_name = getenv('BOOTSTRAP_ADMIN_FULL_NAME');
 $password = getenv('BOOTSTRAP_ADMIN_PASSWORD');
 
 if ($username === false || $username === '' || $full_name === false || $full_name === '' || $password === false || $password === '') {
+    audit_log($conn, null, 'staff_create', 'Staff', null, false, ['reason' => 'bootstrap_input_missing']);
     fwrite(STDERR, "Set BOOTSTRAP_ADMIN_USERNAME, BOOTSTRAP_ADMIN_FULL_NAME, and BOOTSTRAP_ADMIN_PASSWORD before running this command.\n");
     exit(1);
 }
 
 if (!password_meets_policy($password)) {
+    audit_log($conn, null, 'staff_create', 'Staff', null, false, ['reason' => 'password_policy_failed']);
     fwrite(STDERR, "BOOTSTRAP_ADMIN_PASSWORD must contain at least 12 characters.\n");
     exit(1);
 }
 
 $password_hash = password_hash($password, PASSWORD_DEFAULT);
 if ($password_hash === false) {
+    audit_log($conn, null, 'staff_create', 'Staff', null, false, ['reason' => 'password_hash_failed']);
     fwrite(STDERR, "Unable to create the administrator password hash.\n");
     exit(1);
 }
@@ -36,6 +39,7 @@ $stmt = $conn->prepare(
 
 if (!$stmt) {
     error_log('Administrator bootstrap prepare failed: ' . $conn->error);
+    audit_log($conn, null, 'staff_create', 'Staff', null, false, ['reason' => 'database_operation_failed']);
     fwrite(STDERR, "Unable to create the administrator account.\n");
     exit(1);
 }
@@ -44,10 +48,15 @@ $stmt->bind_param('sss', $username, $password_hash, $full_name);
 
 if (!$stmt->execute()) {
     error_log('Administrator bootstrap insert failed: ' . $stmt->error);
+    audit_log($conn, null, 'staff_create', 'Staff', null, false, ['reason' => 'database_operation_failed']);
     fwrite(STDERR, "Unable to create the administrator account. The username may already exist.\n");
     $stmt->close();
     exit(1);
 }
 
 $stmt->close();
+audit_log($conn, null, 'staff_create', 'Staff', (int)$conn->insert_id, true, [
+    'role' => 'admin',
+    'bootstrap' => true,
+]);
 fwrite(STDOUT, "Administrator account created.\n");

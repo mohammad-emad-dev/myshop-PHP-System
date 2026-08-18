@@ -15,6 +15,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['complete_order'])) {
     $csrf_token = $_POST['csrf_token'] ?? '';
     if (!verify_csrf_token($csrf_token)) {
         http_response_code(403);
+        audit_log_current_actor($conn, 'order_create', 'Order', null, false, ['reason' => 'csrf_validation_failed']);
         $error = "Security check failed. Invalid request token.";
     } else {
     // --- POS Transaction Flood Protection ---
@@ -26,9 +27,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['complete_order'])) {
             $order_type = $_POST['order_type'] ?? null;
             if (!is_string($order_type) || !in_array($order_type, ['sale', 'purchase'], true)) {
                 http_response_code(400);
+                audit_log_current_actor($conn, 'order_create', 'Order', null, false, ['reason' => 'invalid_order_type']);
                 $error = "Invalid order type.";
             } elseif ($order_type === 'purchase' && !is_admin()) {
                 http_response_code(403);
+                audit_log_denied($conn, 'purchase_order_create', 'Order', null);
                 $error = "Access denied. Cashier accounts cannot create purchase orders.";
             } else {
                 $cart_json = $_POST['cart_data'] ?? '[]';
@@ -98,6 +101,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['complete_order'])) {
                     $_SESSION['last_order_time'] = time(); // Record time to prevent flood
                     $success = "Order #$order_id completed successfully!";
                 } else {
+                    audit_log_current_actor(
+                        $conn,
+                        $order_type === 'purchase' ? 'purchase_order_create' : 'sale_order_create',
+                        'Order',
+                        null,
+                        false,
+                        ['reason' => 'order_creation_failed']
+                    );
                     $error = "Failed to process order transaction.";
                 }
             }

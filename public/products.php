@@ -13,9 +13,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     $csrf_token = $_POST['csrf_token'] ?? '';
     if (!verify_csrf_token($csrf_token)) {
         http_response_code(403);
+        audit_log_current_actor($conn, 'product_mutation', 'Product', null, false, ['reason' => 'csrf_validation_failed']);
         $error = 'Security check failed. Invalid request token.';
     } elseif (!is_admin()) {
         http_response_code(403);
+        audit_log_denied($conn, 'product_mutation', 'Product', null);
         $error = 'Access denied. You do not have permission to modify products.';
     } else {
         $action = $_POST['action'];
@@ -81,7 +83,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $id = intval($_POST['id'] ?? 0);
             if ($id <= 0) {
                 $error = 'Invalid product selected.';
-            } elseif (delete_product($conn, $id)) {
+            } elseif (delete_product($conn, $id, $_SESSION['staff_id'])) {
                 $success = 'Product deleted successfully';
             } else {
                 $error = 'Failed to delete product. Products with historical orders or stock movements cannot be deleted.';

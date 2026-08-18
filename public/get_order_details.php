@@ -20,6 +20,7 @@ if (isset($_GET['id'])) {
     
     if (!$order) {
         http_response_code(404);
+        audit_log_current_actor($conn, 'order_view', 'Order', $order_id, false, ['reason' => 'not_found_or_not_authorized']);
         echo json_encode(['error' => 'Order not found']);
         exit();
     }
