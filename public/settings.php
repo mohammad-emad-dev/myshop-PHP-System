@@ -10,10 +10,39 @@ $success = '';
 $error = '';
 
 // Fetch current user details from database
-$stmt = $conn->prepare("SELECT id, username, full_name, password FROM Staff WHERE id = ?");
-$stmt->bind_param("i", $staff_id);
-$stmt->execute();
-$staff = $stmt->get_result()->fetch_assoc();
+$stmt = null;
+try {
+    $stmt = $conn->prepare("SELECT id, username, full_name, password FROM Staff WHERE id = ?");
+    if (!$stmt) {
+        throw new Exception('Settings staff lookup prepare failed.');
+    }
+    if (!$stmt->bind_param("i", $staff_id)) {
+        throw new Exception('Settings staff lookup bind failed.');
+    }
+    if (!$stmt->execute()) {
+        throw new Exception('Settings staff lookup execute failed.');
+    }
+    $staff_result = $stmt->get_result();
+    if (!$staff_result) {
+        throw new Exception('Settings staff lookup result failed.');
+    }
+    $staff = $staff_result->fetch_assoc();
+    if (!$staff) {
+        throw new Exception('Settings staff record was not found.');
+    }
+} catch (Throwable $exception) {
+    if ($stmt instanceof mysqli_stmt) {
+        $stmt->close();
+        $stmt = null;
+    }
+    error_log('Settings staff lookup failed: ' . $exception->getMessage());
+    http_response_code(500);
+    exit('Unable to load settings right now.');
+} finally {
+    if ($stmt instanceof mysqli_stmt) {
+        $stmt->close();
+    }
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $csrf_token = $_POST['csrf_token'] ?? '';
@@ -40,11 +69,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $error = 'Password does not meet the minimum security requirements.';
             } else {
                 // Check for duplicate username
-                $dup_check = $conn->prepare("SELECT id FROM Staff WHERE username = ? AND id != ?");
-                $dup_check->bind_param("si", $username, $staff_id);
-                $dup_check->execute();
-                
-                if ($dup_check->get_result()->num_rows > 0) {
+                $duplicate_username = null;
+                $dup_check = null;
+                try {
+                    $dup_check = $conn->prepare("SELECT id FROM Staff WHERE username = ? AND id != ?");
+                    if (!$dup_check) {
+                        throw new Exception('Profile duplicate-check prepare failed.');
+                    }
+                    if (!$dup_check->bind_param("si", $username, $staff_id)) {
+                        throw new Exception('Profile duplicate-check bind failed.');
+                    }
+                    if (!$dup_check->execute()) {
+                        throw new Exception('Profile duplicate-check execute failed.');
+                    }
+                    $duplicate_result = $dup_check->get_result();
+                    if (!$duplicate_result) {
+                        throw new Exception('Profile duplicate-check result failed.');
+                    }
+                    $duplicate_username = $duplicate_result->num_rows > 0;
+                } catch (Throwable $exception) {
+                    error_log('Profile duplicate-check failed: ' . $exception->getMessage());
+                    $error = 'Unable to update profile settings right now.';
+                } finally {
+                    if ($dup_check instanceof mysqli_stmt) {
+                        $dup_check->close();
+                    }
+                }
+
+                if ($duplicate_username === null) {
+                    // A database failure was already logged and converted to a
+                    // generic user-facing error above.
+                } elseif ($duplicate_username) {
                     $error = 'Username is already taken by another staff member.';
                 } else {
                     // Verify current password
@@ -52,40 +107,79 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $error = 'Incorrect current password. Verification failed.';
                     } else {
                         // Process update inside a safe database transaction
-                        $conn->begin_transaction();
+                        $transaction_started = false;
+                        $update_stmt = null;
+                        $hashed_pass = null;
                         try {
+                            if (!$conn->begin_transaction()) {
+                                throw new Exception('Profile update transaction start failed.');
+                            }
+                            $transaction_started = true;
+
                             if (!empty($new_password)) {
                                 if ($new_password !== $confirm_password) {
                                     throw new Exception('New password and confirmation do not match.');
                                 }
                                 $hashed_pass = password_hash($new_password, PASSWORD_BCRYPT);
+                                if (!is_string($hashed_pass) || $hashed_pass === '') {
+                                    throw new Exception('Profile password hashing failed.');
+                                }
                                 $update_stmt = $conn->prepare("UPDATE Staff SET username = ?, full_name = ?, password = ? WHERE id = ?");
-                                $update_stmt->bind_param("sssi", $username, $full_name, $hashed_pass, $staff_id);
+                                if (!$update_stmt) {
+                                    throw new Exception('Profile update prepare failed.');
+                                }
+                                if (!$update_stmt->bind_param("sssi", $username, $full_name, $hashed_pass, $staff_id)) {
+                                    throw new Exception('Profile update bind failed.');
+                                }
                             } else {
                                 $update_stmt = $conn->prepare("UPDATE Staff SET username = ?, full_name = ? WHERE id = ?");
-                                $update_stmt->bind_param("ssi", $username, $full_name, $staff_id);
+                                if (!$update_stmt) {
+                                    throw new Exception('Profile update prepare failed.');
+                                }
+                                if (!$update_stmt->bind_param("ssi", $username, $full_name, $staff_id)) {
+                                    throw new Exception('Profile update bind failed.');
+                                }
                             }
 
-                            if ($update_stmt->execute()) {
-                                $conn->commit();
-                                $_SESSION['full_name'] = $full_name;
-                                $success = 'Profile and settings updated successfully!';
-                                
-                                // Re-fetch updated details
-                                $stmt = $conn->prepare("SELECT id, username, full_name, password FROM Staff WHERE id = ?");
-                                $stmt->bind_param("i", $staff_id);
-                                $stmt->execute();
-                                $staff = $stmt->get_result()->fetch_assoc();
-                            } else {
-                                throw new Exception('Database error occurred while updating profile.');
+                            if (!$update_stmt->execute()) {
+                                throw new Exception('Profile update execute failed.');
                             }
-                        } catch (Exception $e) {
-                            $conn->rollback();
+                            if (!$conn->commit()) {
+                                throw new Exception('Profile update commit failed.');
+                            }
+                            $transaction_started = false;
+                            $update_stmt->close();
+                            $update_stmt = null;
+                            $_SESSION['full_name'] = $full_name;
+                            $staff['username'] = $username;
+                            $staff['full_name'] = $full_name;
+                            if ($hashed_pass !== null) {
+                                $staff['password'] = $hashed_pass;
+                            }
+                            $success = 'Profile and settings updated successfully!';
+                        } catch (Throwable $e) {
+                            if ($update_stmt instanceof mysqli_stmt) {
+                                $update_stmt->close();
+                                $update_stmt = null;
+                            }
+                            if ($transaction_started) {
+                                try {
+                                    if (!$conn->rollback()) {
+                                        error_log('Profile update rollback failed: ' . $conn->error);
+                                    }
+                                } catch (Throwable $rollback_exception) {
+                                    error_log('Profile update rollback failed: ' . $rollback_exception->getMessage());
+                                }
+                            }
                             if ($e->getMessage() === 'New password and confirmation do not match.') {
                                 $error = 'New password and confirmation do not match.';
                             } else {
                                 error_log('Profile update failed: ' . $e->getMessage());
                                 $error = 'Unable to update profile settings right now.';
+                            }
+                        } finally {
+                            if ($update_stmt instanceof mysqli_stmt) {
+                                $update_stmt->close();
                             }
                         }
                     }
