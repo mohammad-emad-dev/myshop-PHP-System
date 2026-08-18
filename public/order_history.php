@@ -12,6 +12,12 @@ $orders = $is_admin_user
 
 // Filter by transaction type
 $filter_type = isset($_GET['type']) ? sanitize_input($_GET['type']) : 'all';
+if (!in_array($filter_type, ['all', 'sale', 'purchase'], true)) {
+    $filter_type = 'all';
+}
+if (!$is_admin_user && $filter_type === 'purchase') {
+    $filter_type = 'all';
+}
 if ($filter_type !== 'all' && ($filter_type === 'sale' || $filter_type === 'purchase')) {
     $orders = array_filter($orders, function($o) use ($filter_type) {
         return $o['order_type'] === $filter_type;
@@ -86,7 +92,9 @@ require_once '../includes/layouts/header.php';
                             <div class="btn-group" role="group" aria-label="Order filters">
                                 <a href="order_history.php?type=all" class="btn btn-outline-primary <?php echo $filter_type === 'all' ? 'active' : ''; ?>">All</a>
                                 <a href="order_history.php?type=sale" class="btn btn-outline-primary <?php echo $filter_type === 'sale' ? 'active' : ''; ?>">Sales</a>
-                                <a href="order_history.php?type=purchase" class="btn btn-outline-primary <?php echo $filter_type === 'purchase' ? 'active' : ''; ?>">Purchases</a>
+                                <?php if ($is_admin_user): ?>
+                                    <a href="order_history.php?type=purchase" class="btn btn-outline-primary <?php echo $filter_type === 'purchase' ? 'active' : ''; ?>">Purchases</a>
+                                <?php endif; ?>
                             </div>
                             <?php if (is_admin()): ?>
                             <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#exportReportModal">

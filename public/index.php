@@ -14,14 +14,18 @@ require_once '../config/db.php';
 
 verify_login();
 
+// Scope order-derived dashboard analytics to the current cashier. Product and
+// stock inventory totals remain global because they do not identify staff.
+$dashboard_staff_id = is_admin() ? null : (int)$_SESSION['staff_id'];
+
 /* ──────────────────────────────────────────────
  * DATA LAYER — Fetch all analytics in one pass.
  * ────────────────────────────────────────────── */
-$stats               = get_dashboard_stats($conn);
-$chart_data           = get_chart_data($conn);
+$stats               = get_dashboard_stats($conn, $dashboard_staff_id);
+$chart_data           = get_chart_data($conn, 7, $dashboard_staff_id);
 $inventory_valuation  = get_inventory_valuation($conn);
-$top_selling_products = get_top_selling_products($conn, 5);
-$category_sales       = get_category_sales_distribution($conn);
+$top_selling_products = get_top_selling_products($conn, 5, $dashboard_staff_id);
+$category_sales       = get_category_sales_distribution($conn, $dashboard_staff_id);
 $low_stock_products   = get_low_stock_products($conn);
 $total_low_stock      = count($low_stock_products);
 
@@ -236,11 +240,11 @@ require_once '../includes/layouts/header.php';
                                                 </td>
                                                 <td class="text-center fw-bold text-secondary"><?php echo (int)$p['alert_threshold']; ?></td>
                                                 <td class="text-end">
+                                                    <?php if (is_admin()): ?>
                                                     <a href="orders.php?purchase_product_id=<?php echo (int)$p['id']; ?>"
                                                        class="btn btn-sm btn-success rounded-3 fw-bold">
                                                         <i class="fas fa-plus me-1"></i> Restock
                                                     </a>
-                                                    <?php if (is_admin()): ?>
                                                     <a href="products.php?highlight=<?php echo (int)$p['id']; ?>"
                                                        class="btn btn-sm btn-outline-secondary rounded-3 ms-1 fw-bold">
                                                         <i class="fas fa-edit me-1"></i> Edit

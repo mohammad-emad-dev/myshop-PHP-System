@@ -1065,7 +1065,7 @@ function get_order_details($conn, $order_id, $staff_id = null)
     return $res;
 }
 
-function get_dashboard_stats($conn)
+function get_dashboard_stats($conn, $staff_id = null)
 {
     $stats = [
         'total_products' => 0,
@@ -1079,15 +1079,45 @@ function get_dashboard_stats($conn)
         $stats['total_products'] = (int) $result->fetch_assoc()['count'];
     }
 
-    $result = $conn->query("SELECT COUNT(*) as count FROM `Order`");
-    if ($result) {
-        $stats['total_orders'] = (int) $result->fetch_assoc()['count'];
-    }
+    if ($staff_id === null) {
+        $result = $conn->query("SELECT COUNT(*) as count FROM `Order`");
+        if ($result) {
+            $stats['total_orders'] = (int) $result->fetch_assoc()['count'];
+        }
 
-    // Only count revenue from SALES, not purchases
-    $result = $conn->query("SELECT COALESCE(SUM(total_amount), 0) as total FROM `Order` WHERE order_type = 'sale'");
-    if ($result) {
-        $stats['total_sales'] = (float) $result->fetch_assoc()['total'];
+        // Only count revenue from SALES, not purchases.
+        $result = $conn->query("SELECT COALESCE(SUM(total_amount), 0) as total FROM `Order` WHERE order_type = 'sale'");
+        if ($result) {
+            $stats['total_sales'] = (float) $result->fetch_assoc()['total'];
+        }
+    } else {
+        // Cashier dashboards must not aggregate another staff member's orders.
+        $staff_id = (int)$staff_id;
+
+        $stmt = $conn->prepare("SELECT COUNT(*) as count FROM `Order` WHERE staff_id = ?");
+        if ($stmt) {
+            $stmt->bind_param('i', $staff_id);
+            if ($stmt->execute()) {
+                $result = $stmt->get_result();
+                if ($result) {
+                    $stats['total_orders'] = (int)$result->fetch_assoc()['count'];
+                }
+            }
+            $stmt->close();
+        }
+
+        // Only count this cashier's sales, not purchases or other staff orders.
+        $stmt = $conn->prepare("SELECT COALESCE(SUM(total_amount), 0) as total FROM `Order` WHERE order_type = 'sale' AND staff_id = ?");
+        if ($stmt) {
+            $stmt->bind_param('i', $staff_id);
+            if ($stmt->execute()) {
+                $result = $stmt->get_result();
+                if ($result) {
+                    $stats['total_sales'] = (float)$result->fetch_assoc()['total'];
+                }
+            }
+            $stmt->close();
+        }
     }
 
     $result = $conn->query("SELECT COALESCE(SUM(stock), 0) as total FROM Product");
@@ -1409,8 +1439,9 @@ function get_asset_integrity($asset_url)
  * Fetches sales and purchase chart data for the last N days.
  * Pads missing dates with 0.0 values.
  */
-function get_chart_data($conn, $days = 7)
+function get_chart_data($conn, $days = 7, $staff_id = null)
 {
+    $days = max(1, min((int)$days, 31));
     $data = [];
     
     // Generate empty values for the last N days to ensure complete timeline
@@ -1426,25 +1457,37 @@ function get_chart_data($conn, $days = 7)
     // Fetch aggregated daily sales and purchases
     $query = "SELECT DATE(order_date) as order_day, order_type, SUM(total_amount) as total 
               FROM `Order` 
-              WHERE order_date >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
-              GROUP BY DATE(order_date), order_type
-              ORDER BY DATE(order_date) ASC";
+              WHERE order_date >= DATE_SUB(CURDATE(), INTERVAL ? DAY)";
+    if ($staff_id !== null) {
+        $query .= " AND staff_id = ?";
+    }
+    $query .= " GROUP BY DATE(order_date), order_type
+                ORDER BY DATE(order_date) ASC";
               
     $stmt = $conn->prepare($query);
     if ($stmt) {
-        $stmt->bind_param("i", $days);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        while ($row = $result->fetch_assoc()) {
-            $day = $row['order_day'];
-            if (isset($data[$day])) {
-                if ($row['order_type'] === 'sale') {
-                    $data[$day]['sales'] = floatval($row['total']);
-                } else if ($row['order_type'] === 'purchase') {
-                    $data[$day]['purchases'] = floatval($row['total']);
+        if ($staff_id === null) {
+            $stmt->bind_param("i", $days);
+        } else {
+            $staff_id = (int)$staff_id;
+            $stmt->bind_param("ii", $days, $staff_id);
+        }
+        if ($stmt->execute()) {
+            $result = $stmt->get_result();
+            if ($result) {
+                while ($row = $result->fetch_assoc()) {
+                    $day = $row['order_day'];
+                    if (isset($data[$day])) {
+                        if ($row['order_type'] === 'sale') {
+                            $data[$day]['sales'] = floatval($row['total']);
+                        } else if ($row['order_type'] === 'purchase') {
+                            $data[$day]['purchases'] = floatval($row['total']);
+                        }
+                    }
                 }
             }
         }
+        $stmt->close();
     }
     
     return array_values($data);
@@ -2183,40 +2226,74 @@ function get_inventory_valuation($conn)
 /**
  * Fetch top selling products sorted by total quantity sold.
  */
-function get_top_selling_products($conn, $limit = 5)
+function get_top_selling_products($conn, $limit = 5, $staff_id = null)
 {
     $limit = max(1, min((int)$limit, 50));
     $sql = "SELECT p.name, SUM(od.quantity) as total_qty, SUM(od.subtotal) as total_sales 
             FROM OrderDetail od 
             JOIN `Order` o ON od.order_id = o.id 
             JOIN Product p ON od.product_id = p.id 
-            WHERE o.order_type = 'sale' 
-            GROUP BY od.product_id, p.name 
-            ORDER BY total_qty DESC 
-            LIMIT ?";
+            WHERE o.order_type = 'sale'";
+    if ($staff_id !== null) {
+        $sql .= " AND o.staff_id = ?";
+    }
+    $sql .= " GROUP BY od.product_id, p.name
+              ORDER BY total_qty DESC
+              LIMIT ?";
     $stmt = $conn->prepare($sql);
     if (!$stmt) {
         return [];
     }
-    $stmt->bind_param('i', $limit);
-    $stmt->execute();
+    if ($staff_id === null) {
+        $stmt->bind_param('i', $limit);
+    } else {
+        $staff_id = (int)$staff_id;
+        $stmt->bind_param('ii', $staff_id, $limit);
+    }
+    if (!$stmt->execute()) {
+        $stmt->close();
+        return [];
+    }
     $result = $stmt->get_result();
-    return $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
+    $products = $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
+    $stmt->close();
+    return $products;
 }
 
 /**
  * Group sales volume distributions based on product categories.
  */
-function get_category_sales_distribution($conn)
+function get_category_sales_distribution($conn, $staff_id = null)
 {
     $sql = "SELECT COALESCE(c.name, 'Uncategorized') as category_name, SUM(od.subtotal) as total_sales 
             FROM OrderDetail od 
             JOIN `Order` o ON od.order_id = o.id 
             JOIN Product p ON od.product_id = p.id 
             LEFT JOIN Category c ON p.category_id = c.id 
-            WHERE o.order_type = 'sale' 
-            GROUP BY p.category_id, c.name 
-            ORDER BY total_sales DESC";
-    $result = $conn->query($sql);
-    return $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
+            WHERE o.order_type = 'sale'";
+    if ($staff_id !== null) {
+        $sql .= " AND o.staff_id = ?";
+    }
+    $sql .= " GROUP BY p.category_id, c.name
+              ORDER BY total_sales DESC";
+
+    if ($staff_id === null) {
+        $result = $conn->query($sql);
+        return $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
+    }
+
+    $stmt = $conn->prepare($sql);
+    if (!$stmt) {
+        return [];
+    }
+    $staff_id = (int)$staff_id;
+    $stmt->bind_param('i', $staff_id);
+    if (!$stmt->execute()) {
+        $stmt->close();
+        return [];
+    }
+    $result = $stmt->get_result();
+    $categories = $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
+    $stmt->close();
+    return $categories;
 }

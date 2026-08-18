@@ -4,6 +4,7 @@ start_secure_session();
 require_once '../config/db.php';
 
 verify_login();
+$is_admin_user = is_admin();
 
 $success = '';
 $error = '';
@@ -230,8 +231,10 @@ require_once '../includes/layouts/header.php';
                             <input type="radio" class="btn-check" name="orderType" id="typeSale" value="sale" checked>
                             <label class="btn btn-outline-primary" for="typeSale"><i class="fas fa-cash-register me-1"></i> Sale</label>
                             
-                            <input type="radio" class="btn-check" name="orderType" id="typePurchase" value="purchase">
-                            <label class="btn btn-outline-success" for="typePurchase"><i class="fas fa-box me-1"></i> Purchase</label>
+                            <?php if ($is_admin_user): ?>
+                                <input type="radio" class="btn-check" name="orderType" id="typePurchase" value="purchase">
+                                <label class="btn btn-outline-success" for="typePurchase"><i class="fas fa-box me-1"></i> Purchase</label>
+                            <?php endif; ?>
                         </div>
                     </div>
                     
@@ -274,15 +277,17 @@ require_once '../includes/layouts/header.php';
                                 </select>
                             </div>
 
-                            <!-- Supplier Selection Dropdown -->
-                            <div class="mb-3 supplier-form-hidden" id="formSupplierGroup">
-                                <label for="supplierSelect" class="form-label fw-bold mb-1 text-secondary"><i class="fas fa-truck me-1 text-success"></i> Supplier</label>
-                                <select class="form-select rounded-3" name="supplier_id" id="supplierSelect">
-                                    <?php foreach ($suppliers as $supp): ?>
-                                        <option value="<?php echo $supp['id']; ?>"><?php echo htmlspecialchars($supp['name'] . ($supp['phone'] ? ' - ' . $supp['phone'] : '')); ?></option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </div>
+                            <?php if ($is_admin_user): ?>
+                                <!-- Supplier Selection Dropdown -->
+                                <div class="mb-3 supplier-form-hidden" id="formSupplierGroup">
+                                    <label for="supplierSelect" class="form-label fw-bold mb-1 text-secondary"><i class="fas fa-truck me-1 text-success"></i> Supplier</label>
+                                    <select class="form-select rounded-3" name="supplier_id" id="supplierSelect">
+                                        <?php foreach ($suppliers as $supp): ?>
+                                            <option value="<?php echo $supp['id']; ?>"><?php echo htmlspecialchars($supp['name'] . ($supp['phone'] ? ' - ' . $supp['phone'] : '')); ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                            <?php endif; ?>
 
                             <button type="button" class="btn btn-success w-100 py-3 fs-5 fw-bold shadow-sm" id="completeOrderBtn" disabled>
                                 <i class="fas fa-check-circle me-2"></i>Complete Order
@@ -311,12 +316,14 @@ $extra_js = [
                 document.getElementById('orderTypeInput').value = orderType;
                 
                 // Toggle visible selector groups dynamically
+                const customerGroup = document.getElementById('formCustomerGroup');
+                const supplierGroup = document.getElementById('formSupplierGroup');
                 if (orderType === 'sale') {
-                    document.getElementById('formCustomerGroup').classList.remove('supplier-form-hidden');
-                    document.getElementById('formSupplierGroup').classList.add('supplier-form-hidden');
+                    if (customerGroup) customerGroup.classList.remove('supplier-form-hidden');
+                    if (supplierGroup) supplierGroup.classList.add('supplier-form-hidden');
                 } else {
-                    document.getElementById('formCustomerGroup').classList.add('supplier-form-hidden');
-                    document.getElementById('formSupplierGroup').classList.remove('supplier-form-hidden');
+                    if (customerGroup) customerGroup.classList.add('supplier-form-hidden');
+                    if (supplierGroup) supplierGroup.classList.remove('supplier-form-hidden');
                 }
                 
                 // Clear cart when transaction type changes to prevent stock validation confusion
@@ -750,7 +757,7 @@ $extra_js = [
     });
 </script>
 <?php endif; ?>
-<?php if (isset($_GET['purchase_product_id'])): ?>
+<?php if ($is_admin_user && isset($_GET['purchase_product_id'])): ?>
     <?php
     $restock_prod_id = intval($_GET['purchase_product_id']);
     $restock_prod = get_product_by_id($conn, $restock_prod_id);
