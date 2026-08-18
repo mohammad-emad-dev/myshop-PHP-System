@@ -25,20 +25,27 @@
 -- Do not use an SQL-client option that ignores errors. These ALTER statements
 -- intentionally do not use IF EXISTS: a missing or renamed constraint must
 -- fail visibly instead of being silently skipped.
--- If either statement fails, stop, retain the error output, inspect the
+-- If any statement fails, stop, retain the error output, inspect the
 -- current schema and migration state, and resolve it before retrying. MySQL
 -- DDL can commit each ALTER independently; do not blindly rerun the file.
 -- Databases predating Batch 1 require manual schema/data inspection first.
 
+-- MySQL validates constraint names across one ALTER statement before applying
+-- the drops, so the drops and same-named replacements must be separate DDL
+-- statements. The final foreign keys remain exactly the canonical definitions.
 ALTER TABLE StockMovement
     DROP FOREIGN KEY fk_stock_movement_product,
-    DROP FOREIGN KEY fk_stock_movement_staff,
+    DROP FOREIGN KEY fk_stock_movement_staff;
+
+ALTER TABLE StockMovement
     ADD CONSTRAINT fk_stock_movement_product
         FOREIGN KEY (product_id) REFERENCES Product(id) ON DELETE RESTRICT,
     ADD CONSTRAINT fk_stock_movement_staff
         FOREIGN KEY (staff_id) REFERENCES Staff(id) ON DELETE RESTRICT;
 
 ALTER TABLE OrderDetail
-    DROP FOREIGN KEY fk_order_detail_order,
+    DROP FOREIGN KEY fk_order_detail_order;
+
+ALTER TABLE OrderDetail
     ADD CONSTRAINT fk_order_detail_order
         FOREIGN KEY (order_id) REFERENCES `Order`(id) ON DELETE RESTRICT;

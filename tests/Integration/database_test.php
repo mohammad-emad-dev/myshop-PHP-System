@@ -1,0 +1,242 @@
+<?php
+
+declare(strict_types=1);
+
+require_once __DIR__ . '/../bootstrap.php';
+
+function run_integration_tests(): int
+{
+    $tests = new TestContext();
+    $database = new DisposableDatabase();
+    $server = null;
+
+    try {
+        $database->setup();
+        $conn = $database->runtime;
+        $schema = $database->schema();
+        $prefix = 'QA_BATCH20_' . strtoupper(bin2hex(random_bytes(4)));
+
+        $expectedTables = [
+            'Staff', 'Category', 'Customer', 'Supplier', 'Product',
+            'Order', 'OrderDetail', 'StockMovement', 'LoginRateLimit'
+        ];
+        $tableRows = test_fetch_all(
+            $schema,
+            "SELECT table_name AS table_name FROM information_schema.tables
+             WHERE table_schema = DATABASE() AND table_type = 'BASE TABLE'"
+        );
+        $actualTables = array_map(static fn(array $row): string => $row['table_name'], $tableRows);
+        sort($actualTables);
+        $expectedSorted = $expectedTables;
+        sort($expectedSorted);
+        $tests->assertSame($expectedSorted, $actualTables, 'Canonical schema/migration table set is incomplete.');
+
+        $rateLimitPasswordColumns = (int)test_scalar(
+            $schema,
+            "SELECT COUNT(*) FROM information_schema.columns
+             WHERE table_schema = DATABASE() AND table_name = 'LoginRateLimit'
+               AND column_name LIKE '%password%'"
+        );
+        $tests->assertSame(0, $rateLimitPasswordColumns, 'The rate-limit table must not contain password fields.');
+
+        $grantResult = $schema->query(
+            "SHOW GRANTS FOR " . test_sql_string($schema, $database->runtimeUsername) . "@'%'"
+        );
+        $grantLines = [];
+        while ($grantRow = $grantResult->fetch_row()) {
+            $grantLines[] = (string)$grantRow[0];
+        }
+        $grantResult->free();
+        $grantText = implode("\n", $grantLines);
+        $tests->assertTrue(
+            preg_match('/SELECT, INSERT, UPDATE, DELETE ON `'.preg_quote($database->databaseName, '/').'`\.\*/i', $grantText) === 1,
+            'The disposable runtime account must have only application CRUD privileges.'
+        );
+        $tests->assertFalse(stripos($grantText, 'ALL PRIVILEGES') !== false, 'The test runtime account must not have ALL PRIVILEGES.');
+        $tests->assertFalse(
+            preg_match('/\b(CREATE|ALTER|DROP|INDEX|GRANT OPTION)\b/i', $grantText) === 1,
+            'The test runtime account must not have schema or grant privileges.'
+        );
+
+        $adminUsername = $prefix . '_ADMIN';
+        $cashierUsername = $prefix . '_CASHIER';
+        $adminPassword = $prefix . '_' . bin2hex(random_bytes(16));
+        $cashierPassword = $prefix . '_' . bin2hex(random_bytes(16));
+        test_execute(
+            $schema,
+            'INSERT INTO Staff (username, full_name, password, role, is_active) VALUES (?, ?, ?, ?, ?)',
+            'ssssi',
+            [$adminUsername, $prefix . ' Admin', password_hash($adminPassword, PASSWORD_BCRYPT), 'admin', 1]
+        );
+        test_execute(
+            $schema,
+            'INSERT INTO Staff (username, full_name, password, role, is_active) VALUES (?, ?, ?, ?, ?)',
+            'ssssi',
+            [$cashierUsername, $prefix . ' Cashier', password_hash($cashierPassword, PASSWORD_BCRYPT), 'cashier', 1]
+        );
+        $adminId = (int)test_scalar($conn, 'SELECT id FROM Staff WHERE username = ?', 's', [$adminUsername]);
+        $cashierId = (int)test_scalar($conn, 'SELECT id FROM Staff WHERE username = ?', 's', [$cashierUsername]);
+        $tests->assertTrue($adminId > 0 && $cashierId > 0, 'Disposable staff fixtures were not created.');
+        $adminRecord = test_fetch_one($conn, 'SELECT password FROM Staff WHERE id = ?', 'i', [$adminId]);
+        $tests->assertTrue(password_verify($adminPassword, $adminRecord['password']), 'Seeded password hashes must verify.');
+
+        $customerName = $prefix . '_CUSTOMER';
+        $supplierName = $prefix . '_SUPPLIER';
+        $tests->assertTrue(create_customer($conn, $customerName, '+1 (555)-100', $prefix . '@example.com', 'Test address'), 'Customer creation failed.');
+        $customerId = (int)test_scalar($conn, 'SELECT id FROM Customer WHERE name = ?', 's', [$customerName]);
+        $tests->assertTrue($customerId > 1, 'Created customer ID was not found.');
+        $tests->assertTrue(update_customer($conn, $customerId, $customerName . '_UPDATED', '555-200', 'updated@example.com', 'Updated address'), 'Customer update failed.');
+        $tests->assertSame($customerName . '_UPDATED', test_scalar($conn, 'SELECT name FROM Customer WHERE id = ?', 'i', [$customerId]), 'Customer update was not persisted.');
+        $tests->assertTrue(delete_customer($conn, $customerId), 'Customer deletion failed.');
+        $tests->assertSame(null, test_scalar($conn, 'SELECT id FROM Customer WHERE id = ?', 'i', [$customerId]), 'Customer deletion was not persisted.');
+        $customerId = (int)test_scalar($conn, 'SELECT id FROM Customer WHERE id = 1');
+
+        $tests->assertTrue(create_supplier($conn, $supplierName, '+1 (555)-300', 'supplier@example.com', 'Supplier address'), 'Supplier creation failed.');
+        $supplierId = (int)test_scalar($conn, 'SELECT id FROM Supplier WHERE name = ?', 's', [$supplierName]);
+        $tests->assertTrue($supplierId > 1, 'Created supplier ID was not found.');
+        $tests->assertTrue(update_supplier($conn, $supplierId, $supplierName . '_UPDATED', '555-400', 'supplier2@example.com', 'Updated supplier address'), 'Supplier update failed.');
+        $tests->assertSame($supplierName . '_UPDATED', test_scalar($conn, 'SELECT name FROM Supplier WHERE id = ?', 'i', [$supplierId]), 'Supplier update was not persisted.');
+        $tests->assertTrue(delete_supplier($conn, $supplierId), 'Supplier deletion failed.');
+        $tests->assertSame(null, test_scalar($conn, 'SELECT id FROM Supplier WHERE id = ?', 'i', [$supplierId]), 'Supplier deletion was not persisted.');
+        $supplierId = (int)test_scalar($conn, 'SELECT id FROM Supplier WHERE id = 1');
+
+        $categoryName = $prefix . '_CATEGORY';
+        $tests->assertTrue(create_category($conn, $categoryName, 'Batch 20 category'), 'Category creation failed.');
+        $categoryId = (int)test_scalar($conn, 'SELECT id FROM Category WHERE name = ?', 's', [$categoryName]);
+        $tests->assertTrue($categoryId > 1, 'Created category ID was not found.');
+        $tests->assertTrue(update_category($conn, $categoryId, $categoryName . '_UPDATED', 'Updated category'), 'Category update failed.');
+        $tests->assertFalse(update_category($conn, 1, $prefix . '_NOT_GENERAL', 'Invalid General rename'), 'The default General category must not be renamed.');
+        $tests->assertFalse(delete_category($conn, 1), 'The default General category must not be deleted.');
+
+        $historyBarcode = $prefix . '-HISTORY';
+        $tests->assertTrue(create_product($conn, $adminId, $prefix . '_HISTORY_PRODUCT', 'History product', 12.34, 20, null, 5, $categoryId, $historyBarcode), 'Historical product creation failed.');
+        $historyProductId = (int)test_scalar($conn, 'SELECT id FROM Product WHERE barcode = ?', 's', [$historyBarcode]);
+        $tests->assertTrue($historyProductId > 0, 'Historical product ID was not found.');
+        $tests->assertTrue(update_product($conn, $adminId, $historyProductId, $prefix . '_HISTORY_PRODUCT_UPDATED', 'Updated history product', 13.34, 22, null, 6, $categoryId, $historyBarcode), 'Product update failed.');
+        $tests->assertSame(22, (int)test_scalar($conn, 'SELECT stock FROM Product WHERE id = ?', 'i', [$historyProductId]), 'Product stock update was not persisted.');
+
+        $reassignmentProductId = $historyProductId;
+        $tests->assertTrue(delete_category($conn, $categoryId), 'Category deletion/reassignment failed.');
+        $tests->assertSame(1, (int)test_scalar($conn, 'SELECT category_id FROM Product WHERE id = ?', 'i', [$reassignmentProductId]), 'Product category was not reassigned to General.');
+
+        $tests->assertFalse(delete_product($conn, $historyProductId), 'Products with stock history must not be deleted.');
+        $tests->assertSame($historyProductId, (int)test_scalar($conn, 'SELECT id FROM Product WHERE id = ?', 'i', [$historyProductId]), 'Historical product was unexpectedly deleted.');
+
+        $noHistoryBarcode = $prefix . '-NOHISTORY';
+        $tests->assertTrue(create_product($conn, $adminId, $prefix . '_NO_HISTORY_PRODUCT', 'No history product', 4.00, 0, null, 5, null, $noHistoryBarcode), 'No-history product creation failed.');
+        $noHistoryProductId = (int)test_scalar($conn, 'SELECT id FROM Product WHERE barcode = ?', 's', [$noHistoryBarcode]);
+        $tests->assertTrue(delete_product($conn, $noHistoryProductId), 'Product without historical rows should be deletable.');
+        $tests->assertSame(null, test_scalar($conn, 'SELECT id FROM Product WHERE id = ?', 'i', [$noHistoryProductId]), 'No-history product deletion was not persisted.');
+
+        $paginationCategoryName = $prefix . '_PAGINATION_CATEGORY';
+        $tests->assertTrue(create_category($conn, $paginationCategoryName, 'Pagination category'), 'Pagination category creation failed.');
+        $paginationCategoryId = (int)test_scalar($conn, 'SELECT id FROM Category WHERE name = ?', 's', [$paginationCategoryName]);
+        for ($index = 1; $index <= 11; $index++) {
+            $barcode = $prefix . '-PAGE-' . $index;
+            $tests->assertTrue(
+                create_product($conn, $adminId, $prefix . '_PAGE_' . $index, 'Paged product', 2.50 + $index, 0, null, 5, $paginationCategoryId, $barcode),
+                'Paged product creation failed.'
+            );
+        }
+        $tests->assertSame(11, count_products($conn, $prefix . '_PAGE_', ''), 'Product search count is incorrect.');
+        $tests->assertSame(11, count_products($conn, $paginationCategoryName, ''), 'Category-name product search is incorrect.');
+        $tests->assertCount(10, get_products_page($conn, $prefix . '_PAGE_', '', 10, 0), 'First product page size is incorrect.');
+        $tests->assertCount(1, get_products_page($conn, $prefix . '_PAGE_', '', 10, 10), 'Last product page size is incorrect.');
+        $tests->assertSame(11, count_products($conn, $prefix . '_PAGE_', 'low_stock'), 'Low-stock count is incorrect.');
+        $tests->assertCount(1, get_products_page($conn, $prefix . '-PAGE-7', '', 10, 0), 'Barcode search did not return one matching product.');
+        $tests->assertSame(0, count_products($conn, $prefix . '_DOES_NOT_EXIST', ''), 'Empty product search should return zero results.');
+
+        $orderBarcode = $prefix . '-ORDER';
+        $tests->assertTrue(create_product($conn, $adminId, $prefix . '_ORDER_PRODUCT', 'Order product', 12.34, 20, null, 5, null, $orderBarcode), 'Order product creation failed.');
+        $orderProductId = (int)test_scalar($conn, 'SELECT id FROM Product WHERE barcode = ?', 's', [$orderBarcode]);
+        $tamperedSaleId = create_order(
+            $conn,
+            $cashierId,
+            [[
+                'product_id' => $orderProductId,
+                'quantity' => 2,
+                'unit_price' => 0.01,
+                'subtotal' => 0.02,
+                'total' => 0.02,
+            ]],
+            'sale',
+            $customerId,
+            null
+        );
+        $tests->assertTrue(is_int($tamperedSaleId) && $tamperedSaleId > 0, 'Cashier sale creation failed.');
+        $detail = test_fetch_one($conn, 'SELECT unit_price, subtotal FROM OrderDetail WHERE order_id = ?', 'i', [$tamperedSaleId]);
+        $sale = test_fetch_one($conn, 'SELECT total_amount FROM `Order` WHERE id = ?', 'i', [$tamperedSaleId]);
+        $tests->assertSame(12.34, round((float)$detail['unit_price'], 2), 'Client unit price tampering was accepted.');
+        $tests->assertSame(24.68, round((float)$detail['subtotal'], 2), 'Client subtotal tampering was accepted.');
+        $tests->assertSame(24.68, round((float)$sale['total_amount'], 2), 'Client total tampering was accepted.');
+        $tests->assertSame(18, (int)test_scalar($conn, 'SELECT stock FROM Product WHERE id = ?', 'i', [$orderProductId]), 'Sale stock update was incorrect.');
+
+        $orderCountBeforePurchase = (int)test_scalar($conn, 'SELECT COUNT(*) FROM `Order`');
+        $tests->assertFalse(create_order($conn, $cashierId, [['product_id' => $orderProductId, 'quantity' => 1]], 'purchase', null, $supplierId), 'Cashiers must not create purchases.');
+        $tests->assertSame($orderCountBeforePurchase, (int)test_scalar($conn, 'SELECT COUNT(*) FROM `Order`'), 'Rejected cashier purchase mutated orders.');
+        $adminPurchaseId = create_order($conn, $adminId, [['product_id' => $orderProductId, 'quantity' => 3]], 'purchase', null, $supplierId);
+        $tests->assertTrue(is_int($adminPurchaseId) && $adminPurchaseId > 0, 'Admin purchase creation failed.');
+        $tests->assertSame(21, (int)test_scalar($conn, 'SELECT stock FROM Product WHERE id = ?', 'i', [$orderProductId]), 'Purchase stock update was incorrect.');
+        $tests->assertFalse(create_order($conn, $adminId, [['product_id' => $orderProductId, 'quantity' => 1]], 'invalid', $customerId, null), 'Invalid order types must be rejected by the database-facing function.');
+
+        $tests->assertCount(1, get_orders_for_staff($conn, $cashierId), 'Cashier order history scope is incorrect.');
+        $tests->assertSame(null, get_order_by_id($conn, $tamperedSaleId, $adminId), 'A cashier order must not be visible to another staff scope.');
+        $tests->assertCount(0, get_order_details($conn, $tamperedSaleId, $adminId), 'Unauthorized order details must be empty.');
+        $tests->assertTrue(is_array(get_order_by_id($conn, $tamperedSaleId)), 'Admin/global order lookup failed.');
+        $tests->assertCount(1, get_order_details($conn, $tamperedSaleId, $cashierId), 'Cashier-owned order details were not visible to the owner.');
+
+        $ratePrefix = $prefix . '_RATE';
+        $keyA = build_login_rate_limit_key($ratePrefix . '_A', '198.51.100.11');
+        $keyB = build_login_rate_limit_key($ratePrefix . '_A', '198.51.100.12');
+        $keyC = build_login_rate_limit_key($ratePrefix . '_B', '198.51.100.11');
+        for ($attempt = 1; $attempt <= 4; $attempt++) {
+            $state = login_rate_limit_record_failure($conn, $keyA);
+            $tests->assertSame('recorded', $state['status'], 'Rate-limit failures below the threshold must be recorded.');
+        }
+        $blockedState = login_rate_limit_record_failure($conn, $keyA);
+        $tests->assertSame('blocked', $blockedState['status'], 'The fifth failed login must block the account/IP pair.');
+        $tests->assertSame('blocked', login_rate_limit_check($conn, $keyA)['status'], 'Blocked account/IP pairs must remain blocked.');
+        $tests->assertSame('allowed', login_rate_limit_check($conn, $keyB)['status'], 'A different source IP must not share a counter.');
+        $tests->assertSame('allowed', login_rate_limit_check($conn, $keyC)['status'], 'A different account must not share a counter.');
+        $tests->assertTrue(login_rate_limit_reset($conn, $keyA), 'Successful-login rate-limit reset failed.');
+        $tests->assertSame('allowed', login_rate_limit_check($conn, $keyA)['status'], 'Successful-login reset did not clear the block.');
+        $tests->assertSame(0, (int)test_scalar($conn, 'SELECT COUNT(*) FROM LoginRateLimit WHERE username_hash = ?', 's', [$keyA['username_hash']]), 'Rate-limit reset left stale state.');
+
+        $server = test_start_local_server();
+        $invalidCsrfStatus = test_http_post($server[1], '/login.php', [
+            'action' => 'login',
+            'username' => $ratePrefix . '_HTTP',
+            'password' => 'not-a-real-password',
+            'csrf_token' => 'invalid-token',
+        ]);
+        $tests->assertSame(403, $invalidCsrfStatus, 'The login endpoint must return HTTP 403 for invalid CSRF.');
+        $httpKey = build_login_rate_limit_key($ratePrefix . '_HTTP', '127.0.0.1');
+        $tests->assertSame(0, (int)test_scalar($conn, 'SELECT COUNT(*) FROM LoginRateLimit WHERE username_hash = ?', 's', [$httpKey['username_hash']]), 'Invalid CSRF must not increment login rate-limit counters.');
+
+        $failureConnection = new mysqli(
+            $database->hostForTests(),
+            $database->runtimeUsername,
+            $database->runtimePassword,
+            $database->databaseName,
+            $database->portForTests()
+        );
+        $failureConnection->close();
+        $tests->assertSame(null, get_product_by_id($failureConnection, 1), 'Single-record DB failures must return null.');
+        $tests->assertCount(0, get_orders($failureConnection), 'List DB failures must return an empty array.');
+        $tests->assertCount(0, get_order_details($failureConnection, 1), 'Order-detail DB failures must return an empty array.');
+        $tests->assertFalse(create_product($failureConnection, $adminId, $prefix . '_DB_FAILURE', 'Failure', 1.00, 1), 'Create DB failures must return false.');
+        $tests->assertFalse(delete_category($failureConnection, 2), 'Delete DB failures must return false.');
+
+        $rollbackBarcode = $prefix . '-ROLLBACK';
+        $tests->assertFalse(create_product($conn, 999999999, $prefix . '_ROLLBACK_PRODUCT', 'Rollback', 3.00, 4, null, 5, null, $rollbackBarcode), 'A stock-ledger failure must fail product creation.');
+        $tests->assertSame(null, test_scalar($conn, 'SELECT id FROM Product WHERE barcode = ?', 's', [$rollbackBarcode]), 'Failed product creation left a partial product row.');
+
+        return $tests->assertions();
+    } finally {
+        if ($server !== null && is_resource($server[0])) {
+            proc_terminate($server[0]);
+            proc_close($server[0]);
+        }
+        $database->cleanup();
+    }
+}

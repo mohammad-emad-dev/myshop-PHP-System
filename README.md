@@ -120,7 +120,32 @@ docker compose --env-file .env run --rm --no-deps app sh -c 'find config databas
 
 The reviewed baseline has also been checked with disposable database integration tests, authorization/CSRF HTTP checks, Docker health checks, JavaScript syntax checks, and database-failure return-contract tests.
 
-Every push to `main` or `security-hardening-baseline`, and every pull request, runs the repository Quality Gate in GitHub Actions. It validates PHP syntax, JavaScript syntax, and the Docker Compose configuration.
+Every push to `main` or `security-hardening-baseline`, and every pull request, runs the repository Quality Gate in GitHub Actions. It validates PHP syntax, JavaScript syntax, Docker Compose configuration, and the disposable database regression suite.
+
+### Automated regression tests
+
+The repository uses a dependency-free CLI PHP harness instead of PHPUnit. This keeps the project free of a Composer dependency while still executing the real application functions and real MySQL transactions.
+
+Run the unit and integration suite from Docker after the local stack is running. The command reads the root password into a process environment variable without printing it:
+
+~~~powershell
+$rootPasswordLine = Get-Content .env | Where-Object { $_ -match '^MYSQL_ROOT_PASSWORD=' } | Select-Object -First 1
+$env:TEST_DB_ROOT_PASSWORD = $rootPasswordLine -replace '^MYSQL_ROOT_PASSWORD=', ''
+docker compose --env-file .env exec -T `
+  -e TEST_DB_HOST=db -e TEST_DB_PORT=3306 -e TEST_DB_ROOT_USER=root `
+  -e TEST_DB_ROOT_PASSWORD="$env:TEST_DB_ROOT_PASSWORD" app php tests/run.php
+Remove-Item Env:TEST_DB_ROOT_PASSWORD
+~~~
+
+The integration harness generates a unique `myshop_test_*` database and a random temporary runtime account. A controlled schema/root account loads `database/schema.sql` followed by the documented migrations; application operations then run through the restricted temporary runtime account. The harness never selects `ioms_db`, never uses the normal runtime account, and drops the temporary database and account in a `finally` cleanup step. Cleanup failure fails the test job and identifies the leftover artifact.
+
+The test layers are deliberately separate:
+
+- `tests/Unit/` covers sanitization, identifiers, password policy, CSRF helpers, and validation that completes before database access.
+- `tests/Integration/` covers real MySQL schema, migrations, CRUD, transactions, stock/order integrity, authorization-sensitive order creation, rate limiting, and database-failure contracts.
+- Browser smoke tests remain a separate local verification layer. They require a running web server and browser automation; they are not represented as passing unit or integration tests.
+
+The GitHub Actions regression job creates its own disposable MySQL container with a generated root password, runs `php tests/run.php`, and removes the container and its volume even when the tests fail.
 
 ## Security model
 
@@ -185,7 +210,7 @@ The project follows a lightweight GitHub Flow:
 4. Commit with a descriptive Conventional Commit message.
 5. Open a Pull Request and document the evidence.
 
-Current published baseline commit: 06a4e9f (fix: address final regression findings).
+Security baseline preceding the regression-suite work: 06a4e9f (fix: address final regression findings).
 
 ## License
 
