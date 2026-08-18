@@ -120,6 +120,8 @@ docker compose --env-file .env run --rm --no-deps app sh -c 'find config databas
 
 The reviewed baseline has also been checked with disposable database integration tests, authorization/CSRF HTTP checks, Docker health checks, JavaScript syntax checks, and database-failure return-contract tests.
 
+Every push to `main` or `security-hardening-baseline`, and every pull request, runs the repository Quality Gate in GitHub Actions. It validates PHP syntax, JavaScript syntax, and the Docker Compose configuration.
+
 ## Security model
 
 - State-changing requests require POST and CSRF validation.
