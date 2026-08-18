@@ -1225,7 +1225,6 @@ a { text-decoration: none; }
 .product-filter-hidden { display: none !important; }
 .cart-row-hidden { display: none !important; }
 .table-row-hidden { display: none !important; }
-.modal-body-locked { overflow: hidden !important; }
 
 /* Invoice print layout */
 #invoicePrintWrapper { display: none; }

@@ -8,14 +8,12 @@ Options -Indexes
 
 # Protect sensitive files
 <FilesMatch "^\.">
-    Order allow,deny
-    Deny from all
+    Require all denied
 </FilesMatch>
 
 # Protect database config
 <Files "db.php">
-    Order allow,deny
-    Deny from all
+    Require all denied
 </Files>
 
 # PHP configuration
