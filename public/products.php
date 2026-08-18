@@ -91,25 +91,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 }
 
 $allowed_page_sizes = [10, 25, 50];
-$raw_page_size = $_GET['page_size'] ?? 25;
-$page_size = is_scalar($raw_page_size) ? filter_var($raw_page_size, FILTER_VALIDATE_INT) : false;
-if ($page_size === false || !in_array($page_size, $allowed_page_sizes, true)) {
-    $page_size = 25;
-}
+$page_size = normalize_page_size($_GET['page_size'] ?? 25, 25, $allowed_page_sizes);
+$page = normalize_page_number($_GET['page'] ?? 1);
 
-$raw_page = $_GET['page'] ?? 1;
-$page = is_scalar($raw_page) ? filter_var($raw_page, FILTER_VALIDATE_INT) : false;
-if ($page === false || $page < 1) {
-    $page = 1;
-}
-
-$raw_search = $_GET['search'] ?? '';
-$search = is_string($raw_search) ? trim($raw_search) : '';
-if (function_exists('mb_substr')) {
-    $search = mb_substr($search, 0, 100, 'UTF-8');
-} else {
-    $search = substr($search, 0, 100);
-}
+$search = truncate_list_search($_GET['search'] ?? '');
 
 $raw_filter = $_GET['filter'] ?? '';
 $filter = is_string($raw_filter) && $raw_filter === 'low_stock' ? 'low_stock' : '';
@@ -166,7 +151,7 @@ if ($total_pages <= 7) {
     $pagination_pages[] = $total_pages;
 }
 
-$categories = get_categories($conn);
+$categories = get_categories_for_selector($conn);
 $page_title = 'Products';
 $active_page = 'products';
 $extra_css = ['https://cdn.jsdelivr.net/npm/sweetalert2@11.10.0/dist/sweetalert2.min.css'];

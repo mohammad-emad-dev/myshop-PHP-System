@@ -107,8 +107,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 }
 
 // Handle read-only filter with strict integer casting
-$selected_product_id = isset($_GET['product_id']) ? intval($_GET['product_id']) : null;
-if ($selected_product_id <= 0) {
+$selected_product_id = isset($_GET['product_id'])
+    ? filter_var($_GET['product_id'], FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]])
+    : null;
+if ($selected_product_id === false || $selected_product_id === null) {
     $selected_product_id = null;
 }
 
@@ -121,9 +123,47 @@ if ($selected_product_id !== null) {
     }
 }
 
-// Fetch stock movements
-$movements = get_stock_movements($conn, $selected_product_id);
-$products_list = get_all_products($conn); // for the dropdown filter
+$page_size_options = [10, 25, 50, 100];
+$page_size = normalize_page_size($_GET['page_size'] ?? 25, 25, $page_size_options);
+$page = normalize_page_number($_GET['page'] ?? 1);
+$total_movements = count_stock_movements($conn, $selected_product_id);
+$total_pages = max(1, (int)ceil($total_movements / $page_size));
+if ($page > $total_pages) {
+    $page = $total_pages;
+}
+$offset = ($page - 1) * $page_size;
+$movements = get_stock_movements_page($conn, $selected_product_id, $page_size, $offset);
+$products_list = get_pos_products($conn, '', 100); // bounded selector data
+$range_start = $total_movements > 0 ? $offset + 1 : 0;
+$range_end = $total_movements > 0 ? min($offset + count($movements), $total_movements) : 0;
+$stock_ledger_url = static function ($target_page) use ($selected_product_id, $page_size) {
+    $query = [
+        'page' => max(1, (int)$target_page),
+        'page_size' => $page_size,
+    ];
+    if ($selected_product_id !== null) {
+        $query['product_id'] = $selected_product_id;
+    }
+    return 'stock_movements.php?' . http_build_query($query);
+};
+$pagination_pages = [];
+if ($total_pages <= 7) {
+    $pagination_pages = range(1, $total_pages);
+} else {
+    $pagination_pages = [1];
+    $window_start = max(2, $page - 2);
+    $window_end = min($total_pages - 1, $page + 2);
+    if ($window_start > 2) {
+        $pagination_pages[] = '...';
+    }
+    for ($pagination_page = $window_start; $pagination_page <= $window_end; $pagination_page++) {
+        $pagination_pages[] = $pagination_page;
+    }
+    if ($window_end < $total_pages - 1) {
+        $pagination_pages[] = '...';
+    }
+    $pagination_pages[] = $total_pages;
+}
 
 $page_title = 'Stock Ledger';
 $active_page = 'stock_movements';
@@ -141,7 +181,7 @@ require_once '../includes/layouts/header.php';
             <div>
                 <h1 class="h3 mb-0 fw-bold ui-page-heading">
                     Stock Ledger
-                    <span class="badge bg-primary rounded-pill ms-2 align-middle ui-count-text-lg"><?php echo count($movements); ?> Records</span>
+                    <span class="badge bg-primary rounded-pill ms-2 align-middle ui-count-text-lg"><?php echo number_format($total_movements); ?> Records</span>
                 </h1>
                 <p class="text-muted mb-0 mt-1">Detailed history of all inventory stock updates, additions, and manual corrections.</p>
             </div>
@@ -174,6 +214,14 @@ require_once '../includes/layouts/header.php';
                             <?php endforeach; ?>
                         </select>
                     </div>
+                    <div class="col-md-2">
+                        <label for="ledgerPageSize" class="form-label fw-semibold text-secondary">Per page</label>
+                        <select name="page_size" id="ledgerPageSize" class="form-select rounded-3">
+                            <?php foreach ($page_size_options as $option): ?>
+                                <option value="<?php echo $option; ?>" <?php echo $page_size === $option ? 'selected' : ''; ?>><?php echo $option; ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
                     <div class="col-md-4">
                         <button type="submit" class="btn btn-primary rounded-3 px-4 w-100">
                             <i class="fas fa-filter me-2"></i>Filter Ledger
@@ -193,7 +241,10 @@ require_once '../includes/layouts/header.php';
         <!-- Movements Table Card -->
         <div class="card shadow-sm border-0 rounded-4">
             <div class="card-body">
-                <div class="table-responsive">
+                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                            <span class="text-muted small">Showing <?php echo $range_start; ?>-<?php echo $range_end; ?> of <?php echo $total_movements; ?> records</span>
+                        </div>
+                        <div class="table-responsive">
                     <table class="table table-hover table-striped align-middle">
                         <thead class="bg-light text-secondary">
                             <tr>
@@ -268,8 +319,29 @@ require_once '../includes/layouts/header.php';
                             <?php endif; ?>
                         </tbody>
                     </table>
-                </div>
-            </div>
+                        </div>
+                        <?php if ($total_pages > 1): ?>
+                            <nav class="mt-4" aria-label="Stock movement pagination">
+                                <ul class="pagination justify-content-center flex-wrap mb-0">
+                                    <li class="page-item <?php echo $page <= 1 ? 'disabled' : ''; ?>">
+                                        <a class="page-link" aria-label="Previous page" href="<?php echo $page > 1 ? htmlspecialchars($stock_ledger_url($page - 1), ENT_QUOTES, 'UTF-8') : '#'; ?>">Previous</a>
+                                    </li>
+                                    <?php foreach ($pagination_pages as $pagination_page): ?>
+                                        <?php if ($pagination_page === '...'): ?>
+                                            <li class="page-item disabled"><span class="page-link">&hellip;</span></li>
+                                        <?php else: ?>
+                                            <li class="page-item <?php echo $page === $pagination_page ? 'active' : ''; ?>">
+                                                <a class="page-link" href="<?php echo htmlspecialchars($stock_ledger_url($pagination_page), ENT_QUOTES, 'UTF-8'); ?>" <?php echo $page === $pagination_page ? 'aria-current="page"' : ''; ?>><?php echo $pagination_page; ?></a>
+                                            </li>
+                                        <?php endif; ?>
+                                    <?php endforeach; ?>
+                                    <li class="page-item <?php echo $page >= $total_pages ? 'disabled' : ''; ?>">
+                                        <a class="page-link" aria-label="Next page" href="<?php echo $page < $total_pages ? htmlspecialchars($stock_ledger_url($page + 1), ENT_QUOTES, 'UTF-8') : '#'; ?>">Next</a>
+                                    </li>
+                                </ul>
+                            </nav>
+                        <?php endif; ?>
+                    </div>
         </div>
     </div>
 </div>

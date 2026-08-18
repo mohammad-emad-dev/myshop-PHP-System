@@ -603,6 +603,40 @@ function build_product_filter_sql($search, $filter, &$search_pattern)
     return empty($conditions) ? '' : ' WHERE ' . implode(' AND ', $conditions);
 }
 
+/**
+ * Normalizes user-facing list pagination without allowing unbounded limits.
+ */
+function normalize_page_number($page, $default = 1)
+{
+    $default = max(1, (int)$default);
+    $value = is_scalar($page) ? filter_var($page, FILTER_VALIDATE_INT) : false;
+
+    return $value === false || $value < 1 ? $default : (int)$value;
+}
+
+function normalize_page_size($page_size, $default = 25, $allowed_sizes = [10, 25, 50, 100])
+{
+    $default = (int)$default;
+    $allowed_sizes = array_values(array_unique(array_map('intval', (array)$allowed_sizes)));
+    if (empty($allowed_sizes)) {
+        $allowed_sizes = [25];
+    }
+    if (!in_array($default, $allowed_sizes, true)) {
+        $default = $allowed_sizes[0];
+    }
+
+    $value = is_scalar($page_size) ? filter_var($page_size, FILTER_VALIDATE_INT) : false;
+    return $value !== false && in_array((int)$value, $allowed_sizes, true) ? (int)$value : $default;
+}
+
+function truncate_list_search($search, $max_length = 100)
+{
+    $search = is_scalar($search) ? trim((string)$search) : '';
+    return function_exists('mb_substr')
+        ? mb_substr($search, 0, $max_length, 'UTF-8')
+        : substr($search, 0, $max_length);
+}
+
 function get_all_products($conn)
 {
     $sql = "SELECT p.*, c.name as category_name
@@ -621,6 +655,118 @@ function get_all_products($conn)
     } catch (Throwable $exception) {
         error_log('Product list query failed: ' . $exception->getMessage());
         return [];
+    }
+}
+
+/**
+ * Returns a bounded product set for the POS. Search is optional so the POS
+ * remains fast for normal selection while barcode/name lookups never require
+ * loading the full catalog into memory.
+ */
+function get_pos_products($conn, $search = '', $limit = 100)
+{
+    $search = truncate_list_search($search);
+    $limit = normalize_page_size($limit, 100, [25, 50, 100]);
+    $stmt = null;
+
+    try {
+        if ($search !== '') {
+            $search_pattern = '%' . $search . '%';
+            $stmt = $conn->prepare(
+                "SELECT p.*, c.name as category_name
+                 FROM Product p
+                 LEFT JOIN Category c ON p.category_id = c.id
+                 WHERE p.name LIKE ? OR p.barcode LIKE ?
+                 ORDER BY p.created_at DESC, p.id DESC
+                 LIMIT ?"
+            );
+            if (!$stmt) {
+                error_log('POS product search prepare failed: ' . $conn->error);
+                return [];
+            }
+            if (!$stmt->bind_param('ssi', $search_pattern, $search_pattern, $limit)) {
+                error_log('POS product search bind failed: ' . $stmt->error);
+                return [];
+            }
+        } else {
+            $stmt = $conn->prepare(
+                "SELECT p.*, c.name as category_name
+                 FROM Product p
+                 LEFT JOIN Category c ON p.category_id = c.id
+                 ORDER BY p.created_at DESC, p.id DESC
+                 LIMIT ?"
+            );
+            if (!$stmt) {
+                error_log('POS product list prepare failed: ' . $conn->error);
+                return [];
+            }
+            if (!$stmt->bind_param('i', $limit)) {
+                error_log('POS product list bind failed: ' . $stmt->error);
+                return [];
+            }
+        }
+
+        if (!$stmt->execute()) {
+            error_log('POS product query execute failed: ' . $stmt->error);
+            return [];
+        }
+        $result = $stmt->get_result();
+        if (!$result) {
+            error_log('POS product result retrieval failed: ' . $stmt->error);
+            return [];
+        }
+        return $result->fetch_all(MYSQLI_ASSOC);
+    } catch (Throwable $exception) {
+        error_log('POS product query failed: ' . $exception->getMessage());
+        return [];
+    } finally {
+        if ($stmt instanceof mysqli_stmt) {
+            $stmt->close();
+        }
+    }
+}
+
+function get_pos_product_by_barcode($conn, $barcode)
+{
+    $barcode = truncate_list_search($barcode);
+    if ($barcode === '') {
+        return null;
+    }
+
+    $stmt = null;
+    try {
+        $stmt = $conn->prepare(
+            "SELECT p.*, c.name as category_name
+             FROM Product p
+             LEFT JOIN Category c ON p.category_id = c.id
+             WHERE p.barcode = ?
+             LIMIT 1"
+        );
+        if (!$stmt) {
+            error_log('POS barcode lookup prepare failed: ' . $conn->error);
+            return null;
+        }
+        if (!$stmt->bind_param('s', $barcode)) {
+            error_log('POS barcode lookup bind failed: ' . $stmt->error);
+            return null;
+        }
+        if (!$stmt->execute()) {
+            error_log('POS barcode lookup execute failed: ' . $stmt->error);
+            return null;
+        }
+        $result = $stmt->get_result();
+        if (!$result) {
+            error_log('POS barcode lookup result failed: ' . $stmt->error);
+            return null;
+        }
+        return $result->fetch_assoc() ?: null;
+    } catch (Throwable $exception) {
+        error_log('POS barcode lookup failed: ' . $exception->getMessage());
+        return null;
+    } finally {
+        if ($stmt instanceof mysqli_stmt) {
+            $stmt->close();
+        }
     }
 }
 
@@ -772,24 +918,44 @@ function get_product_by_id($conn, $id)
     }
 }
 
-function get_low_stock_products($conn)
+function get_low_stock_products($conn, $limit = 100)
 {
-    $sql = "SELECT p.*, c.name as category_name 
-            FROM Product p 
-            LEFT JOIN Category c ON p.category_id = c.id 
-            WHERE p.stock <= p.alert_threshold 
-            ORDER BY p.stock ASC, p.name ASC";
+    $limit = normalize_page_size($limit, 100, [25, 50, 100]);
+    $stmt = null;
     try {
-        $result = $conn->query($sql);
-        if (!$result) {
-            error_log('Low-stock product query failed: ' . $conn->error);
+        $stmt = $conn->prepare(
+            "SELECT p.*, c.name as category_name
+             FROM Product p
+             LEFT JOIN Category c ON p.category_id = c.id
+             WHERE p.stock <= p.alert_threshold
+             ORDER BY p.stock ASC, p.name ASC, p.id ASC
+             LIMIT ?"
+        );
+        if (!$stmt) {
+            error_log('Low-stock product prepare failed: ' . $conn->error);
             return [];
         }
-
+        if (!$stmt->bind_param('i', $limit)) {
+            error_log('Low-stock product bind failed: ' . $stmt->error);
+            return [];
+        }
+        if (!$stmt->execute()) {
+            error_log('Low-stock product execute failed: ' . $stmt->error);
+            return [];
+        }
+        $result = $stmt->get_result();
+        if (!$result) {
+            error_log('Low-stock product result retrieval failed: ' . $stmt->error);
+            return [];
+        }
         return $result->fetch_all(MYSQLI_ASSOC);
     } catch (Throwable $exception) {
         error_log('Low-stock product query failed: ' . $exception->getMessage());
         return [];
+    } finally {
+        if ($stmt instanceof mysqli_stmt) {
+            $stmt->close();
+        }
     }
 }
 
@@ -885,6 +1051,111 @@ function get_stock_movements($conn, $product_id = null)
         } catch (Throwable $exception) {
             error_log('Stock movement query failed: ' . $exception->getMessage());
             return [];
+        }
+    }
+}
+
+function count_stock_movements($conn, $product_id = null)
+{
+    $product_id = $product_id === null ? null : (int)$product_id;
+    if ($product_id !== null && $product_id <= 0) {
+        return 0;
+    }
+
+    $stmt = null;
+    try {
+        if ($product_id === null) {
+            $stmt = $conn->prepare("SELECT COUNT(*) AS total FROM `StockMovement`");
+        } else {
+            $stmt = $conn->prepare("SELECT COUNT(*) AS total FROM `StockMovement` WHERE product_id = ?");
+        }
+        if (!$stmt) {
+            error_log('Stock movement count prepare failed: ' . $conn->error);
+            return 0;
+        }
+        if ($product_id !== null && !$stmt->bind_param('i', $product_id)) {
+            error_log('Stock movement count bind failed: ' . $stmt->error);
+            return 0;
+        }
+        if (!$stmt->execute()) {
+            error_log('Stock movement count execute failed: ' . $stmt->error);
+            return 0;
+        }
+        $result = $stmt->get_result();
+        if (!$result) {
+            error_log('Stock movement count result failed: ' . $stmt->error);
+            return 0;
+        }
+        $row = $result->fetch_assoc();
+        return $row ? max(0, (int)$row['total']) : 0;
+    } catch (Throwable $exception) {
+        error_log('Stock movement count failed: ' . $exception->getMessage());
+        return 0;
+    } finally {
+        if ($stmt instanceof mysqli_stmt) {
+            $stmt->close();
+        }
+    }
+}
+
+function get_stock_movements_page($conn, $product_id = null, $limit = 25, $offset = 0)
+{
+    $product_id = $product_id === null ? null : (int)$product_id;
+    if ($product_id !== null && $product_id <= 0) {
+        return [];
+    }
+    $limit = normalize_page_size($limit, 25);
+    $offset = max(0, (int)$offset);
+    $stmt = null;
+
+    try {
+        if ($product_id === null) {
+            $stmt = $conn->prepare(
+                "SELECT sm.*, p.name as product_name, s.full_name as staff_name
+                 FROM `StockMovement` sm
+                 JOIN Product p ON sm.product_id = p.id
+                 JOIN Staff s ON sm.staff_id = s.id
+                 ORDER BY sm.created_at DESC, sm.id DESC
+                 LIMIT ? OFFSET ?"
+            );
+        } else {
+            $stmt = $conn->prepare(
+                "SELECT sm.*, p.name as product_name, s.full_name as staff_name
+                 FROM `StockMovement` sm
+                 JOIN Product p ON sm.product_id = p.id
+                 JOIN Staff s ON sm.staff_id = s.id
+                 WHERE sm.product_id = ?
+                 ORDER BY sm.created_at DESC, sm.id DESC
+                 LIMIT ? OFFSET ?"
+            );
+        }
+        if (!$stmt) {
+            error_log('Stock movement page prepare failed: ' . $conn->error);
+            return [];
+        }
+        $bound = $product_id === null
+            ? $stmt->bind_param('ii', $limit, $offset)
+            : $stmt->bind_param('iii', $product_id, $limit, $offset);
+        if (!$bound) {
+            error_log('Stock movement page bind failed: ' . $stmt->error);
+            return [];
+        }
+        if (!$stmt->execute()) {
+            error_log('Stock movement page execute failed: ' . $stmt->error);
+            return [];
+        }
+        $result = $stmt->get_result();
+        if (!$result) {
+            error_log('Stock movement page result failed: ' . $stmt->error);
+            return [];
+        }
+        return $result->fetch_all(MYSQLI_ASSOC);
+    } catch (Throwable $exception) {
+        error_log('Stock movement page failed: ' . $exception->getMessage());
+        return [];
+    } finally {
+        if ($stmt instanceof mysqli_stmt) {
+            $stmt->close();
         }
     }
 }
@@ -1645,6 +1916,213 @@ function get_orders_for_staff($conn, $staff_id)
     }
 }
 
+function count_orders($conn, $staff_id = null, $filter_type = 'all')
+{
+    $filter_type = in_array($filter_type, ['all', 'sale', 'purchase'], true) ? $filter_type : 'all';
+    $staff_id = $staff_id === null ? null : (int)$staff_id;
+    if ($staff_id !== null && $staff_id <= 0) {
+        return 0;
+    }
+
+    $stmt = null;
+    try {
+        if ($staff_id === null && $filter_type === 'all') {
+            $stmt = $conn->prepare("SELECT COUNT(*) AS total FROM `Order`");
+        } elseif ($staff_id === null) {
+            $stmt = $conn->prepare("SELECT COUNT(*) AS total FROM `Order` WHERE order_type = ?");
+        } elseif ($filter_type === 'all') {
+            $stmt = $conn->prepare("SELECT COUNT(*) AS total FROM `Order` WHERE staff_id = ?");
+        } else {
+            $stmt = $conn->prepare("SELECT COUNT(*) AS total FROM `Order` WHERE staff_id = ? AND order_type = ?");
+        }
+        if (!$stmt) {
+            error_log('Order count prepare failed: ' . $conn->error);
+            return 0;
+        }
+
+        if ($staff_id === null && $filter_type !== 'all') {
+            if (!$stmt->bind_param('s', $filter_type)) {
+                error_log('Order count bind failed: ' . $stmt->error);
+                return 0;
+            }
+        } elseif ($staff_id !== null && $filter_type === 'all') {
+            if (!$stmt->bind_param('i', $staff_id)) {
+                error_log('Order count bind failed: ' . $stmt->error);
+                return 0;
+            }
+        } elseif ($staff_id !== null) {
+            if (!$stmt->bind_param('is', $staff_id, $filter_type)) {
+                error_log('Order count bind failed: ' . $stmt->error);
+                return 0;
+            }
+        }
+
+        if (!$stmt->execute()) {
+            error_log('Order count execute failed: ' . $stmt->error);
+            return 0;
+        }
+        $result = $stmt->get_result();
+        if (!$result) {
+            error_log('Order count result failed: ' . $stmt->error);
+            return 0;
+        }
+        $row = $result->fetch_assoc();
+        return $row ? max(0, (int)$row['total']) : 0;
+    } catch (Throwable $exception) {
+        error_log('Order count failed: ' . $exception->getMessage());
+        return 0;
+    } finally {
+        if ($stmt instanceof mysqli_stmt) {
+            $stmt->close();
+        }
+    }
+}
+
+function get_order_summary($conn, $staff_id = null, $filter_type = 'all')
+{
+    $empty_summary = [
+        'total_orders' => 0,
+        'total_sales_amount' => 0.0,
+        'total_purchases_amount' => 0.0,
+        'sales_count' => 0,
+        'purchases_count' => 0,
+    ];
+    $filter_type = in_array($filter_type, ['all', 'sale', 'purchase'], true) ? $filter_type : 'all';
+    $staff_id = $staff_id === null ? null : (int)$staff_id;
+    if ($staff_id !== null && $staff_id <= 0) {
+        return $empty_summary;
+    }
+
+    $stmt = null;
+    try {
+        $sql = "SELECT COUNT(*) AS total_orders,
+                       COALESCE(SUM(CASE WHEN order_type = 'sale' THEN total_amount ELSE 0 END), 0) AS total_sales_amount,
+                       COALESCE(SUM(CASE WHEN order_type = 'purchase' THEN total_amount ELSE 0 END), 0) AS total_purchases_amount,
+                       COALESCE(SUM(CASE WHEN order_type = 'sale' THEN 1 ELSE 0 END), 0) AS sales_count,
+                       COALESCE(SUM(CASE WHEN order_type = 'purchase' THEN 1 ELSE 0 END), 0) AS purchases_count
+                FROM `Order`";
+        if ($staff_id === null && $filter_type !== 'all') {
+            $sql .= " WHERE order_type = ?";
+        } elseif ($staff_id !== null && $filter_type === 'all') {
+            $sql .= " WHERE staff_id = ?";
+        } elseif ($staff_id !== null) {
+            $sql .= " WHERE staff_id = ? AND order_type = ?";
+        }
+        $stmt = $conn->prepare($sql);
+        if (!$stmt) {
+            error_log('Order summary prepare failed: ' . $conn->error);
+            return $empty_summary;
+        }
+        if ($staff_id === null && $filter_type !== 'all') {
+            if (!$stmt->bind_param('s', $filter_type)) {
+                error_log('Order summary bind failed: ' . $stmt->error);
+                return $empty_summary;
+            }
+        } elseif ($staff_id !== null && $filter_type === 'all') {
+            if (!$stmt->bind_param('i', $staff_id)) {
+                error_log('Order summary bind failed: ' . $stmt->error);
+                return $empty_summary;
+            }
+        } elseif ($staff_id !== null) {
+            if (!$stmt->bind_param('is', $staff_id, $filter_type)) {
+                error_log('Order summary bind failed: ' . $stmt->error);
+                return $empty_summary;
+            }
+        }
+        if (!$stmt->execute()) {
+            error_log('Order summary execute failed: ' . $stmt->error);
+            return $empty_summary;
+        }
+        $result = $stmt->get_result();
+        if (!$result) {
+            error_log('Order summary result failed: ' . $stmt->error);
+            return $empty_summary;
+        }
+        $row = $result->fetch_assoc();
+        if (!$row) {
+            return $empty_summary;
+        }
+        return [
+            'total_orders' => max(0, (int)$row['total_orders']),
+            'total_sales_amount' => (float)$row['total_sales_amount'],
+            'total_purchases_amount' => (float)$row['total_purchases_amount'],
+            'sales_count' => max(0, (int)$row['sales_count']),
+            'purchases_count' => max(0, (int)$row['purchases_count']),
+        ];
+    } catch (Throwable $exception) {
+        error_log('Order summary failed: ' . $exception->getMessage());
+        return $empty_summary;
+    } finally {
+        if ($stmt instanceof mysqli_stmt) {
+            $stmt->close();
+        }
+    }
+}
+
+function get_orders_page($conn, $staff_id = null, $filter_type = 'all', $limit = 25, $offset = 0)
+{
+    $filter_type = in_array($filter_type, ['all', 'sale', 'purchase'], true) ? $filter_type : 'all';
+    $staff_id = $staff_id === null ? null : (int)$staff_id;
+    if ($staff_id !== null && $staff_id <= 0) {
+        return [];
+    }
+    $limit = normalize_page_size($limit, 25);
+    $offset = max(0, (int)$offset);
+    $stmt = null;
+
+    try {
+        $sql = "SELECT o.*, s.full_name as staff_name, c.name as customer_name, sup.name as supplier_name
+                FROM `Order` o
+                JOIN Staff s ON o.staff_id = s.id
+                LEFT JOIN Customer c ON o.customer_id = c.id
+                LEFT JOIN Supplier sup ON o.supplier_id = sup.id";
+        if ($staff_id === null && $filter_type !== 'all') {
+            $sql .= " WHERE o.order_type = ?";
+        } elseif ($staff_id !== null && $filter_type === 'all') {
+            $sql .= " WHERE o.staff_id = ?";
+        } elseif ($staff_id !== null) {
+            $sql .= " WHERE o.staff_id = ? AND o.order_type = ?";
+        }
+        $sql .= " ORDER BY o.order_date DESC, o.id DESC LIMIT ? OFFSET ?";
+        $stmt = $conn->prepare($sql);
+        if (!$stmt) {
+            error_log('Order page prepare failed: ' . $conn->error);
+            return [];
+        }
+
+        if ($staff_id === null && $filter_type !== 'all') {
+            $bound = $stmt->bind_param('sii', $filter_type, $limit, $offset);
+        } elseif ($staff_id !== null && $filter_type === 'all') {
+            $bound = $stmt->bind_param('iii', $staff_id, $limit, $offset);
+        } elseif ($staff_id !== null) {
+            $bound = $stmt->bind_param('isii', $staff_id, $filter_type, $limit, $offset);
+        } else {
+            $bound = $stmt->bind_param('ii', $limit, $offset);
+        }
+        if (!$bound) {
+            error_log('Order page bind failed: ' . $stmt->error);
+            return [];
+        }
+        if (!$stmt->execute()) {
+            error_log('Order page execute failed: ' . $stmt->error);
+            return [];
+        }
+        $result = $stmt->get_result();
+        if (!$result) {
+            error_log('Order page result failed: ' . $stmt->error);
+            return [];
+        }
+        return $result->fetch_all(MYSQLI_ASSOC);
+    } catch (Throwable $exception) {
+        error_log('Order page failed: ' . $exception->getMessage());
+        return [];
+    } finally {
+        if ($stmt instanceof mysqli_stmt) {
+            $stmt->close();
+        }
+    }
+}
+
 function get_order_by_id($conn, $order_id, $staff_id = null)
 {
     $order_id = (int)$order_id;
@@ -1655,8 +2133,8 @@ function get_order_by_id($conn, $order_id, $staff_id = null)
     $sql = "SELECT o.*, s.full_name as staff_name,
                                    c.name as customer_name, c.phone as customer_phone, c.email as customer_email, c.address as customer_address,
                                    sup.name as supplier_name, sup.phone as supplier_phone, sup.email as supplier_email, sup.address as supplier_address
-                            FROM `Order` o 
-                            JOIN Staff s ON o.staff_id = s.id 
+                            FROM `Order` o
+                            JOIN Staff s ON o.staff_id = s.id
                             LEFT JOIN Customer c ON o.customer_id = c.id
                             LEFT JOIN Supplier sup ON o.supplier_id = sup.id
                             WHERE o.id = ?";
@@ -1712,8 +2190,8 @@ function get_order_details($conn, $order_id, $staff_id = null)
     }
 
     $sql = "SELECT od.*, p.name as product_name
-                           FROM OrderDetail od 
-                           JOIN Product p ON od.product_id = p.id 
+                           FROM OrderDetail od
+                           JOIN Product p ON od.product_id = p.id
                            WHERE od.order_id = ?";
     if ($staff_id !== null) {
         $staff_id = (int)$staff_id;
@@ -2265,21 +2743,45 @@ function require_admin()
 }
 
 /**
- * Retrieves all registered staff accounts.
+ * Retrieves a bounded staff account list for the settings view.
  */
-function get_staff_members($conn)
+function get_staff_members($conn, $limit = 100, $offset = 0)
 {
-    $sql = "SELECT id, username, full_name, role, is_active, created_at FROM Staff ORDER BY created_at DESC";
+    $limit = normalize_page_size($limit, 100, [25, 50, 100]);
+    $offset = max(0, (int)$offset);
+    $stmt = null;
     try {
-        $result = $conn->query($sql);
+        $stmt = $conn->prepare(
+            "SELECT id, username, full_name, role, is_active, created_at
+             FROM Staff
+             ORDER BY created_at DESC, id DESC
+             LIMIT ? OFFSET ?"
+        );
+        if (!$stmt) {
+            error_log('Staff list prepare failed: ' . $conn->error);
+            return [];
+        }
+        if (!$stmt->bind_param('ii', $limit, $offset)) {
+            error_log('Staff list bind failed: ' . $stmt->error);
+            return [];
+        }
+        if (!$stmt->execute()) {
+            error_log('Staff list execute failed: ' . $stmt->error);
+            return [];
+        }
+        $result = $stmt->get_result();
         if (!$result) {
-            error_log('Staff list query failed: ' . $conn->error);
+            error_log('Staff list result failed: ' . $stmt->error);
             return [];
         }
         return $result->fetch_all(MYSQLI_ASSOC);
     } catch (Throwable $exception) {
         error_log('Staff list query failed: ' . $exception->getMessage());
         return [];
+    } finally {
+        if ($stmt instanceof mysqli_stmt) {
+            $stmt->close();
+        }
     }
 }
 
@@ -2733,6 +3235,131 @@ function get_categories($conn)
     }
 }
 
+function count_categories($conn, $search = '')
+{
+    $search = truncate_list_search($search);
+    $stmt = null;
+    try {
+        if ($search === '') {
+            $stmt = $conn->prepare("SELECT COUNT(*) AS total FROM Category");
+        } else {
+            $stmt = $conn->prepare("SELECT COUNT(*) AS total FROM Category WHERE name LIKE ? OR description LIKE ?");
+        }
+        if (!$stmt) {
+            error_log('Category count prepare failed: ' . $conn->error);
+            return 0;
+        }
+        if ($search !== '') {
+            $pattern = '%' . $search . '%';
+            if (!$stmt->bind_param('ss', $pattern, $pattern)) {
+                error_log('Category count bind failed: ' . $stmt->error);
+                return 0;
+            }
+        }
+        if (!$stmt->execute()) {
+            error_log('Category count execute failed: ' . $stmt->error);
+            return 0;
+        }
+        $result = $stmt->get_result();
+        if (!$result) {
+            error_log('Category count result failed: ' . $stmt->error);
+            return 0;
+        }
+        $row = $result->fetch_assoc();
+        return $row ? max(0, (int)$row['total']) : 0;
+    } catch (Throwable $exception) {
+        error_log('Category count failed: ' . $exception->getMessage());
+        return 0;
+    } finally {
+        if ($stmt instanceof mysqli_stmt) {
+            $stmt->close();
+        }
+    }
+}
+
+function get_categories_page($conn, $search = '', $limit = 25, $offset = 0)
+{
+    $search = truncate_list_search($search);
+    $limit = normalize_page_size($limit, 25);
+    $offset = max(0, (int)$offset);
+    $stmt = null;
+    try {
+        $sql = "SELECT c.*, COUNT(p.id) AS product_count
+                FROM Category c
+                LEFT JOIN Product p ON c.id = p.category_id";
+        if ($search !== '') {
+            $sql .= " WHERE c.name LIKE ? OR c.description LIKE ?";
+        }
+        $sql .= " GROUP BY c.id ORDER BY c.name ASC, c.id ASC LIMIT ? OFFSET ?";
+        $stmt = $conn->prepare($sql);
+        if (!$stmt) {
+            error_log('Category page prepare failed: ' . $conn->error);
+            return [];
+        }
+        if ($search !== '') {
+            $pattern = '%' . $search . '%';
+            $bound = $stmt->bind_param('ssii', $pattern, $pattern, $limit, $offset);
+        } else {
+            $bound = $stmt->bind_param('ii', $limit, $offset);
+        }
+        if (!$bound) {
+            error_log('Category page bind failed: ' . $stmt->error);
+            return [];
+        }
+        if (!$stmt->execute()) {
+            error_log('Category page execute failed: ' . $stmt->error);
+            return [];
+        }
+        $result = $stmt->get_result();
+        if (!$result) {
+            error_log('Category page result failed: ' . $stmt->error);
+            return [];
+        }
+        return $result->fetch_all(MYSQLI_ASSOC);
+    } catch (Throwable $exception) {
+        error_log('Category page failed: ' . $exception->getMessage());
+        return [];
+    } finally {
+        if ($stmt instanceof mysqli_stmt) {
+            $stmt->close();
+        }
+    }
+}
+
+function get_categories_for_selector($conn, $limit = 100)
+{
+    $limit = normalize_page_size($limit, 100, [25, 50, 100]);
+    $stmt = null;
+    try {
+        $stmt = $conn->prepare("SELECT id, name FROM Category ORDER BY name ASC, id ASC LIMIT ?");
+        if (!$stmt) {
+            error_log('Category selector prepare failed: ' . $conn->error);
+            return [];
+        }
+        if (!$stmt->bind_param('i', $limit)) {
+            error_log('Category selector bind failed: ' . $stmt->error);
+            return [];
+        }
+        if (!$stmt->execute()) {
+            error_log('Category selector execute failed: ' . $stmt->error);
+            return [];
+        }
+        $result = $stmt->get_result();
+        if (!$result) {
+            error_log('Category selector result failed: ' . $stmt->error);
+            return [];
+        }
+        return $result->fetch_all(MYSQLI_ASSOC);
+    } catch (Throwable $exception) {
+        error_log('Category selector failed: ' . $exception->getMessage());
+        return [];
+    } finally {
+        if ($stmt instanceof mysqli_stmt) {
+            $stmt->close();
+        }
+    }
+}
+
 /**
  * Retrieves a specific category by its ID.
  */
@@ -3085,6 +3712,129 @@ function get_customers($conn)
     }
 }
 
+function count_customers($conn, $search = '')
+{
+    $search = truncate_list_search($search);
+    $stmt = null;
+    try {
+        if ($search === '') {
+            $stmt = $conn->prepare("SELECT COUNT(*) AS total FROM Customer");
+        } else {
+            $stmt = $conn->prepare("SELECT COUNT(*) AS total FROM Customer WHERE name LIKE ? OR phone LIKE ? OR email LIKE ?");
+        }
+        if (!$stmt) {
+            error_log('Customer count prepare failed: ' . $conn->error);
+            return 0;
+        }
+        if ($search !== '') {
+            $pattern = '%' . $search . '%';
+            if (!$stmt->bind_param('sss', $pattern, $pattern, $pattern)) {
+                error_log('Customer count bind failed: ' . $stmt->error);
+                return 0;
+            }
+        }
+        if (!$stmt->execute()) {
+            error_log('Customer count execute failed: ' . $stmt->error);
+            return 0;
+        }
+        $result = $stmt->get_result();
+        if (!$result) {
+            error_log('Customer count result failed: ' . $stmt->error);
+            return 0;
+        }
+        $row = $result->fetch_assoc();
+        return $row ? max(0, (int)$row['total']) : 0;
+    } catch (Throwable $exception) {
+        error_log('Customer count failed: ' . $exception->getMessage());
+        return 0;
+    } finally {
+        if ($stmt instanceof mysqli_stmt) {
+            $stmt->close();
+        }
+    }
+}
+
+function get_customers_page($conn, $search = '', $limit = 25, $offset = 0)
+{
+    $search = truncate_list_search($search);
+    $limit = normalize_page_size($limit, 25);
+    $offset = max(0, (int)$offset);
+    $stmt = null;
+    try {
+        $sql = "SELECT * FROM Customer";
+        if ($search !== '') {
+            $sql .= " WHERE name LIKE ? OR phone LIKE ? OR email LIKE ?";
+        }
+        $sql .= " ORDER BY name ASC, id ASC LIMIT ? OFFSET ?";
+        $stmt = $conn->prepare($sql);
+        if (!$stmt) {
+            error_log('Customer page prepare failed: ' . $conn->error);
+            return [];
+        }
+        if ($search !== '') {
+            $pattern = '%' . $search . '%';
+            $bound = $stmt->bind_param('sssii', $pattern, $pattern, $pattern, $limit, $offset);
+        } else {
+            $bound = $stmt->bind_param('ii', $limit, $offset);
+        }
+        if (!$bound) {
+            error_log('Customer page bind failed: ' . $stmt->error);
+            return [];
+        }
+        if (!$stmt->execute()) {
+            error_log('Customer page execute failed: ' . $stmt->error);
+            return [];
+        }
+        $result = $stmt->get_result();
+        if (!$result) {
+            error_log('Customer page result failed: ' . $stmt->error);
+            return [];
+        }
+        return $result->fetch_all(MYSQLI_ASSOC);
+    } catch (Throwable $exception) {
+        error_log('Customer page failed: ' . $exception->getMessage());
+        return [];
+    } finally {
+        if ($stmt instanceof mysqli_stmt) {
+            $stmt->close();
+        }
+    }
+}
+
+function get_customers_for_selector($conn, $limit = 100)
+{
+    $limit = normalize_page_size($limit, 100, [25, 50, 100]);
+    $stmt = null;
+    try {
+        $stmt = $conn->prepare("SELECT id, name, phone FROM Customer ORDER BY name ASC, id ASC LIMIT ?");
+        if (!$stmt) {
+            error_log('Customer selector prepare failed: ' . $conn->error);
+            return [];
+        }
+        if (!$stmt->bind_param('i', $limit)) {
+            error_log('Customer selector bind failed: ' . $stmt->error);
+            return [];
+        }
+        if (!$stmt->execute()) {
+            error_log('Customer selector execute failed: ' . $stmt->error);
+            return [];
+        }
+        $result = $stmt->get_result();
+        if (!$result) {
+            error_log('Customer selector result failed: ' . $stmt->error);
+            return [];
+        }
+        return $result->fetch_all(MYSQLI_ASSOC);
+    } catch (Throwable $exception) {
+        error_log('Customer selector failed: ' . $exception->getMessage());
+        return [];
+    } finally {
+        if ($stmt instanceof mysqli_stmt) {
+            $stmt->close();
+        }
+    }
+}
+
 /**
  * Fetch customer details by ID.
  */
@@ -3267,6 +4017,129 @@ function get_suppliers($conn)
     } catch (Throwable $exception) {
         error_log('Supplier list query failed: ' . $exception->getMessage());
         return [];
+    }
+}
+
+function count_suppliers($conn, $search = '')
+{
+    $search = truncate_list_search($search);
+    $stmt = null;
+    try {
+        if ($search === '') {
+            $stmt = $conn->prepare("SELECT COUNT(*) AS total FROM Supplier");
+        } else {
+            $stmt = $conn->prepare("SELECT COUNT(*) AS total FROM Supplier WHERE name LIKE ? OR phone LIKE ? OR email LIKE ?");
+        }
+        if (!$stmt) {
+            error_log('Supplier count prepare failed: ' . $conn->error);
+            return 0;
+        }
+        if ($search !== '') {
+            $pattern = '%' . $search . '%';
+            if (!$stmt->bind_param('sss', $pattern, $pattern, $pattern)) {
+                error_log('Supplier count bind failed: ' . $stmt->error);
+                return 0;
+            }
+        }
+        if (!$stmt->execute()) {
+            error_log('Supplier count execute failed: ' . $stmt->error);
+            return 0;
+        }
+        $result = $stmt->get_result();
+        if (!$result) {
+            error_log('Supplier count result failed: ' . $stmt->error);
+            return 0;
+        }
+        $row = $result->fetch_assoc();
+        return $row ? max(0, (int)$row['total']) : 0;
+    } catch (Throwable $exception) {
+        error_log('Supplier count failed: ' . $exception->getMessage());
+        return 0;
+    } finally {
+        if ($stmt instanceof mysqli_stmt) {
+            $stmt->close();
+        }
+    }
+}
+
+function get_suppliers_page($conn, $search = '', $limit = 25, $offset = 0)
+{
+    $search = truncate_list_search($search);
+    $limit = normalize_page_size($limit, 25);
+    $offset = max(0, (int)$offset);
+    $stmt = null;
+    try {
+        $sql = "SELECT * FROM Supplier";
+        if ($search !== '') {
+            $sql .= " WHERE name LIKE ? OR phone LIKE ? OR email LIKE ?";
+        }
+        $sql .= " ORDER BY name ASC, id ASC LIMIT ? OFFSET ?";
+        $stmt = $conn->prepare($sql);
+        if (!$stmt) {
+            error_log('Supplier page prepare failed: ' . $conn->error);
+            return [];
+        }
+        if ($search !== '') {
+            $pattern = '%' . $search . '%';
+            $bound = $stmt->bind_param('sssii', $pattern, $pattern, $pattern, $limit, $offset);
+        } else {
+            $bound = $stmt->bind_param('ii', $limit, $offset);
+        }
+        if (!$bound) {
+            error_log('Supplier page bind failed: ' . $stmt->error);
+            return [];
+        }
+        if (!$stmt->execute()) {
+            error_log('Supplier page execute failed: ' . $stmt->error);
+            return [];
+        }
+        $result = $stmt->get_result();
+        if (!$result) {
+            error_log('Supplier page result failed: ' . $stmt->error);
+            return [];
+        }
+        return $result->fetch_all(MYSQLI_ASSOC);
+    } catch (Throwable $exception) {
+        error_log('Supplier page failed: ' . $exception->getMessage());
+        return [];
+    } finally {
+        if ($stmt instanceof mysqli_stmt) {
+            $stmt->close();
+        }
+    }
+}
+
+function get_suppliers_for_selector($conn, $limit = 100)
+{
+    $limit = normalize_page_size($limit, 100, [25, 50, 100]);
+    $stmt = null;
+    try {
+        $stmt = $conn->prepare("SELECT id, name, phone FROM Supplier ORDER BY name ASC, id ASC LIMIT ?");
+        if (!$stmt) {
+            error_log('Supplier selector prepare failed: ' . $conn->error);
+            return [];
+        }
+        if (!$stmt->bind_param('i', $limit)) {
+            error_log('Supplier selector bind failed: ' . $stmt->error);
+            return [];
+        }
+        if (!$stmt->execute()) {
+            error_log('Supplier selector execute failed: ' . $stmt->error);
+            return [];
+        }
+        $result = $stmt->get_result();
+        if (!$result) {
+            error_log('Supplier selector result failed: ' . $stmt->error);
+            return [];
+        }
+        return $result->fetch_all(MYSQLI_ASSOC);
+    } catch (Throwable $exception) {
+        error_log('Supplier selector failed: ' . $exception->getMessage());
+        return [];
+    } finally {
+        if ($stmt instanceof mysqli_stmt) {
+            $stmt->close();
+        }
     }
 }
 
@@ -3510,8 +4383,9 @@ function get_top_selling_products($conn, $limit = 5, $staff_id = null)
 /**
  * Group sales volume distributions based on product categories.
  */
-function get_category_sales_distribution($conn, $staff_id = null)
+function get_category_sales_distribution($conn, $staff_id = null, $limit = 100)
 {
+    $limit = normalize_page_size($limit, 100, [25, 50, 100]);
     $sql = "SELECT COALESCE(c.name, 'Uncategorized') as category_name, SUM(od.subtotal) as total_sales 
             FROM OrderDetail od 
             JOIN `Order` o ON od.order_id = o.id 
@@ -3522,19 +4396,38 @@ function get_category_sales_distribution($conn, $staff_id = null)
         $sql .= " AND o.staff_id = ?";
     }
     $sql .= " GROUP BY p.category_id, c.name
-              ORDER BY total_sales DESC";
+              ORDER BY total_sales DESC
+              LIMIT ?";
 
     if ($staff_id === null) {
+        $stmt = null;
         try {
-            $result = $conn->query($sql);
+            $stmt = $conn->prepare($sql);
+            if (!$stmt) {
+                error_log('Category sales distribution prepare failed: ' . $conn->error);
+                return [];
+            }
+            if (!$stmt->bind_param('i', $limit)) {
+                error_log('Category sales distribution bind failed: ' . $stmt->error);
+                return [];
+            }
+            if (!$stmt->execute()) {
+                error_log('Category sales distribution execute failed: ' . $stmt->error);
+                return [];
+            }
+            $result = $stmt->get_result();
             if (!$result) {
-                error_log('Category sales distribution query failed: ' . $conn->error);
+                error_log('Category sales distribution result failed: ' . $stmt->error);
                 return [];
             }
             return $result->fetch_all(MYSQLI_ASSOC);
         } catch (Throwable $exception) {
             error_log('Category sales distribution query failed: ' . $exception->getMessage());
             return [];
+        } finally {
+            if ($stmt instanceof mysqli_stmt) {
+                $stmt->close();
+            }
         }
     }
 
@@ -3544,7 +4437,7 @@ function get_category_sales_distribution($conn, $staff_id = null)
         return [];
     }
     $staff_id = (int)$staff_id;
-    if (!$stmt->bind_param('i', $staff_id)) {
+    if (!$stmt->bind_param('ii', $staff_id, $limit)) {
         error_log('Scoped category sales distribution bind failed: ' . $stmt->error);
         $stmt->close();
         return [];

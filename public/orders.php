@@ -108,10 +108,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['complete_order'])) {
 }
 }
 
-$products = get_all_products($conn);
-$categories = get_categories($conn);
-$customers = get_customers($conn);
-$suppliers = get_suppliers($conn);
+$pos_search = truncate_list_search($_GET['product_search'] ?? '');
+$products = get_pos_products($conn, $pos_search, 100);
+$categories = get_categories_for_selector($conn, 100);
+$customers = get_customers_for_selector($conn, 100);
+$suppliers = get_suppliers_for_selector($conn, 100);
 
 $page_title = 'POS System';
 $active_page = 'orders';
@@ -141,14 +142,14 @@ require_once '../includes/layouts/header.php';
                 </div>
 
                 <!-- Search Bar -->
-                <div class="row mb-3">
+                <form method="GET" action="orders.php" class="row mb-3">
                     <div class="col-12">
                         <div class="input-group shadow-sm border rounded-3 overflow-hidden">
                             <span class="input-group-text bg-white border-0"><i class="fas fa-search text-muted"></i></span>
-                            <input type="text" id="searchProduct" class="form-control border-0 pos-search-input" placeholder="Search products by name..." aria-label="Search products by name">
+                            <input type="search" id="searchProduct" name="product_search" value="<?php echo htmlspecialchars($pos_search, ENT_QUOTES, 'UTF-8'); ?>" class="form-control border-0 pos-search-input" placeholder="Search products by name or barcode..." aria-label="Search products by name or barcode">
                         </div>
                     </div>
-                </div>
+                </form>
 
                 <!-- Category Navigation Pills -->
                 <div class="mb-3 d-flex overflow-x-auto pb-2 category-pill-list">
@@ -387,7 +388,7 @@ $extra_js = [
         }
     });
 
-    function handleBarcodeScan(barcode) {
+    async function handleBarcodeScan(barcode) {
         // Search all products for matching barcode
         // Product data is carried by escaped DOM data attributes and read by the card listener.
         const productItems = document.querySelectorAll('.product-item');
@@ -416,10 +417,42 @@ $extra_js = [
         });
         
         if (!found) {
+            try {
+                const response = await fetch('pos_product_lookup.php?barcode=' + encodeURIComponent(barcode), {
+                    method: 'GET',
+                    credentials: 'same-origin',
+                    headers: { 'Accept': 'application/json' }
+                });
+                if (response.ok) {
+                    const payload = await response.json();
+                    if (payload && payload.product) {
+                        if (orderType === 'sale' && Number(payload.product.stock) <= 0) {
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Out of Stock',
+                                text: 'This product is scanned but currently out of stock!',
+                                confirmButtonColor: '#198754'
+                            });
+                        } else {
+                            addToCart({
+                                id: Number(payload.product.id),
+                                name: String(payload.product.name),
+                                price: Number(payload.product.price),
+                                stock: Number(payload.product.stock)
+                            });
+                            playBeep();
+                        }
+                        return;
+                    }
+                }
+            } catch (error) {
+                console.warn('Barcode lookup request failed.');
+            }
+
             Swal.fire({
                 icon: 'warning',
                 title: 'Not Found',
-                text: 'No product matches this barcode: ' + barcode,
+                text: 'No product matches this barcode.',
                 timer: 2000,
                 showConfirmButton: false
             });

@@ -64,7 +64,35 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     require_admin();
 }
 
-$categories = get_categories($conn);
+$search = truncate_list_search($_GET['search'] ?? '');
+$page_size_options = [10, 25, 50, 100];
+$page_size = normalize_page_size($_GET['page_size'] ?? 25, 25, $page_size_options);
+$page = normalize_page_number($_GET['page'] ?? 1);
+$total_categories = count_categories($conn, $search);
+$total_pages = max(1, (int)ceil($total_categories / $page_size));
+if ($page > $total_pages) {
+    $page = $total_pages;
+}
+$offset = ($page - 1) * $page_size;
+$categories = get_categories_page($conn, $search, $page_size, $offset);
+$range_start = $total_categories > 0 ? $offset + 1 : 0;
+$range_end = $total_categories > 0 ? min($offset + count($categories), $total_categories) : 0;
+$category_page_url = static function ($target_page) use ($search, $page_size) {
+    $query = ['page' => max(1, (int)$target_page), 'page_size' => $page_size];
+    if ($search !== '') {
+        $query['search'] = $search;
+    }
+    return 'categories.php?' . http_build_query($query);
+};
+$pagination_pages = $total_pages <= 7 ? range(1, $total_pages) : [1];
+if ($total_pages > 7) {
+    $window_start = max(2, $page - 2);
+    $window_end = min($total_pages - 1, $page + 2);
+    if ($window_start > 2) $pagination_pages[] = '...';
+    for ($pagination_page = $window_start; $pagination_page <= $window_end; $pagination_page++) $pagination_pages[] = $pagination_page;
+    if ($window_end < $total_pages - 1) $pagination_pages[] = '...';
+    $pagination_pages[] = $total_pages;
+}
 $page_title = 'Categories';
 $active_page = 'categories';
 $header_title = 'Categories';
@@ -85,21 +113,33 @@ require_once '../includes/layouts/header.php';
                     <div class="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center">
                         <h4 class="mb-0 fw-bold ui-page-heading">
                             <i class="fas fa-tags me-2 text-primary"></i>Product Categories
-                            <span class="badge bg-primary rounded-pill ms-2 ui-count-text"><?php echo count($categories); ?></span>
+                            <span class="badge bg-primary rounded-pill ms-2 ui-count-text"><?php echo number_format($total_categories); ?></span>
                         </h4>
                         <button class="btn btn-primary shadow-sm fw-bold px-4 rounded-pill pulse-btn ui-transition" data-bs-toggle="modal" data-bs-target="#addCategoryModal">
                             <i class="fas fa-plus-circle me-2 fs-5 align-middle"></i>Add Category
                         </button>
                     </div>
                     <div class="card-body">
-                        <div class="row mb-3">
+                        <form method="GET" action="categories.php" class="row mb-3 g-2 align-items-end">
                             <div class="col-md-4">
+                                <label for="searchCategory" class="form-label">Search categories</label>
                                 <div class="input-group shadow-sm rounded-3 overflow-hidden border">
                                     <span class="input-group-text bg-white border-0"><i class="fas fa-search text-muted"></i></span>
-                                    <input type="text" id="searchCategory" placeholder="Search categories by name..." class="form-control border-0 px-2 ui-search-input">
+                                    <input type="search" id="searchCategory" name="search" value="<?php echo htmlspecialchars($search, ENT_QUOTES, 'UTF-8'); ?>" placeholder="Search categories by name..." class="form-control border-0 px-2 ui-search-input">
                                 </div>
                             </div>
-                        </div>
+                            <div class="col-sm-4 col-md-2">
+                                <label for="categoryPageSize" class="form-label">Items per page</label>
+                                <select id="categoryPageSize" name="page_size" class="form-select">
+                                    <?php foreach ($page_size_options as $option): ?>
+                                        <option value="<?php echo $option; ?>" <?php echo $page_size === $option ? 'selected' : ''; ?>><?php echo $option; ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <input type="hidden" name="page" value="1">
+                            <div class="col-auto"><button type="submit" class="btn btn-outline-primary">Apply</button></div>
+                        </form>
+                        <p class="text-muted small mb-3">Showing <?php echo $range_start; ?>-<?php echo $range_end; ?> of <?php echo $total_categories; ?> categories.</p>
                         <div class="table-responsive">
                             <table class="table table-hover table-striped align-middle" id="categoriesTable">
                                 <thead class="bg-light text-secondary">
@@ -173,6 +213,17 @@ require_once '../includes/layouts/header.php';
                                 </tbody>
                             </table>
                         </div>
+                        <?php if ($total_pages > 1): ?>
+                            <nav class="mt-4" aria-label="Category pagination">
+                                <ul class="pagination justify-content-center flex-wrap mb-0">
+                                    <li class="page-item <?php echo $page <= 1 ? 'disabled' : ''; ?>"><a class="page-link" aria-label="Previous page" href="<?php echo $page > 1 ? htmlspecialchars($category_page_url($page - 1), ENT_QUOTES, 'UTF-8') : '#'; ?>">Previous</a></li>
+                                    <?php foreach ($pagination_pages as $pagination_page): ?>
+                                        <?php if ($pagination_page === '...'): ?><li class="page-item disabled"><span class="page-link">&hellip;</span></li><?php else: ?><li class="page-item <?php echo $page === $pagination_page ? 'active' : ''; ?>"><a class="page-link" href="<?php echo htmlspecialchars($category_page_url($pagination_page), ENT_QUOTES, 'UTF-8'); ?>" <?php echo $page === $pagination_page ? 'aria-current="page"' : ''; ?>><?php echo $pagination_page; ?></a></li><?php endif; ?>
+                                    <?php endforeach; ?>
+                                    <li class="page-item <?php echo $page >= $total_pages ? 'disabled' : ''; ?>"><a class="page-link" aria-label="Next page" href="<?php echo $page < $total_pages ? htmlspecialchars($category_page_url($page + 1), ENT_QUOTES, 'UTF-8') : '#'; ?>">Next</a></li>
+                                </ul>
+                            </nav>
+                        <?php endif; ?>
                     </div>
                 </div>
             </div>

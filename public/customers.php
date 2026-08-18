@@ -67,7 +67,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     }
 }
 
-$customers = get_customers($conn);
+$search = truncate_list_search($_GET['search'] ?? '');
+$page_size_options = [10, 25, 50, 100];
+$page_size = normalize_page_size($_GET['page_size'] ?? 25, 25, $page_size_options);
+$page = normalize_page_number($_GET['page'] ?? 1);
+$total_customers = count_customers($conn, $search);
+$total_pages = max(1, (int)ceil($total_customers / $page_size));
+if ($page > $total_pages) {
+    $page = $total_pages;
+}
+$offset = ($page - 1) * $page_size;
+$customers = get_customers_page($conn, $search, $page_size, $offset);
+$range_start = $total_customers > 0 ? $offset + 1 : 0;
+$range_end = $total_customers > 0 ? min($offset + count($customers), $total_customers) : 0;
+$customer_page_url = static function ($target_page) use ($search, $page_size) {
+    $query = ['page' => max(1, (int)$target_page), 'page_size' => $page_size];
+    if ($search !== '') {
+        $query['search'] = $search;
+    }
+    return 'customers.php?' . http_build_query($query);
+};
+$pagination_pages = $total_pages <= 7 ? range(1, $total_pages) : [1];
+if ($total_pages > 7) {
+    $window_start = max(2, $page - 2);
+    $window_end = min($total_pages - 1, $page + 2);
+    if ($window_start > 2) $pagination_pages[] = '...';
+    for ($pagination_page = $window_start; $pagination_page <= $window_end; $pagination_page++) $pagination_pages[] = $pagination_page;
+    if ($window_end < $total_pages - 1) $pagination_pages[] = '...';
+    $pagination_pages[] = $total_pages;
+}
 $page_title = 'Customers Management';
 $active_page = 'customers';
 $header_title = 'Customers';
@@ -88,7 +116,7 @@ require_once '../includes/layouts/header.php';
                         <div class="d-flex align-items-center">
                             <h4 class="mb-0 fw-bold ui-page-heading">
                                 <i class="fas fa-users me-2 text-primary"></i>Customers
-                                <span class="badge bg-primary rounded-pill ms-2 ui-count-text"><?php echo count($customers); ?></span>
+                                <span class="badge bg-primary rounded-pill ms-2 ui-count-text"><?php echo number_format($total_customers); ?></span>
                             </h4>
                         </div>
                         <div class="d-flex gap-2">
@@ -103,14 +131,26 @@ require_once '../includes/layouts/header.php';
                         </div>
                     </div>
                     <div class="card-body">
-                        <div class="row mb-3">
+                        <form method="GET" action="customers.php" class="row mb-3 g-2 align-items-end">
                             <div class="col-md-4">
+                                <label for="searchCustomer" class="form-label">Search customers</label>
                                 <div class="input-group shadow-sm rounded-3 overflow-hidden border">
                                     <span class="input-group-text bg-white border-0"><i class="fas fa-search text-muted"></i></span>
-                                    <input type="text" id="searchCustomer" placeholder="Search customers by name, phone..." class="form-control border-0 px-2 ui-search-input">
+                                    <input type="search" id="searchCustomer" name="search" value="<?php echo htmlspecialchars($search, ENT_QUOTES, 'UTF-8'); ?>" placeholder="Search customers by name, phone..." class="form-control border-0 px-2 ui-search-input">
                                 </div>
                             </div>
-                        </div>
+                            <div class="col-sm-4 col-md-2">
+                                <label for="customerPageSize" class="form-label">Items per page</label>
+                                <select id="customerPageSize" name="page_size" class="form-select">
+                                    <?php foreach ($page_size_options as $option): ?>
+                                        <option value="<?php echo $option; ?>" <?php echo $page_size === $option ? 'selected' : ''; ?>><?php echo $option; ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <input type="hidden" name="page" value="1">
+                            <div class="col-auto"><button type="submit" class="btn btn-outline-primary">Apply</button></div>
+                        </form>
+                        <p class="text-muted small mb-3">Showing <?php echo $range_start; ?>-<?php echo $range_end; ?> of <?php echo $total_customers; ?> customers.</p>
                         <div class="table-responsive">
                             <table class="table table-hover table-striped align-middle" id="customersTable">
                                 <thead class="bg-light text-secondary">
@@ -180,6 +220,17 @@ require_once '../includes/layouts/header.php';
                                 </tbody>
                             </table>
                         </div>
+                        <?php if ($total_pages > 1): ?>
+                            <nav class="mt-4" aria-label="Customer pagination">
+                                <ul class="pagination justify-content-center flex-wrap mb-0">
+                                    <li class="page-item <?php echo $page <= 1 ? 'disabled' : ''; ?>"><a class="page-link" aria-label="Previous page" href="<?php echo $page > 1 ? htmlspecialchars($customer_page_url($page - 1), ENT_QUOTES, 'UTF-8') : '#'; ?>">Previous</a></li>
+                                    <?php foreach ($pagination_pages as $pagination_page): ?>
+                                        <?php if ($pagination_page === '...'): ?><li class="page-item disabled"><span class="page-link">&hellip;</span></li><?php else: ?><li class="page-item <?php echo $page === $pagination_page ? 'active' : ''; ?>"><a class="page-link" href="<?php echo htmlspecialchars($customer_page_url($pagination_page), ENT_QUOTES, 'UTF-8'); ?>" <?php echo $page === $pagination_page ? 'aria-current="page"' : ''; ?>><?php echo $pagination_page; ?></a></li><?php endif; ?>
+                                    <?php endforeach; ?>
+                                    <li class="page-item <?php echo $page >= $total_pages ? 'disabled' : ''; ?>"><a class="page-link" aria-label="Next page" href="<?php echo $page < $total_pages ? htmlspecialchars($customer_page_url($page + 1), ENT_QUOTES, 'UTF-8') : '#'; ?>">Next</a></li>
+                                </ul>
+                            </nav>
+                        <?php endif; ?>
                     </div>
                 </div>
             </div>

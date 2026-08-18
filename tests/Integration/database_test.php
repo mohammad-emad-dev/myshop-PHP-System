@@ -77,6 +77,7 @@ function run_integration_tests(): int
         $adminId = (int)test_scalar($conn, 'SELECT id FROM Staff WHERE username = ?', 's', [$adminUsername]);
         $cashierId = (int)test_scalar($conn, 'SELECT id FROM Staff WHERE username = ?', 's', [$cashierUsername]);
         $tests->assertTrue($adminId > 0 && $cashierId > 0, 'Disposable staff fixtures were not created.');
+        $tests->assertTrue(count(get_staff_members($conn, 100, 0)) <= 100, 'Staff list loading must be bounded.');
         $adminRecord = test_fetch_one($conn, 'SELECT password FROM Staff WHERE id = ?', 'i', [$adminId]);
         $tests->assertTrue(password_verify($adminPassword, $adminRecord['password']), 'Seeded password hashes must verify.');
 
@@ -145,6 +146,40 @@ function run_integration_tests(): int
         $tests->assertSame(11, count_products($conn, $prefix . '_PAGE_', 'low_stock'), 'Low-stock count is incorrect.');
         $tests->assertCount(1, get_products_page($conn, $prefix . '-PAGE-7', '', 10, 0), 'Barcode search did not return one matching product.');
         $tests->assertSame(0, count_products($conn, $prefix . '_DOES_NOT_EXIST', ''), 'Empty product search should return zero results.');
+        $tests->assertSame(1, count_categories($conn, $paginationCategoryName), 'Category search count is incorrect.');
+        $tests->assertCount(1, get_categories_page($conn, $paginationCategoryName, 10, 0), 'Category search page is incorrect.');
+        $tests->assertTrue(count(get_categories_page($conn, '', 10, 0)) <= 10, 'Category first page is not bounded.');
+        $tests->assertCount(0, get_categories_page($conn, '', 10, 999), 'Empty category page should return an empty list.');
+        $tests->assertCount(0, get_categories_page($conn, $prefix . '_MISSING_CATEGORY', 10, 0), 'Empty category search should return zero results.');
+        $tests->assertTrue(count(get_categories_for_selector($conn, 100)) <= 100, 'Category selector must be bounded.');
+        $tests->assertTrue(count(get_pos_products($conn, '', 100)) <= 100, 'POS product loading must be bounded.');
+        $tests->assertCount(1, get_pos_products($conn, $prefix . '-PAGE-7', 100), 'POS barcode/name search did not return the matching product.');
+        $tests->assertSame($historyProductId, (int)get_pos_product_by_barcode($conn, $historyBarcode)['id'], 'POS exact barcode lookup failed.');
+
+        $pagedCustomerOne = $prefix . '_CUSTOMER_PAGE_1';
+        $pagedCustomerTwo = $prefix . '_CUSTOMER_PAGE_2';
+        $tests->assertTrue(create_customer($conn, $pagedCustomerOne, '555-501', 'page1@example.com', 'Page 1'), 'Paged customer fixture one failed.');
+        $tests->assertTrue(create_customer($conn, $pagedCustomerTwo, '555-502', 'page2@example.com', 'Page 2'), 'Paged customer fixture two failed.');
+        $tests->assertTrue(count_customers($conn, $prefix . '_CUSTOMER_PAGE_') >= 2, 'Customer search count is incorrect.');
+        $tests->assertCount(1, get_customers_page($conn, $pagedCustomerOne, 10, 0), 'Customer search page is incorrect.');
+        $customerPageRows = get_customers_page($conn, $prefix . '_CUSTOMER_PAGE_', 10, 0);
+        $tests->assertTrue(count($customerPageRows) <= 10, 'Customer first page is not bounded.');
+        $tests->assertCount(1, get_customers_page($conn, $prefix . '_CUSTOMER_PAGE_', 10, 1), 'Customer middle/last page size is incorrect.');
+        $tests->assertCount(0, get_customers_page($conn, $prefix . '_CUSTOMER_PAGE_', 10, 99), 'Empty customer page should return an empty list.');
+        $tests->assertTrue(count(get_customers_for_selector($conn, 100)) <= 100, 'Customer selector must be bounded.');
+
+        $pagedSupplierOne = $prefix . '_SUPPLIER_PAGE_1';
+        $pagedSupplierTwo = $prefix . '_SUPPLIER_PAGE_2';
+        $tests->assertTrue(create_supplier($conn, $pagedSupplierOne, '555-601', 'supplier1@example.com', 'Page 1'), 'Paged supplier fixture one failed.');
+        $tests->assertTrue(create_supplier($conn, $pagedSupplierTwo, '555-602', 'supplier2@example.com', 'Page 2'), 'Paged supplier fixture two failed.');
+        $tests->assertTrue(count_suppliers($conn, $prefix . '_SUPPLIER_PAGE_') >= 2, 'Supplier search count is incorrect.');
+        $tests->assertCount(1, get_suppliers_page($conn, $pagedSupplierOne, 10, 0), 'Supplier search page is incorrect.');
+        $tests->assertTrue(count(get_suppliers_page($conn, $prefix . '_SUPPLIER_PAGE_', 10, 0)) <= 10, 'Supplier first page is not bounded.');
+        $tests->assertCount(1, get_suppliers_page($conn, $prefix . '_SUPPLIER_PAGE_', 10, 1), 'Supplier middle/last page size is incorrect.');
+        $tests->assertCount(0, get_suppliers_page($conn, $prefix . '_SUPPLIER_PAGE_', 10, 99), 'Empty supplier page should return an empty list.');
+        $tests->assertTrue(count(get_suppliers_for_selector($conn, 100)) <= 100, 'Supplier selector must be bounded.');
+        $tests->assertSame(1, normalize_page_number('not-a-page'), 'Invalid page values must normalize to page one.');
+        $tests->assertSame(25, normalize_page_size(999), 'Oversized page values must normalize to the default page size.');
 
         $orderBarcode = $prefix . '-ORDER';
         $tests->assertTrue(create_product($conn, $adminId, $prefix . '_ORDER_PRODUCT', 'Order product', 12.34, 20, null, 5, null, $orderBarcode), 'Order product creation failed.');
@@ -178,6 +213,21 @@ function run_integration_tests(): int
         $tests->assertTrue(is_int($adminPurchaseId) && $adminPurchaseId > 0, 'Admin purchase creation failed.');
         $tests->assertSame(21, (int)test_scalar($conn, 'SELECT stock FROM Product WHERE id = ?', 'i', [$orderProductId]), 'Purchase stock update was incorrect.');
         $tests->assertFalse(create_order($conn, $adminId, [['product_id' => $orderProductId, 'quantity' => 1]], 'invalid', $customerId, null), 'Invalid order types must be rejected by the database-facing function.');
+        $tests->assertSame(2, count_orders($conn, null, 'all'), 'Admin order count is incorrect.');
+        $tests->assertSame(1, count_orders($conn, null, 'sale'), 'Admin sales count is incorrect.');
+        $tests->assertSame(1, count_orders($conn, $cashierId, 'sale'), 'Cashier sales count is incorrect.');
+        $tests->assertCount(1, get_orders_page($conn, null, 'sale', 10, 0), 'Admin order page filter is incorrect.');
+        $tests->assertCount(1, get_orders_page($conn, $cashierId, 'all', 10, 0), 'Cashier order page scope is incorrect.');
+        $tests->assertTrue(count(get_orders_page($conn, null, 'all', 10, 0)) <= 10, 'Order first page is not bounded.');
+        $tests->assertCount(1, get_orders_page($conn, null, 'all', 10, 1), 'Order middle/last page size is incorrect.');
+        $tests->assertCount(0, get_orders_page($conn, null, 'all', 10, 99), 'Empty order page should return an empty list.');
+        $orderSummary = get_order_summary($conn, $cashierId, 'all');
+        $tests->assertSame(1, $orderSummary['total_orders'], 'Cashier order summary scope is incorrect.');
+        $tests->assertSame(24.68, round($orderSummary['total_sales_amount'], 2), 'Cashier order summary total is incorrect.');
+        $tests->assertTrue(count_stock_movements($conn) > 0, 'Stock movement count should include transaction history.');
+        $tests->assertTrue(count(get_stock_movements_page($conn, null, 10, 0)) <= 10, 'Stock movement page is not bounded.');
+        $tests->assertTrue(count(get_stock_movements_page($conn, null, 10, 10)) <= 10, 'Stock movement middle page is not bounded.');
+        $tests->assertCount(0, get_stock_movements_page($conn, null, 10, 999999), 'Empty stock movement pages must return an empty list.');
 
         $tests->assertCount(1, get_orders_for_staff($conn, $cashierId), 'Cashier order history scope is incorrect.');
         $tests->assertSame(null, get_order_by_id($conn, $tamperedSaleId, $adminId), 'A cashier order must not be visible to another staff scope.');

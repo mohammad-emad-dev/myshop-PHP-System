@@ -6,22 +6,51 @@ require_once '../config/db.php';
 verify_login();
 
 $is_admin_user = is_admin();
-$orders = $is_admin_user
-    ? get_orders($conn)
-    : get_orders_for_staff($conn, (int)$_SESSION['staff_id']);
-
-// Filter by transaction type
-$filter_type = isset($_GET['type']) ? sanitize_input($_GET['type']) : 'all';
+$filter_type = isset($_GET['type']) && is_scalar($_GET['type']) ? sanitize_input((string)$_GET['type']) : 'all';
 if (!in_array($filter_type, ['all', 'sale', 'purchase'], true)) {
     $filter_type = 'all';
 }
 if (!$is_admin_user && $filter_type === 'purchase') {
     $filter_type = 'all';
 }
-if ($filter_type !== 'all' && ($filter_type === 'sale' || $filter_type === 'purchase')) {
-    $orders = array_filter($orders, function($o) use ($filter_type) {
-        return $o['order_type'] === $filter_type;
-    });
+$page_size_options = [10, 25, 50, 100];
+$page_size = normalize_page_size($_GET['page_size'] ?? 25, 25, $page_size_options);
+$page = normalize_page_number($_GET['page'] ?? 1);
+$order_scope_staff_id = $is_admin_user ? null : (int)$_SESSION['staff_id'];
+$total_orders = count_orders($conn, $order_scope_staff_id, $filter_type);
+$total_pages = max(1, (int)ceil($total_orders / $page_size));
+if ($page > $total_pages) {
+    $page = $total_pages;
+}
+$offset = ($page - 1) * $page_size;
+$orders = get_orders_page($conn, $order_scope_staff_id, $filter_type, $page_size, $offset);
+$order_summary = get_order_summary($conn, $order_scope_staff_id, $filter_type);
+$range_start = $total_orders > 0 ? $offset + 1 : 0;
+$range_end = $total_orders > 0 ? min($offset + count($orders), $total_orders) : 0;
+$order_history_url = static function ($target_page) use ($filter_type, $page_size) {
+    return 'order_history.php?' . http_build_query([
+        'type' => $filter_type,
+        'page_size' => $page_size,
+        'page' => max(1, (int)$target_page),
+    ]);
+};
+$pagination_pages = [];
+if ($total_pages <= 7) {
+    $pagination_pages = range(1, $total_pages);
+} else {
+    $pagination_pages = [1];
+    $window_start = max(2, $page - 2);
+    $window_end = min($total_pages - 1, $page + 2);
+    if ($window_start > 2) {
+        $pagination_pages[] = '...';
+    }
+    for ($pagination_page = $window_start; $pagination_page <= $window_end; $pagination_page++) {
+        $pagination_pages[] = $pagination_page;
+    }
+    if ($window_end < $total_pages - 1) {
+        $pagination_pages[] = '...';
+    }
+    $pagination_pages[] = $total_pages;
 }
 
 $page_title = 'Order History';
@@ -39,20 +68,11 @@ require_once '../includes/layouts/header.php';
     <div class="container-fluid px-4 py-4">
         <!-- Summary Stats Bar -->
         <?php
-        $total_orders_count = count($orders);
-        $total_sales_amount = 0;
-        $total_purchases_amount = 0;
-        $sales_count = 0;
-        $purchases_count = 0;
-        foreach ($orders as $o) {
-            if (($o['order_type'] ?? 'sale') === 'sale') {
-                $total_sales_amount += $o['total_amount'];
-                $sales_count++;
-            } else {
-                $total_purchases_amount += $o['total_amount'];
-                $purchases_count++;
-            }
-        }
+        $total_orders_count = $order_summary['total_orders'];
+        $total_sales_amount = $order_summary['total_sales_amount'];
+        $total_purchases_amount = $order_summary['total_purchases_amount'];
+        $sales_count = $order_summary['sales_count'];
+        $purchases_count = $order_summary['purchases_count'];
         ?>
         <div class="row g-3 mb-4">
             <div class="col-md-4">
@@ -90,10 +110,10 @@ require_once '../includes/layouts/header.php';
                         <h4 class="mb-0 text-secondary fw-bold">Transaction History</h4>
                         <div class="d-flex align-items-center gap-2">
                             <div class="btn-group" role="group" aria-label="Order filters">
-                                <a href="order_history.php?type=all" class="btn btn-outline-primary <?php echo $filter_type === 'all' ? 'active' : ''; ?>">All</a>
-                                <a href="order_history.php?type=sale" class="btn btn-outline-primary <?php echo $filter_type === 'sale' ? 'active' : ''; ?>">Sales</a>
+                                <a href="<?php echo htmlspecialchars('order_history.php?' . http_build_query(['type' => 'all', 'page_size' => $page_size, 'page' => 1]), ENT_QUOTES, 'UTF-8'); ?>" class="btn btn-outline-primary <?php echo $filter_type === 'all' ? 'active' : ''; ?>">All</a>
+                                <a href="<?php echo htmlspecialchars('order_history.php?' . http_build_query(['type' => 'sale', 'page_size' => $page_size, 'page' => 1]), ENT_QUOTES, 'UTF-8'); ?>" class="btn btn-outline-primary <?php echo $filter_type === 'sale' ? 'active' : ''; ?>">Sales</a>
                                 <?php if ($is_admin_user): ?>
-                                    <a href="order_history.php?type=purchase" class="btn btn-outline-primary <?php echo $filter_type === 'purchase' ? 'active' : ''; ?>">Purchases</a>
+                                    <a href="<?php echo htmlspecialchars('order_history.php?' . http_build_query(['type' => 'purchase', 'page_size' => $page_size, 'page' => 1]), ENT_QUOTES, 'UTF-8'); ?>" class="btn btn-outline-primary <?php echo $filter_type === 'purchase' ? 'active' : ''; ?>">Purchases</a>
                                 <?php endif; ?>
                             </div>
                             <?php if (is_admin()): ?>
@@ -104,6 +124,19 @@ require_once '../includes/layouts/header.php';
                         </div>
                     </div>
                     <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                            <span class="text-muted small">Showing <?php echo $range_start; ?>-<?php echo $range_end; ?> of <?php echo $total_orders; ?> orders</span>
+                            <form method="GET" action="order_history.php" class="d-flex align-items-center gap-2">
+                                <input type="hidden" name="type" value="<?php echo htmlspecialchars($filter_type, ENT_QUOTES, 'UTF-8'); ?>">
+                                <input type="hidden" name="page" value="1">
+                                <label for="orderPageSize" class="form-label mb-0 small text-muted">Per page</label>
+                                <select id="orderPageSize" name="page_size" class="form-select form-select-sm" aria-label="Orders per page" onchange="this.form.submit()">
+                                    <?php foreach ($page_size_options as $option): ?>
+                                        <option value="<?php echo $option; ?>" <?php echo $page_size === $option ? 'selected' : ''; ?>><?php echo $option; ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </form>
+                        </div>
                         <div class="table-responsive">
                             <table class="table table-hover table-striped align-middle">
                                 <thead class="bg-light text-secondary">
@@ -159,6 +192,27 @@ require_once '../includes/layouts/header.php';
                                 </tbody>
                             </table>
                         </div>
+                        <?php if ($total_pages > 1): ?>
+                            <nav class="mt-4" aria-label="Order history pagination">
+                                <ul class="pagination justify-content-center flex-wrap mb-0">
+                                    <li class="page-item <?php echo $page <= 1 ? 'disabled' : ''; ?>">
+                                        <a class="page-link" aria-label="Previous page" href="<?php echo $page > 1 ? htmlspecialchars($order_history_url($page - 1), ENT_QUOTES, 'UTF-8') : '#'; ?>">Previous</a>
+                                    </li>
+                                    <?php foreach ($pagination_pages as $pagination_page): ?>
+                                        <?php if ($pagination_page === '...'): ?>
+                                            <li class="page-item disabled"><span class="page-link">&hellip;</span></li>
+                                        <?php else: ?>
+                                            <li class="page-item <?php echo $page === $pagination_page ? 'active' : ''; ?>">
+                                                <a class="page-link" href="<?php echo htmlspecialchars($order_history_url($pagination_page), ENT_QUOTES, 'UTF-8'); ?>" <?php echo $page === $pagination_page ? 'aria-current="page"' : ''; ?>><?php echo $pagination_page; ?></a>
+                                            </li>
+                                        <?php endif; ?>
+                                    <?php endforeach; ?>
+                                    <li class="page-item <?php echo $page >= $total_pages ? 'disabled' : ''; ?>">
+                                        <a class="page-link" aria-label="Next page" href="<?php echo $page < $total_pages ? htmlspecialchars($order_history_url($page + 1), ENT_QUOTES, 'UTF-8') : '#'; ?>">Next</a>
+                                    </li>
+                                </ul>
+                            </nav>
+                        <?php endif; ?>
                     </div>
                 </div>
             </div>
