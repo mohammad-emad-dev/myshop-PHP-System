@@ -1,0 +1,12 @@
+.git
+.env
+.env.*
+!.env.example
+public/uploads/*
+!public/uploads/.htaccess
+!public/uploads/.gitkeep
+backups/
+database/backups/
+*.log
+*.tmp
+*.bak

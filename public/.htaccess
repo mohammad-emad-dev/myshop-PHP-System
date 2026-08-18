@@ -1,0 +1,14 @@
+# public/ is the web document root. Keep this file limited to safe defaults.
+Options -Indexes
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule ^favicon\.ico$ assets/favicon.svg [L]
+</IfModule>
+
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    Header always set Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=(), accelerometer=(), gyroscope=(), magnetometer=(), display-capture=()"
+    Header always set X-Frame-Options "DENY"
+</IfModule>
