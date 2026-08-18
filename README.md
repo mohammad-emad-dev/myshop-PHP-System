@@ -4,7 +4,7 @@ MyShop is a native PHP and MySQL inventory, point-of-sale, and order management 
 
 It is built as a portfolio-grade software engineering project with a focus on secure database access, role-based authorization, transactional stock updates, and practical deployment hygiene.
 
-> **Current status:** Security-hardened Release Candidate. The published baseline is available on the [security-hardening-baseline](https://github.com/mohammad-emad-dev/myshop-PHP-System/tree/security-hardening-baseline) branch. It is suitable for portfolio review and local evaluation; production deployment still requires the deployment checklist below.
+> **Current status:** Security-hardened Release Candidate. The current baseline is published on `main` and mirrored on the [security-hardening-baseline](https://github.com/mohammad-emad-dev/myshop-PHP-System/tree/security-hardening-baseline) for traceability. It is suitable for portfolio review and local evaluation; production deployment still requires the deployment checklist below.
 
 ## Highlights
 
