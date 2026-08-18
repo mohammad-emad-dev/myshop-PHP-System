@@ -188,4 +188,3 @@ Current published baseline commit: 06a4e9f (fix: address final regression findin
 ## License
 
 Add the project license before treating this repository as a reusable open-source package.
-
