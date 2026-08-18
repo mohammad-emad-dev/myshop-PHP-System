@@ -7,6 +7,7 @@ if (PHP_SAPI !== 'cli') {
     exit("Not found.\n");
 }
 
+require_once __DIR__ . '/../includes/functions.php';
 require_once __DIR__ . '/../config/db.php';
 
 $username = getenv('BOOTSTRAP_ADMIN_USERNAME');
@@ -18,7 +19,7 @@ if ($username === false || $username === '' || $full_name === false || $full_nam
     exit(1);
 }
 
-if (strlen($password) < 12) {
+if (!password_meets_policy($password)) {
     fwrite(STDERR, "BOOTSTRAP_ADMIN_PASSWORD must contain at least 12 characters.\n");
     exit(1);
 }

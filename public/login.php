@@ -49,6 +49,7 @@ if (!$is_logout_request && $_SERVER['REQUEST_METHOD'] === 'POST') {
     if (empty($error)) {
         $csrf_token = $_POST['csrf_token'] ?? '';
         if (!verify_csrf_token($csrf_token)) {
+            http_response_code(403);
             $error = 'Security check failed. Invalid request token.';
         } else {
             $username = sanitize_input($_POST['username']);

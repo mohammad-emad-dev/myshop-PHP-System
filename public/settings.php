@@ -18,9 +18,13 @@ $staff = $stmt->get_result()->fetch_assoc();
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $csrf_token = $_POST['csrf_token'] ?? '';
     if (!verify_csrf_token($csrf_token)) {
-        $error = 'Security check failed. Invalid token.';
+        http_response_code(403);
+        $error = 'Security check failed. Invalid request token.';
     } else {
         $action = $_POST['action'] ?? 'update_profile';
+        // All Staff table mutations are administrator-only. Cashiers may log in
+        // and use the POS, but cannot change staff records, including profiles.
+        require_admin();
 
         if ($action === 'update_profile') {
             $full_name = sanitize_input($_POST['full_name']);
@@ -31,6 +35,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             if (empty($full_name) || empty($username)) {
                 $error = 'Full Name and Username cannot be empty.';
+            } elseif ($new_password !== '' && !password_meets_policy($new_password)) {
+                http_response_code(400);
+                $error = 'Password does not meet the minimum security requirements.';
             } else {
                 // Check for duplicate username
                 $dup_check = $conn->prepare("SELECT id FROM Staff WHERE username = ? AND id != ?");
@@ -85,32 +92,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
         } elseif ($action === 'create_staff') {
-            require_admin();
             $new_username = sanitize_input($_POST['staff_username'] ?? '');
             $new_full_name = sanitize_input($_POST['staff_full_name'] ?? '');
             $new_role = sanitize_input($_POST['staff_role'] ?? 'cashier');
             $new_pass = $_POST['staff_password'] ?? '';
 
-            if (create_staff_member($conn, $new_username, $new_pass, $new_full_name, $new_role)) {
+            if (!password_meets_policy($new_pass)) {
+                http_response_code(400);
+                $error = 'Password does not meet the minimum security requirements.';
+            } elseif (create_staff_member($conn, $new_username, $new_pass, $new_full_name, $new_role)) {
                 $success = 'Staff account registered successfully!';
             } else {
                 $error = 'Failed to create staff account. The username may already be in use.';
             }
         } elseif ($action === 'update_staff') {
-            require_admin();
             $target_id = (int)($_POST['staff_id'] ?? 0);
             $target_username = sanitize_input($_POST['staff_username'] ?? '');
             $target_full_name = sanitize_input($_POST['staff_full_name'] ?? '');
             $target_role = sanitize_input($_POST['staff_role'] ?? 'cashier');
             $target_pass = $_POST['staff_password'] ?? '';
 
-            if (update_staff_member($conn, $target_id, $target_username, $target_full_name, $target_role, $target_pass)) {
+            if ($target_pass !== '' && !password_meets_policy($target_pass)) {
+                http_response_code(400);
+                $error = 'Password does not meet the minimum security requirements.';
+            } elseif (update_staff_member($conn, $target_id, $target_username, $target_full_name, $target_role, $target_pass)) {
                 $success = 'Staff member updated successfully!';
             } else {
                 $error = 'Failed to update staff member. Ensure you are not attempting to demote the sole active administrator.';
             }
         } elseif ($action === 'delete_staff') {
-            require_admin();
             $target_id = (int)($_POST['staff_id'] ?? 0);
 
             if (delete_staff_member($conn, $target_id, $_SESSION['staff_id'])) {
@@ -119,7 +129,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $error = 'Failed to deactivate staff account. Self-deactivation and deactivation of the last active administrator are blocked.';
             }
         } elseif ($action === 'set_staff_active') {
-            require_admin();
             $target_id = (int)($_POST['staff_id'] ?? 0);
             $requested_active = filter_var($_POST['is_active'] ?? null, FILTER_VALIDATE_INT);
 

@@ -32,6 +32,19 @@ function sanitize_id($id)
     return filter_var($id, FILTER_VALIDATE_INT) !== false ? (int)$id : 0;
 }
 
+/**
+ * Applies the single password policy used by every password-changing flow.
+ */
+function password_meets_policy($password)
+{
+    if (!is_string($password)) {
+        return false;
+    }
+
+    $length = function_exists('mb_strlen') ? mb_strlen($password, 'UTF-8') : strlen($password);
+    return $length >= 12;
+}
+
 function verify_login($redirect_on_failure = true)
 {
     global $conn;
@@ -649,6 +662,34 @@ function create_order($conn, $staff_id, $items, $order_type = 'sale', $customer_
     }
 
     try {
+        $staff_stmt = $conn->prepare(
+            "SELECT role, is_active FROM Staff WHERE id = ? LIMIT 1"
+        );
+        if (!$staff_stmt) {
+            throw new Exception('Failed to prepare order staff authorization statement.');
+        }
+        if (!$staff_stmt->bind_param('i', $staff_id)) {
+            throw new Exception('Failed to bind order staff authorization statement.');
+        }
+        if (!$staff_stmt->execute()) {
+            throw new Exception('Failed to verify order staff authorization.');
+        }
+        $staff_result = $staff_stmt->get_result();
+        if (!$staff_result) {
+            throw new Exception('Failed to read order staff authorization result.');
+        }
+        $staff_record = $staff_result->fetch_assoc();
+        $staff_stmt->close();
+
+        if (
+            !$staff_record
+            || (int)$staff_record['is_active'] !== 1
+            || !in_array($staff_record['role'], ['admin', 'cashier'], true)
+            || ($order_type === 'purchase' && $staff_record['role'] !== 'admin')
+        ) {
+            throw new Exception('The staff account is not authorized for this order type.');
+        }
+
         $party_table = $order_type === 'sale' ? 'Customer' : 'Supplier';
         $party_id = $order_type === 'sale' ? $customer_id : $supplier_id;
         $party_stmt = $conn->prepare("SELECT id FROM {$party_table} WHERE id = ? LIMIT 1");
@@ -873,35 +914,153 @@ function get_orders($conn)
     return $conn->query($sql)->fetch_all(MYSQLI_ASSOC);
 }
 
-function get_order_by_id($conn, $order_id)
+function get_orders_for_staff($conn, $staff_id)
 {
-    $stmt = $conn->prepare("SELECT o.*, s.full_name as staff_name, 
+    $staff_id = (int)$staff_id;
+    if ($staff_id <= 0) {
+        return [];
+    }
+
+    $stmt = $conn->prepare(
+        "SELECT o.*, s.full_name as staff_name, c.name as customer_name, sup.name as supplier_name
+         FROM `Order` o
+         JOIN Staff s ON o.staff_id = s.id
+         LEFT JOIN Customer c ON o.customer_id = c.id
+         LEFT JOIN Supplier sup ON o.supplier_id = sup.id
+         WHERE o.staff_id = ?
+         ORDER BY o.order_date DESC"
+    );
+    if (!$stmt) {
+        error_log('Scoped order list prepare failed: ' . $conn->error);
+        return [];
+    }
+    if (!$stmt->bind_param('i', $staff_id)) {
+        error_log('Scoped order list bind failed: ' . $stmt->error);
+        $stmt->close();
+        return [];
+    }
+    if (!$stmt->execute()) {
+        error_log('Scoped order list execute failed: ' . $stmt->error);
+        $stmt->close();
+        return [];
+    }
+    $result = $stmt->get_result();
+    if (!$result) {
+        error_log('Scoped order list result failed: ' . $stmt->error);
+        $stmt->close();
+        return [];
+    }
+    $orders = $result->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+    return $orders;
+}
+
+function get_order_by_id($conn, $order_id, $staff_id = null)
+{
+    $order_id = (int)$order_id;
+    if ($order_id <= 0) {
+        return null;
+    }
+
+    $sql = "SELECT o.*, s.full_name as staff_name,
                                    c.name as customer_name, c.phone as customer_phone, c.email as customer_email, c.address as customer_address,
                                    sup.name as supplier_name, sup.phone as supplier_phone, sup.email as supplier_email, sup.address as supplier_address
                             FROM `Order` o 
                             JOIN Staff s ON o.staff_id = s.id 
                             LEFT JOIN Customer c ON o.customer_id = c.id
                             LEFT JOIN Supplier sup ON o.supplier_id = sup.id
-                            WHERE o.id = ?");
+                            WHERE o.id = ?";
+    if ($staff_id !== null) {
+        $staff_id = (int)$staff_id;
+        if ($staff_id <= 0) {
+            return null;
+        }
+        $sql .= " AND o.staff_id = ?";
+    }
+
+    $stmt = $conn->prepare($sql);
     if (!$stmt) {
+        error_log('Order lookup prepare failed: ' . $conn->error);
         return null;
     }
-    $stmt->bind_param("i", $order_id);
-    $stmt->execute();
-    $res = $stmt->get_result()->fetch_assoc();
+    if ($staff_id === null) {
+        if (!$stmt->bind_param('i', $order_id)) {
+            error_log('Order lookup bind failed: ' . $stmt->error);
+            $stmt->close();
+            return null;
+        }
+    } elseif (!$stmt->bind_param('ii', $order_id, $staff_id)) {
+        error_log('Scoped order lookup bind failed: ' . $stmt->error);
+        $stmt->close();
+        return null;
+    }
+    if (!$stmt->execute()) {
+        error_log('Order lookup execute failed: ' . $stmt->error);
+        $stmt->close();
+        return null;
+    }
+    $result = $stmt->get_result();
+    if (!$result) {
+        error_log('Order lookup result failed: ' . $stmt->error);
+        $stmt->close();
+        return null;
+    }
+    $res = $result->fetch_assoc();
     $stmt->close();
     return $res;
 }
 
-function get_order_details($conn, $order_id)
+function get_order_details($conn, $order_id, $staff_id = null)
 {
-    $stmt = $conn->prepare("SELECT od.*, p.name as product_name 
+    $order_id = (int)$order_id;
+    if ($order_id <= 0) {
+        return [];
+    }
+
+    $sql = "SELECT od.*, p.name as product_name
                            FROM OrderDetail od 
                            JOIN Product p ON od.product_id = p.id 
-                           WHERE od.order_id = ?");
-    $stmt->bind_param("i", $order_id);
-    $stmt->execute();
-    $res = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+                           WHERE od.order_id = ?";
+    if ($staff_id !== null) {
+        $staff_id = (int)$staff_id;
+        if ($staff_id <= 0) {
+            return [];
+        }
+        $sql = "SELECT od.*, p.name as product_name
+                FROM OrderDetail od
+                JOIN Product p ON od.product_id = p.id
+                JOIN `Order` o ON o.id = od.order_id
+                WHERE od.order_id = ? AND o.staff_id = ?";
+    }
+
+    $stmt = $conn->prepare($sql);
+    if (!$stmt) {
+        error_log('Order detail lookup prepare failed: ' . $conn->error);
+        return [];
+    }
+    if ($staff_id === null) {
+        if (!$stmt->bind_param('i', $order_id)) {
+            error_log('Order detail lookup bind failed: ' . $stmt->error);
+            $stmt->close();
+            return [];
+        }
+    } elseif (!$stmt->bind_param('ii', $order_id, $staff_id)) {
+        error_log('Scoped order detail lookup bind failed: ' . $stmt->error);
+        $stmt->close();
+        return [];
+    }
+    if (!$stmt->execute()) {
+        error_log('Order detail lookup execute failed: ' . $stmt->error);
+        $stmt->close();
+        return [];
+    }
+    $result = $stmt->get_result();
+    if (!$result) {
+        error_log('Order detail lookup result failed: ' . $stmt->error);
+        $stmt->close();
+        return [];
+    }
+    $res = $result->fetch_all(MYSQLI_ASSOC);
     $stmt->close();
     return $res;
 }
@@ -1307,14 +1466,14 @@ function is_admin()
 }
 
 /**
- * Enforces admin privileges, redirecting cashier accounts to index.
+ * Enforces administrator privileges with a non-leaking forbidden response.
  */
 function require_admin()
 {
     verify_login();
     if (!is_admin()) {
-        header('Location: index.php?error=unauthorized');
-        exit();
+        http_response_code(403);
+        exit('Access denied.');
     }
 }
 
@@ -1337,18 +1496,31 @@ function create_staff_member($conn, $username, $password, $full_name, $role)
     $full_name = trim($full_name);
     $role = trim($role);
 
-    if (empty($username) || empty($password) || empty($full_name) || !in_array($role, ['admin', 'cashier'])) {
+    if (
+        empty($username)
+        || !password_meets_policy($password)
+        || empty($full_name)
+        || !in_array($role, ['admin', 'cashier'], true)
+    ) {
         return false;
     }
 
     $hashed_password = password_hash($password, PASSWORD_DEFAULT);
+    if ($hashed_password === false) {
+        return false;
+    }
     $stmt = $conn->prepare("INSERT INTO Staff (username, password, full_name, role) VALUES (?, ?, ?, ?)");
     if (!$stmt) {
         return false;
     }
 
-    $stmt->bind_param("ssss", $username, $hashed_password, $full_name, $role);
-    return $stmt->execute();
+    if (!$stmt->bind_param("ssss", $username, $hashed_password, $full_name, $role)) {
+        $stmt->close();
+        return false;
+    }
+    $result = $stmt->execute();
+    $stmt->close();
+    return $result;
 }
 
 /**
@@ -1361,7 +1533,11 @@ function update_staff_member($conn, $id, $username, $full_name, $role, $password
     $full_name = trim($full_name);
     $role = trim($role);
 
-    if ($id <= 0 || empty($username) || empty($full_name) || !in_array($role, ['admin', 'cashier'])) {
+    if ($id <= 0 || empty($username) || empty($full_name) || !in_array($role, ['admin', 'cashier'], true)) {
+        return false;
+    }
+
+    if ($password !== null && $password !== '' && !password_meets_policy($password)) {
         return false;
     }
 

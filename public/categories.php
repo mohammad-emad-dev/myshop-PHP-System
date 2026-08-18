@@ -3,8 +3,9 @@ require_once '../includes/functions.php';
 start_secure_session();
 require_once '../config/db.php';
 
-// Enforce admin access
-require_admin();
+// Authenticate first so POST requests can return a consistent CSRF response
+// before the administrator authorization check.
+verify_login();
 
 $success = '';
 $error = '';
@@ -13,7 +14,11 @@ $error = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     $csrf_token = $_POST['csrf_token'] ?? '';
     if (!verify_csrf_token($csrf_token)) {
+        http_response_code(403);
         $error = 'Security check failed. Invalid request token.';
+    } elseif (!is_admin()) {
+        http_response_code(403);
+        $error = 'Access denied. Administrator privileges are required for category changes.';
     } else {
         $action = $_POST['action'];
 
@@ -53,6 +58,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             }
         }
     }
+}
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    require_admin();
 }
 
 $categories = get_categories($conn);

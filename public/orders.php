@@ -11,17 +11,26 @@ $completed_order_id = 0;
 
 // Handle Order Submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['complete_order'])) {
+    $csrf_token = $_POST['csrf_token'] ?? '';
+    if (!verify_csrf_token($csrf_token)) {
+        http_response_code(403);
+        $error = "Security check failed. Invalid request token.";
+    } else {
     // --- POS Transaction Flood Protection ---
     $current_time = time();
     if (isset($_SESSION['last_order_time']) && ($current_time - $_SESSION['last_order_time']) < 3) {
         // Prevent submissions faster than 3 seconds
         $error = "Transaction processing. Please wait a moment before submitting another order.";
     } else {
-        $csrf_token = $_POST['csrf_token'] ?? '';
-        if (!verify_csrf_token($csrf_token)) {
-            $error = "Security check failed. Invalid request token.";
-        } else {
-            $cart_json = $_POST['cart_data'] ?? '[]';
+            $order_type = $_POST['order_type'] ?? null;
+            if (!is_string($order_type) || !in_array($order_type, ['sale', 'purchase'], true)) {
+                http_response_code(400);
+                $error = "Invalid order type.";
+            } elseif ($order_type === 'purchase' && !is_admin()) {
+                http_response_code(403);
+                $error = "Access denied. Cashier accounts cannot create purchase orders.";
+            } else {
+                $cart_json = $_POST['cart_data'] ?? '[]';
             
             // Defend against excessively large payloads
             if (strlen($cart_json) > 50000) {
@@ -33,11 +42,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['complete_order'])) {
                 if (json_last_error() !== JSON_ERROR_NONE || !is_array($cart_items) || isset($cart_items['id'])) {
                     $cart_items = [];
                 }
-
-        $order_type = $_POST['order_type'] ?? 'sale';
-        if (!in_array($order_type, ['sale', 'purchase'], true)) {
-            $order_type = 'sale';
-        }
 
         if (empty($cart_items)) {
             $error = "Cart is empty or invalid. Please add products.";
@@ -97,6 +101,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['complete_order'])) {
                 }
             }
         }
+    }
     }
 }
 }

@@ -11,12 +11,15 @@ if ($order_id <= 0) {
     die("Invalid Order ID.");
 }
 
-$order = get_order_by_id($conn, $order_id);
+$is_admin_user = is_admin();
+$staff_scope = $is_admin_user ? null : (int)$_SESSION['staff_id'];
+$order = get_order_by_id($conn, $order_id, $staff_scope);
 if (!$order) {
-    die("Order not found.");
+    http_response_code(404);
+    exit("Invoice not found.");
 }
 
-$items = get_order_details($conn, $order_id);
+$items = get_order_details($conn, $order_id, $staff_scope);
 
 $is_sale = ($order['order_type'] === 'sale');
 $party_title = $is_sale ? "Customer:" : "Supplier:";

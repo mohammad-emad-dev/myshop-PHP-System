@@ -5,7 +5,10 @@ require_once '../config/db.php';
 
 verify_login();
 
-$orders = get_orders($conn);
+$is_admin_user = is_admin();
+$orders = $is_admin_user
+    ? get_orders($conn)
+    : get_orders_for_staff($conn, (int)$_SESSION['staff_id']);
 
 // Filter by transaction type
 $filter_type = isset($_GET['type']) ? sanitize_input($_GET['type']) : 'all';

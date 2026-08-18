@@ -13,7 +13,11 @@ $error = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     $csrf_token = $_POST['csrf_token'] ?? '';
     if (!verify_csrf_token($csrf_token)) {
+        http_response_code(403);
         $error = 'Security check failed. Invalid request token.';
+    } elseif (!is_admin()) {
+        http_response_code(403);
+        $error = 'Access denied. Administrator privileges are required for customer changes.';
     } else {
         $action = $_POST['action'];
 
