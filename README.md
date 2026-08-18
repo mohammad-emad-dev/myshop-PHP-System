@@ -3,15 +3,15 @@
 Native PHP and MySQL inventory, point-of-sale, and order management application.
 
 The repository contains the completed application-hardening work through Batch
-13 and the Batch 14 migration and database least-privilege hardening. The
+17, including migration safety, database least privilege, isolated backup
+verification, role authorization, and account/IP-aware login rate limiting. The
 current codebase includes the database and installation foundation,
 authentication and HTTP-boundary protections, inventory/order data-integrity
 controls, browser/XSS hardening, upload and CSV safeguards, protected backups,
 security headers/CSP, reproducible Docker setup, browser-QA fixes, release
-hygiene, and server-side product pagination. Batch 14 keeps the canonical
-schema unchanged while making the active-staff migration safe across supported
-database baselines and restricting the normal PHP runtime account to CRUD
-privileges.
+hygiene, server-side product pagination, and deployment verification. The
+canonical schema includes the login rate-limit table, while normal PHP requests
+still cannot create or migrate schema objects.
 
 ## Project overview and architecture
 
@@ -284,6 +284,7 @@ deployment/schema account:
 1. `database/batch2_staff_active.sql`
 2. `database/batch3_product_history.sql`
 3. `database/batch14_runtime_privileges.sql`
+4. `database/batch17_login_rate_limit.sql`
 
 Run each migration successfully before starting the next. These files
 must be executed from a controlled CLI/deployment process and must never be
@@ -316,6 +317,27 @@ mysql --host="$DB_HOST" --port="$DB_PORT" \
 Use the actual MySQL account host if an existing deployment does not use `%`.
 The schema account password is entered interactively or supplied by the
 deployment secret manager; no migration credential belongs in this repository.
+
+Batch 17 creates `LoginRateLimit` when it is absent and performs a no-op when
+the table already matches the canonical schema. A partial or incompatible
+table fails explicitly and requires manual inspection; migration errors are
+not ignored. The table stores only a SHA-256 hash of the normalized login
+identifier, the canonical `REMOTE_ADDR`, failure counters, and UTC timestamps;
+it stores no passwords or password-equivalent values. The policy is five
+failed attempts for an account/IP pair within 15 minutes, followed by a
+generic HTTP 429 response. Successful authentication removes that pair's
+failed-attempt record, and expired records are removed opportunistically in
+bounded batches. Arbitrary `X-Forwarded-For` headers are ignored.
+
+The login limiter fails closed: if its table, query, or transaction is
+unavailable, the login request returns a generic HTTP 503 and does not
+authenticate. This protects the control at the cost of temporarily rejecting
+all logins until the database issue is fixed. It is not a replacement for an
+upstream WAF or distributed network-level rate limiter.
+
+Batch 17 is a deployment/schema-account migration only. It must be run after
+Batch 14 and never through PHP, `config/db.php`, a web request, or application
+startup.
 
 Databases created by versions older than Batch 1 may have different tables,
 columns, or foreign-key names. Stop and perform a manual schema and data

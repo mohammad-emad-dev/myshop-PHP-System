@@ -45,6 +45,455 @@ function password_meets_policy($password)
     return $length >= 12;
 }
 
+/**
+ * Normalize the login identifier used by authentication and rate limiting.
+ * This is deliberately not sanitize_input(), which is an output-encoding
+ * helper and must not change the value used for an authentication lookup.
+ */
+function normalize_login_identifier($username)
+{
+    if (!is_string($username)) {
+        return '';
+    }
+
+    $username = trim($username);
+    return function_exists('mb_strtolower')
+        ? mb_strtolower($username, 'UTF-8')
+        : strtolower($username);
+}
+
+/**
+ * Use the direct peer address. Forwarded headers are intentionally ignored
+ * unless a trusted-proxy policy is added explicitly in a future change.
+ */
+function get_login_source_ip()
+{
+    $source_ip = $_SERVER['REMOTE_ADDR'] ?? '';
+    if (!is_string($source_ip) || filter_var($source_ip, FILTER_VALIDATE_IP) === false) {
+        return false;
+    }
+
+    $packed_ip = @inet_pton($source_ip);
+    if ($packed_ip === false) {
+        return false;
+    }
+
+    $canonical_ip = @inet_ntop($packed_ip);
+    return is_string($canonical_ip) ? $canonical_ip : false;
+}
+
+function build_login_rate_limit_key($username, $source_ip)
+{
+    if (!is_string($source_ip) || filter_var($source_ip, FILTER_VALIDATE_IP) === false) {
+        return false;
+    }
+
+    return [
+        'username_hash' => hash('sha256', normalize_login_identifier($username)),
+        'ip_address' => $source_ip,
+    ];
+}
+
+function login_rate_limit_log_failure($operation, $database_error = '')
+{
+    $message = 'Login rate limiter ' . $operation . ' failed.';
+    if ($database_error !== '') {
+        $message .= ' ' . $database_error;
+    }
+
+    error_log($message);
+}
+
+function login_rate_limit_begin_transaction($conn, $operation)
+{
+    try {
+        if (!$conn->begin_transaction()) {
+            login_rate_limit_log_failure($operation . ' transaction start', $conn->error);
+            return false;
+        }
+    } catch (Throwable $exception) {
+        login_rate_limit_log_failure($operation . ' transaction start', $exception->getMessage());
+        return false;
+    }
+
+    return true;
+}
+
+function login_rate_limit_rollback($conn, $operation)
+{
+    try {
+        if (!$conn->rollback()) {
+            login_rate_limit_log_failure($operation . ' rollback', $conn->error);
+        }
+    } catch (Throwable $exception) {
+        login_rate_limit_log_failure($operation . ' rollback', $exception->getMessage());
+    }
+}
+
+function login_rate_limit_cleanup_expired($conn)
+{
+    $cleanup_queries = [
+        "DELETE FROM LoginRateLimit
+         WHERE blocked_until IS NOT NULL
+           AND blocked_until <= UTC_TIMESTAMP()
+         LIMIT 100",
+        "DELETE FROM LoginRateLimit
+         WHERE blocked_until IS NULL
+           AND last_attempt_at <= DATE_SUB(UTC_TIMESTAMP(), INTERVAL 15 MINUTE)
+         LIMIT 100",
+    ];
+
+    foreach ($cleanup_queries as $cleanup_query) {
+        $stmt = $conn->prepare($cleanup_query);
+        if (!$stmt) {
+            login_rate_limit_log_failure('cleanup prepare', $conn->error);
+            return false;
+        }
+
+        if (!$stmt->execute()) {
+            login_rate_limit_log_failure('cleanup execute', $stmt->error);
+            $stmt->close();
+            return false;
+        }
+
+        if ($stmt->affected_rows < 0) {
+            login_rate_limit_log_failure('cleanup affected-row check', $stmt->error);
+            $stmt->close();
+            return false;
+        }
+
+        $stmt->close();
+    }
+
+    return true;
+}
+
+function login_rate_limit_check($conn, $rate_limit_key)
+{
+    if (!is_array($rate_limit_key)) {
+        return ['status' => 'error', 'retry_after' => 0];
+    }
+
+    if (!login_rate_limit_begin_transaction($conn, 'check')) {
+        return ['status' => 'error', 'retry_after' => 0];
+    }
+
+    try {
+        if (!login_rate_limit_cleanup_expired($conn)) {
+            login_rate_limit_rollback($conn, 'check cleanup');
+            return ['status' => 'error', 'retry_after' => 0];
+        }
+
+        $stmt = $conn->prepare(
+            "SELECT failure_count,
+                    CASE
+                        WHEN blocked_until IS NOT NULL AND blocked_until > UTC_TIMESTAMP()
+                        THEN TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), blocked_until)
+                        ELSE 0
+                    END AS blocked_seconds
+             FROM LoginRateLimit
+             WHERE username_hash = ? AND ip_address = ?
+             LIMIT 1
+             FOR UPDATE"
+        );
+        if (!$stmt) {
+            login_rate_limit_log_failure('check prepare', $conn->error);
+            login_rate_limit_rollback($conn, 'check prepare');
+            return ['status' => 'error', 'retry_after' => 0];
+        }
+
+        if (!$stmt->bind_param('ss', $rate_limit_key['username_hash'], $rate_limit_key['ip_address'])) {
+            login_rate_limit_log_failure('check bind', $stmt->error);
+            $stmt->close();
+            login_rate_limit_rollback($conn, 'check bind');
+            return ['status' => 'error', 'retry_after' => 0];
+        }
+
+        if (!$stmt->execute()) {
+            login_rate_limit_log_failure('check execute', $stmt->error);
+            $stmt->close();
+            login_rate_limit_rollback($conn, 'check execute');
+            return ['status' => 'error', 'retry_after' => 0];
+        }
+
+        $result = $stmt->get_result();
+        if (!$result) {
+            login_rate_limit_log_failure('check result', $stmt->error);
+            $stmt->close();
+            login_rate_limit_rollback($conn, 'check result');
+            return ['status' => 'error', 'retry_after' => 0];
+        }
+
+        $rate_limit_row = $result->fetch_assoc();
+        $result->free();
+        $stmt->close();
+
+        if (!$conn->commit()) {
+            login_rate_limit_log_failure('check commit', $conn->error);
+            login_rate_limit_rollback($conn, 'check commit');
+            return ['status' => 'error', 'retry_after' => 0];
+        }
+
+        $blocked_seconds = $rate_limit_row ? max(0, (int)$rate_limit_row['blocked_seconds']) : 0;
+        $failure_count = $rate_limit_row ? (int)$rate_limit_row['failure_count'] : 0;
+
+        if ($failure_count >= 5 && $blocked_seconds > 0) {
+            return ['status' => 'blocked', 'retry_after' => max(1, $blocked_seconds)];
+        }
+
+        return ['status' => 'allowed', 'retry_after' => 0];
+    } catch (Throwable $exception) {
+        login_rate_limit_log_failure('check unexpected failure', $exception->getMessage());
+        login_rate_limit_rollback($conn, 'check unexpected failure');
+        return ['status' => 'error', 'retry_after' => 0];
+    }
+}
+
+function login_rate_limit_record_failure($conn, $rate_limit_key)
+{
+    if (!is_array($rate_limit_key)) {
+        return ['status' => 'error', 'retry_after' => 0];
+    }
+
+    if (!login_rate_limit_begin_transaction($conn, 'failure')) {
+        return ['status' => 'error', 'retry_after' => 0];
+    }
+
+    try {
+        if (!login_rate_limit_cleanup_expired($conn)) {
+            login_rate_limit_rollback($conn, 'failure cleanup');
+            return ['status' => 'error', 'retry_after' => 0];
+        }
+
+        $upsert = $conn->prepare(
+            "INSERT INTO LoginRateLimit
+                (username_hash, ip_address, failure_count, first_attempt_at, last_attempt_at)
+             VALUES (?, ?, 0, UTC_TIMESTAMP(), UTC_TIMESTAMP())
+             ON DUPLICATE KEY UPDATE id = id"
+        );
+        if (!$upsert) {
+            login_rate_limit_log_failure('failure upsert prepare', $conn->error);
+            login_rate_limit_rollback($conn, 'failure upsert prepare');
+            return ['status' => 'error', 'retry_after' => 0];
+        }
+
+        if (!$upsert->bind_param('ss', $rate_limit_key['username_hash'], $rate_limit_key['ip_address'])) {
+            login_rate_limit_log_failure('failure upsert bind', $upsert->error);
+            $upsert->close();
+            login_rate_limit_rollback($conn, 'failure upsert bind');
+            return ['status' => 'error', 'retry_after' => 0];
+        }
+
+        if (!$upsert->execute()) {
+            login_rate_limit_log_failure('failure upsert execute', $upsert->error);
+            $upsert->close();
+            login_rate_limit_rollback($conn, 'failure upsert execute');
+            return ['status' => 'error', 'retry_after' => 0];
+        }
+
+        if ($upsert->affected_rows < 0) {
+            login_rate_limit_log_failure('failure upsert affected-row check', $upsert->error);
+            $upsert->close();
+            login_rate_limit_rollback($conn, 'failure upsert affected-row check');
+            return ['status' => 'error', 'retry_after' => 0];
+        }
+        $upsert->close();
+
+        $select = $conn->prepare(
+            "SELECT failure_count,
+                    TIMESTAMPDIFF(SECOND, first_attempt_at, UTC_TIMESTAMP()) AS window_age_seconds,
+                    CASE
+                        WHEN blocked_until IS NOT NULL AND blocked_until > UTC_TIMESTAMP()
+                        THEN TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), blocked_until)
+                        ELSE 0
+                    END AS blocked_seconds
+             FROM LoginRateLimit
+             WHERE username_hash = ? AND ip_address = ?
+             LIMIT 1
+             FOR UPDATE"
+        );
+        if (!$select) {
+            login_rate_limit_log_failure('failure select prepare', $conn->error);
+            login_rate_limit_rollback($conn, 'failure select prepare');
+            return ['status' => 'error', 'retry_after' => 0];
+        }
+
+        if (!$select->bind_param('ss', $rate_limit_key['username_hash'], $rate_limit_key['ip_address'])) {
+            login_rate_limit_log_failure('failure select bind', $select->error);
+            $select->close();
+            login_rate_limit_rollback($conn, 'failure select bind');
+            return ['status' => 'error', 'retry_after' => 0];
+        }
+
+        if (!$select->execute()) {
+            login_rate_limit_log_failure('failure select execute', $select->error);
+            $select->close();
+            login_rate_limit_rollback($conn, 'failure select execute');
+            return ['status' => 'error', 'retry_after' => 0];
+        }
+
+        $result = $select->get_result();
+        if (!$result) {
+            login_rate_limit_log_failure('failure select result', $select->error);
+            $select->close();
+            login_rate_limit_rollback($conn, 'failure select result');
+            return ['status' => 'error', 'retry_after' => 0];
+        }
+
+        $rate_limit_row = $result->fetch_assoc();
+        $result->free();
+        $select->close();
+
+        if (!$rate_limit_row) {
+            login_rate_limit_log_failure('failure select returned no row');
+            login_rate_limit_rollback($conn, 'failure missing row');
+            return ['status' => 'error', 'retry_after' => 0];
+        }
+
+        $blocked_seconds = max(0, (int)$rate_limit_row['blocked_seconds']);
+        if ((int)$rate_limit_row['failure_count'] >= 5 && $blocked_seconds > 0) {
+            if (!$conn->commit()) {
+                login_rate_limit_log_failure('blocked failure commit', $conn->error);
+                login_rate_limit_rollback($conn, 'blocked failure commit');
+                return ['status' => 'error', 'retry_after' => 0];
+            }
+
+            return ['status' => 'blocked', 'retry_after' => max(1, $blocked_seconds)];
+        }
+
+        $window_age = (int)$rate_limit_row['window_age_seconds'];
+        $window_expired = $window_age < 0 || $window_age >= 900;
+        $failure_count = $window_expired
+            ? 1
+            : min(5, (int)$rate_limit_row['failure_count'] + 1);
+
+        if ($window_expired) {
+            $update_sql =
+                "UPDATE LoginRateLimit
+                 SET failure_count = ?,
+                     first_attempt_at = UTC_TIMESTAMP(),
+                     last_attempt_at = UTC_TIMESTAMP(),
+                     blocked_until = NULL
+                 WHERE username_hash = ? AND ip_address = ?";
+        } elseif ($failure_count >= 5) {
+            $update_sql =
+                "UPDATE LoginRateLimit
+                 SET failure_count = ?,
+                     last_attempt_at = UTC_TIMESTAMP(),
+                     blocked_until = DATE_ADD(UTC_TIMESTAMP(), INTERVAL 15 MINUTE)
+                 WHERE username_hash = ? AND ip_address = ?";
+        } else {
+            $update_sql =
+                "UPDATE LoginRateLimit
+                 SET failure_count = ?,
+                     last_attempt_at = UTC_TIMESTAMP(),
+                     blocked_until = NULL
+                 WHERE username_hash = ? AND ip_address = ?";
+        }
+
+        $update = $conn->prepare($update_sql);
+        if (!$update) {
+            login_rate_limit_log_failure('failure update prepare', $conn->error);
+            login_rate_limit_rollback($conn, 'failure update prepare');
+            return ['status' => 'error', 'retry_after' => 0];
+        }
+
+        if (!$update->bind_param('iss', $failure_count, $rate_limit_key['username_hash'], $rate_limit_key['ip_address'])) {
+            login_rate_limit_log_failure('failure update bind', $update->error);
+            $update->close();
+            login_rate_limit_rollback($conn, 'failure update bind');
+            return ['status' => 'error', 'retry_after' => 0];
+        }
+
+        if (!$update->execute()) {
+            login_rate_limit_log_failure('failure update execute', $update->error);
+            $update->close();
+            login_rate_limit_rollback($conn, 'failure update execute');
+            return ['status' => 'error', 'retry_after' => 0];
+        }
+
+        if ($update->affected_rows !== 1) {
+            login_rate_limit_log_failure('failure update affected-row check', $update->error);
+            $update->close();
+            login_rate_limit_rollback($conn, 'failure update affected-row check');
+            return ['status' => 'error', 'retry_after' => 0];
+        }
+        $update->close();
+
+        if (!$conn->commit()) {
+            login_rate_limit_log_failure('failure commit', $conn->error);
+            login_rate_limit_rollback($conn, 'failure commit');
+            return ['status' => 'error', 'retry_after' => 0];
+        }
+
+        if ($failure_count >= 5) {
+            return ['status' => 'blocked', 'retry_after' => 900];
+        }
+
+        return ['status' => 'recorded', 'retry_after' => 0];
+    } catch (Throwable $exception) {
+        login_rate_limit_log_failure('failure unexpected failure', $exception->getMessage());
+        login_rate_limit_rollback($conn, 'failure unexpected failure');
+        return ['status' => 'error', 'retry_after' => 0];
+    }
+}
+
+function login_rate_limit_reset($conn, $rate_limit_key)
+{
+    if (!is_array($rate_limit_key)) {
+        return false;
+    }
+
+    if (!login_rate_limit_begin_transaction($conn, 'reset')) {
+        return false;
+    }
+
+    try {
+        $stmt = $conn->prepare(
+            "DELETE FROM LoginRateLimit WHERE username_hash = ? AND ip_address = ?"
+        );
+        if (!$stmt) {
+            login_rate_limit_log_failure('reset prepare', $conn->error);
+            login_rate_limit_rollback($conn, 'reset prepare');
+            return false;
+        }
+
+        if (!$stmt->bind_param('ss', $rate_limit_key['username_hash'], $rate_limit_key['ip_address'])) {
+            login_rate_limit_log_failure('reset bind', $stmt->error);
+            $stmt->close();
+            login_rate_limit_rollback($conn, 'reset bind');
+            return false;
+        }
+
+        if (!$stmt->execute()) {
+            login_rate_limit_log_failure('reset execute', $stmt->error);
+            $stmt->close();
+            login_rate_limit_rollback($conn, 'reset execute');
+            return false;
+        }
+
+        if ($stmt->affected_rows < 0) {
+            login_rate_limit_log_failure('reset affected-row check', $stmt->error);
+            $stmt->close();
+            login_rate_limit_rollback($conn, 'reset affected-row check');
+            return false;
+        }
+        $stmt->close();
+
+        if (!$conn->commit()) {
+            login_rate_limit_log_failure('reset commit', $conn->error);
+            login_rate_limit_rollback($conn, 'reset commit');
+            return false;
+        }
+
+        return true;
+    } catch (Throwable $exception) {
+        login_rate_limit_log_failure('reset unexpected failure', $exception->getMessage());
+        login_rate_limit_rollback($conn, 'reset unexpected failure');
+        return false;
+    }
+}
+
 function verify_login($redirect_on_failure = true)
 {
     global $conn;

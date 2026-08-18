@@ -34,6 +34,24 @@ CREATE TABLE Staff (
   DEFAULT CHARACTER SET utf8mb4
   COLLATE = utf8mb4_unicode_ci;
 
+CREATE TABLE LoginRateLimit (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    username_hash CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+    ip_address VARCHAR(45) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+    failure_count SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+    first_attempt_at DATETIME NOT NULL,
+    last_attempt_at DATETIME NOT NULL,
+    blocked_until DATETIME NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT chk_login_rate_failure_count CHECK (failure_count <= 5),
+    CONSTRAINT uq_login_rate_account_ip UNIQUE (username_hash, ip_address),
+    INDEX idx_login_rate_blocked_until (blocked_until),
+    INDEX idx_login_rate_last_attempt (last_attempt_at)
+) ENGINE = InnoDB
+  DEFAULT CHARACTER SET utf8mb4
+  COLLATE = utf8mb4_unicode_ci;
+
 CREATE TABLE Customer (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) NOT NULL,

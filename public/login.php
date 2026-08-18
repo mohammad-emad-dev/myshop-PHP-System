@@ -26,80 +26,116 @@ if (!$is_logout_request && isset($_SESSION['staff_id']) && verify_login(false)) 
 // A logout POST is never allowed to fall through to the login handler. This
 // also ensures invalid logout tokens do not initialize or increment attempts.
 if (!$is_logout_request && $_SERVER['REQUEST_METHOD'] === 'POST') {
-    // --- Brute Force Protection (Session-based) ---
-    if (!isset($_SESSION['login_attempts'])) {
-        $_SESSION['login_attempts'] = 0;
-        $_SESSION['last_attempt_time'] = time();
-    }
+    $csrf_token = $_POST['csrf_token'] ?? '';
+    if (!verify_csrf_token($csrf_token)) {
+        http_response_code(403);
+        $error = 'Security check failed. Invalid request token.';
+    } else {
+        $submitted_username = $_POST['username'] ?? '';
+        $username = is_string($submitted_username) ? trim($submitted_username) : '';
+        $password = $_POST['password'] ?? '';
+        $source_ip = get_login_source_ip();
+        $rate_limit_key = build_login_rate_limit_key($username, $source_ip);
 
-    $lockout_time = 15 * 60; // 15 minutes
-    $max_attempts = 5;
-
-    if ($_SESSION['login_attempts'] >= $max_attempts) {
-        if (time() - $_SESSION['last_attempt_time'] < $lockout_time) {
-            $remaining = ceil(($lockout_time - (time() - $_SESSION['last_attempt_time'])) / 60);
-            $error = "Too many failed attempts. Please try again in {$remaining} minutes.";
+        if ($rate_limit_key === false) {
+            http_response_code(503);
+            $error = 'Unable to process the login request right now.';
         } else {
-            // Reset after lockout expires
-            $_SESSION['login_attempts'] = 0;
-            $_SESSION['last_attempt_time'] = time();
-        }
-    }
+            $rate_limit_state = login_rate_limit_check($conn, $rate_limit_key);
 
-    if (empty($error)) {
-        $csrf_token = $_POST['csrf_token'] ?? '';
-        if (!verify_csrf_token($csrf_token)) {
-            http_response_code(403);
-            $error = 'Security check failed. Invalid request token.';
-        } else {
-            $username = sanitize_input($_POST['username']);
-            $password = $_POST['password'];
-
-            $stmt = $conn->prepare("SELECT id, password, full_name, role FROM Staff WHERE username = ? AND is_active = 1");
-            if (!$stmt) {
-                error_log('Login query prepare failed: ' . $conn->error);
+            if ($rate_limit_state['status'] === 'error') {
+                http_response_code(503);
                 $error = 'Unable to process the login request right now.';
+            } elseif ($rate_limit_state['status'] === 'blocked') {
+                http_response_code(429);
+                header('Retry-After: ' . (int)$rate_limit_state['retry_after']);
+                $error = 'Too many login attempts. Please try again later.';
             } else {
-                $stmt->bind_param("s", $username);
-                if (!$stmt->execute()) {
-                    error_log('Login query execution failed: ' . $stmt->error);
-                    $error = 'Unable to process the login request right now.';
-                } else {
-                    $result = $stmt->get_result();
+                try {
+                    $stmt = $conn->prepare(
+                        "SELECT id, password, full_name, role
+                         FROM Staff
+                         WHERE username = ? AND is_active = 1
+                         LIMIT 1"
+                    );
 
-                    if ($result->num_rows === 1) {
-                        $user = $result->fetch_assoc();
-
-                        if (password_verify($password, $user['password'])) {
-                            // Secure session regeneration to prevent fixation
-                            session_regenerate_id(true);
-
-                            // Clear failed attempts
-                            unset($_SESSION['login_attempts']);
-                            unset($_SESSION['last_attempt_time']);
-
-                            $_SESSION['staff_id'] = $user['id'];
-                            $_SESSION['full_name'] = $user['full_name'];
-                            $_SESSION['role'] = $user['role'];
-                            $_SESSION['last_activity'] = time();
-
-                            // Refresh CSRF token for the active session
-                            unset($_SESSION['csrf_token']);
-                            generate_csrf_token();
-
-                            redirect('index.php');
-                        } else {
-                            $_SESSION['login_attempts']++;
-                            $_SESSION['last_attempt_time'] = time();
-                            $error = 'Invalid credentials';
-                        }
+                    if (!$stmt) {
+                        error_log('Login query prepare failed: ' . $conn->error);
+                        http_response_code(503);
+                        $error = 'Unable to process the login request right now.';
+                    } elseif (!$stmt->bind_param('s', $username)) {
+                        error_log('Login query bind failed: ' . $stmt->error);
+                        $stmt->close();
+                        http_response_code(503);
+                        $error = 'Unable to process the login request right now.';
+                    } elseif (!$stmt->execute()) {
+                        error_log('Login query execution failed: ' . $stmt->error);
+                        $stmt->close();
+                        http_response_code(503);
+                        $error = 'Unable to process the login request right now.';
                     } else {
-                        $_SESSION['login_attempts']++;
-                        $_SESSION['last_attempt_time'] = time();
-                        $error = 'Invalid credentials';
+                        $result = $stmt->get_result();
+                        if (!$result) {
+                            error_log('Login query result failed: ' . $stmt->error);
+                            $stmt->close();
+                            http_response_code(503);
+                            $error = 'Unable to process the login request right now.';
+                        } else {
+                            $user = $result->num_rows === 1 ? $result->fetch_assoc() : null;
+                            $result->free();
+                            $stmt->close();
+
+                            $credentials_valid = is_array($user)
+                                && is_string($password)
+                                && is_string($user['password'] ?? null)
+                                && password_verify($password, $user['password']);
+
+                            if ($credentials_valid) {
+                                if (!login_rate_limit_reset($conn, $rate_limit_key)) {
+                                    http_response_code(503);
+                                    $error = 'Unable to process the login request right now.';
+                                } elseif (!session_regenerate_id(true)) {
+                                    error_log('Login session regeneration failed.');
+                                    http_response_code(503);
+                                    $error = 'Unable to process the login request right now.';
+                                } else {
+                                    // Remove legacy session counters if an older session contains them.
+                                    unset($_SESSION['login_attempts'], $_SESSION['last_attempt_time']);
+
+                                    $_SESSION['staff_id'] = $user['id'];
+                                    $_SESSION['full_name'] = $user['full_name'];
+                                    $_SESSION['role'] = $user['role'];
+                                    $_SESSION['last_activity'] = time();
+
+                                    // Refresh CSRF token for the active session.
+                                    unset($_SESSION['csrf_token']);
+                                    generate_csrf_token();
+
+                                    redirect('index.php');
+                                }
+                            } else {
+                                $failure_state = login_rate_limit_record_failure($conn, $rate_limit_key);
+                                if ($failure_state['status'] === 'error') {
+                                    http_response_code(503);
+                                    $error = 'Unable to process the login request right now.';
+                                } elseif ($failure_state['status'] === 'blocked') {
+                                    http_response_code(429);
+                                    header('Retry-After: ' . (int)$failure_state['retry_after']);
+                                    $error = 'Too many login attempts. Please try again later.';
+                                } else {
+                                    $error = 'Invalid credentials';
+                                }
+                            }
+                        }
                     }
+                } catch (Throwable $exception) {
+                    error_log('Login database operation failed: ' . $exception->getMessage());
+                    if (isset($stmt) && $stmt instanceof mysqli_stmt) {
+                        $stmt->close();
+                    }
+                    http_response_code(503);
+                    $error = 'Unable to process the login request right now.';
                 }
-                $stmt->close();
             }
         }
     }
