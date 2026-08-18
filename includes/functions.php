@@ -527,24 +527,40 @@ function verify_login($redirect_on_failure = true)
         return $fail_authentication('The database connection is unavailable.');
     }
 
-    $stmt = $conn->prepare(
-        "SELECT id, full_name, role, is_active FROM Staff WHERE id = ? LIMIT 1"
-    );
+    $stmt = null;
+    try {
+        $stmt = $conn->prepare(
+            "SELECT id, full_name, role, is_active FROM Staff WHERE id = ? LIMIT 1"
+        );
 
-    if (!$stmt) {
-        error_log('Authentication staff lookup prepare failed: ' . $conn->error);
-        return $fail_authentication('The staff lookup could not be prepared.');
-    }
+        if (!$stmt) {
+            error_log('Authentication staff lookup prepare failed: ' . $conn->error);
+            return $fail_authentication('The staff lookup could not be prepared.');
+        }
 
-    $stmt->bind_param('i', $staff_id);
-    if (!$stmt->execute()) {
-        error_log('Authentication staff lookup failed: ' . $stmt->error);
-        $stmt->close();
+        if (!$stmt->bind_param('i', $staff_id)) {
+            error_log('Authentication staff lookup bind failed: ' . $stmt->error);
+            return $fail_authentication('The staff lookup could not be bound.');
+        }
+        if (!$stmt->execute()) {
+            error_log('Authentication staff lookup failed: ' . $stmt->error);
+            return $fail_authentication('The staff lookup failed.');
+        }
+
+        $result = $stmt->get_result();
+        if (!$result) {
+            error_log('Authentication staff lookup result failed: ' . $stmt->error);
+            return $fail_authentication('The staff lookup result failed.');
+        }
+        $staff = $result->fetch_assoc();
+    } catch (Throwable $exception) {
+        error_log('Authentication staff lookup failed: ' . $exception->getMessage());
         return $fail_authentication('The staff lookup failed.');
+    } finally {
+        if ($stmt instanceof mysqli_stmt) {
+            $stmt->close();
+        }
     }
-
-    $staff = $stmt->get_result()->fetch_assoc();
-    $stmt->close();
 
     if (
         !$staff
@@ -593,55 +609,64 @@ function get_all_products($conn)
             FROM Product p
             LEFT JOIN Category c ON p.category_id = c.id
             ORDER BY p.created_at DESC, p.id DESC";
-    $result = $conn->query($sql);
+    try {
+        $result = $conn->query($sql);
 
-    if (!$result) {
-        error_log('Product list query failed: ' . $conn->error);
+        if (!$result) {
+            error_log('Product list query failed: ' . $conn->error);
+            return [];
+        }
+
+        return $result->fetch_all(MYSQLI_ASSOC);
+    } catch (Throwable $exception) {
+        error_log('Product list query failed: ' . $exception->getMessage());
         return [];
     }
-
-    return $result->fetch_all(MYSQLI_ASSOC);
 }
 
 function count_products($conn, $search = '', $filter = '')
 {
-    $search_pattern = '';
-    $where_sql = build_product_filter_sql($search, $filter, $search_pattern);
-    $stmt = $conn->prepare(
-        "SELECT COUNT(*) AS total
-         FROM Product p
-         LEFT JOIN Category c ON p.category_id = c.id" . $where_sql
-    );
+    $stmt = null;
+    try {
+        $search_pattern = '';
+        $where_sql = build_product_filter_sql($search, $filter, $search_pattern);
+        $stmt = $conn->prepare(
+            "SELECT COUNT(*) AS total
+             FROM Product p
+             LEFT JOIN Category c ON p.category_id = c.id" . $where_sql
+        );
 
-    if (!$stmt) {
-        error_log('Product count prepare failed: ' . $conn->error);
-        return 0;
-    }
-
-    if ($search_pattern !== '') {
-        if (!$stmt->bind_param('sss', $search_pattern, $search_pattern, $search_pattern)) {
-            error_log('Product count bind failed: ' . $stmt->error);
-            $stmt->close();
+        if (!$stmt) {
+            error_log('Product count prepare failed: ' . $conn->error);
             return 0;
         }
-    }
 
-    if (!$stmt->execute()) {
-        error_log('Product count execute failed: ' . $stmt->error);
-        $stmt->close();
+        if ($search_pattern !== '' && !$stmt->bind_param('sss', $search_pattern, $search_pattern, $search_pattern)) {
+            error_log('Product count bind failed: ' . $stmt->error);
+            return 0;
+        }
+
+        if (!$stmt->execute()) {
+            error_log('Product count execute failed: ' . $stmt->error);
+            return 0;
+        }
+
+        $result = $stmt->get_result();
+        if (!$result) {
+            error_log('Product count result retrieval failed: ' . $stmt->error);
+            return 0;
+        }
+
+        $row = $result->fetch_assoc();
+        return $row ? max(0, (int)$row['total']) : 0;
+    } catch (Throwable $exception) {
+        error_log('Product count failed: ' . $exception->getMessage());
         return 0;
+    } finally {
+        if ($stmt instanceof mysqli_stmt) {
+            $stmt->close();
+        }
     }
-
-    $result = $stmt->get_result();
-    if (!$result) {
-        error_log('Product count result retrieval failed: ' . $stmt->error);
-        $stmt->close();
-        return 0;
-    }
-
-    $row = $result->fetch_assoc();
-    $stmt->close();
-    return $row ? max(0, (int)$row['total']) : 0;
 }
 
 function get_products_page($conn, $search = '', $filter = '', $limit = 25, $offset = 0)
@@ -653,60 +678,98 @@ function get_products_page($conn, $search = '', $filter = '', $limit = 25, $offs
         $limit = 25;
     }
 
-    $search_pattern = '';
-    $where_sql = build_product_filter_sql($search, $filter, $search_pattern);
-    $stmt = $conn->prepare(
-        "SELECT p.*, c.name as category_name
-         FROM Product p
-         LEFT JOIN Category c ON p.category_id = c.id" . $where_sql . "
-         ORDER BY p.created_at DESC, p.id DESC
-         LIMIT ? OFFSET ?"
-    );
+    $stmt = null;
+    try {
+        $search_pattern = '';
+        $where_sql = build_product_filter_sql($search, $filter, $search_pattern);
+        $stmt = $conn->prepare(
+            "SELECT p.*, c.name as category_name
+             FROM Product p
+             LEFT JOIN Category c ON p.category_id = c.id" . $where_sql . "
+             ORDER BY p.created_at DESC, p.id DESC
+             LIMIT ? OFFSET ?"
+        );
 
-    if (!$stmt) {
-        error_log('Product page prepare failed: ' . $conn->error);
-        return [];
-    }
-
-    if ($search_pattern !== '') {
-        if (!$stmt->bind_param('sssii', $search_pattern, $search_pattern, $search_pattern, $limit, $offset)) {
-            error_log('Product page bind failed: ' . $stmt->error);
-            $stmt->close();
+        if (!$stmt) {
+            error_log('Product page prepare failed: ' . $conn->error);
             return [];
         }
-    } elseif (!$stmt->bind_param('ii', $limit, $offset)) {
-        error_log('Product page bind failed: ' . $stmt->error);
-        $stmt->close();
-        return [];
-    }
 
-    if (!$stmt->execute()) {
-        error_log('Product page execute failed: ' . $stmt->error);
-        $stmt->close();
-        return [];
-    }
+        if ($search_pattern !== '') {
+            if (!$stmt->bind_param('sssii', $search_pattern, $search_pattern, $search_pattern, $limit, $offset)) {
+                error_log('Product page bind failed: ' . $stmt->error);
+                return [];
+            }
+        } elseif (!$stmt->bind_param('ii', $limit, $offset)) {
+            error_log('Product page bind failed: ' . $stmt->error);
+            return [];
+        }
 
-    $result = $stmt->get_result();
-    if (!$result) {
-        error_log('Product page result retrieval failed: ' . $stmt->error);
-        $stmt->close();
-        return [];
-    }
+        if (!$stmt->execute()) {
+            error_log('Product page execute failed: ' . $stmt->error);
+            return [];
+        }
 
-    $products = $result->fetch_all(MYSQLI_ASSOC);
-    $stmt->close();
-    return $products;
+        $result = $stmt->get_result();
+        if (!$result) {
+            error_log('Product page result retrieval failed: ' . $stmt->error);
+            return [];
+        }
+
+        return $result->fetch_all(MYSQLI_ASSOC);
+    } catch (Throwable $exception) {
+        error_log('Product page query failed: ' . $exception->getMessage());
+        return [];
+    } finally {
+        if ($stmt instanceof mysqli_stmt) {
+            $stmt->close();
+        }
+    }
 }
 
 function get_product_by_id($conn, $id)
 {
-    $stmt = $conn->prepare("SELECT p.*, c.name as category_name 
-                            FROM Product p 
-                            LEFT JOIN Category c ON p.category_id = c.id 
-                            WHERE p.id = ?");
-    $stmt->bind_param("i", $id);
-    $stmt->execute();
-    return $stmt->get_result()->fetch_assoc();
+    $id = (int)$id;
+    if ($id <= 0) {
+        return null;
+    }
+
+    $stmt = null;
+    try {
+        $stmt = $conn->prepare(
+            "SELECT p.*, c.name as category_name
+             FROM Product p
+             LEFT JOIN Category c ON p.category_id = c.id
+             WHERE p.id = ?"
+        );
+        if (!$stmt) {
+            error_log('Product lookup prepare failed: ' . $conn->error);
+            return null;
+        }
+        if (!$stmt->bind_param('i', $id)) {
+            error_log('Product lookup bind failed: ' . $stmt->error);
+            return null;
+        }
+        if (!$stmt->execute()) {
+            error_log('Product lookup execute failed: ' . $stmt->error);
+            return null;
+        }
+
+        $result = $stmt->get_result();
+        if (!$result) {
+            error_log('Product lookup result failed: ' . $stmt->error);
+            return null;
+        }
+
+        return $result->fetch_assoc() ?: null;
+    } catch (Throwable $exception) {
+        error_log('Product lookup failed: ' . $exception->getMessage());
+        return null;
+    } finally {
+        if ($stmt instanceof mysqli_stmt) {
+            $stmt->close();
+        }
+    }
 }
 
 function get_low_stock_products($conn)
@@ -716,111 +779,197 @@ function get_low_stock_products($conn)
             LEFT JOIN Category c ON p.category_id = c.id 
             WHERE p.stock <= p.alert_threshold 
             ORDER BY p.stock ASC, p.name ASC";
-    $result = $conn->query($sql);
-    return $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
+    try {
+        $result = $conn->query($sql);
+        if (!$result) {
+            error_log('Low-stock product query failed: ' . $conn->error);
+            return [];
+        }
+
+        return $result->fetch_all(MYSQLI_ASSOC);
+    } catch (Throwable $exception) {
+        error_log('Low-stock product query failed: ' . $exception->getMessage());
+        return [];
+    }
 }
 
 function log_stock_movement($conn, $product_id, $staff_id, $quantity, $movement_type, $reason = null)
 {
-    $stmt = $conn->prepare("INSERT INTO `StockMovement` (product_id, staff_id, quantity, movement_type, reason) VALUES (?, ?, ?, ?, ?)");
-    if (!$stmt) {
-        error_log('Stock movement prepare failed: ' . $conn->error);
-        return false;
-    }
+    $stmt = null;
+    try {
+        $stmt = $conn->prepare(
+            "INSERT INTO `StockMovement`
+                (product_id, staff_id, quantity, movement_type, reason)
+             VALUES (?, ?, ?, ?, ?)"
+        );
+        if (!$stmt) {
+            error_log('Stock movement prepare failed: ' . $conn->error);
+            return false;
+        }
 
-    if (!$stmt->bind_param("iiiss", $product_id, $staff_id, $quantity, $movement_type, $reason)) {
-        error_log('Stock movement bind failed: ' . $stmt->error);
-        $stmt->close();
+        if (!$stmt->bind_param('iiiss', $product_id, $staff_id, $quantity, $movement_type, $reason)) {
+            error_log('Stock movement bind failed: ' . $stmt->error);
+            return false;
+        }
+        if (!$stmt->execute()) {
+            error_log('Stock movement insert failed: ' . $stmt->error);
+            return false;
+        }
+        if ($stmt->affected_rows !== 1) {
+            error_log('Stock movement insert affected an unexpected number of rows.');
+            return false;
+        }
+        return true;
+    } catch (Throwable $exception) {
+        error_log('Stock movement insert failed: ' . $exception->getMessage());
         return false;
+    } finally {
+        if ($stmt instanceof mysqli_stmt) {
+            $stmt->close();
+        }
     }
-
-    $result = $stmt->execute();
-    if (!$result) {
-        error_log('Stock movement insert failed: ' . $stmt->error);
-    } elseif ($stmt->affected_rows !== 1) {
-        error_log('Stock movement insert affected an unexpected number of rows.');
-        $result = false;
-    }
-    $stmt->close();
-    return $result;
 }
 
 function get_stock_movements($conn, $product_id = null)
 {
     if ($product_id !== null) {
-        $stmt = $conn->prepare("SELECT sm.*, p.name as product_name, s.full_name as staff_name 
-                               FROM `StockMovement` sm
-                               JOIN Product p ON sm.product_id = p.id
-                               JOIN Staff s ON sm.staff_id = s.id
-                               WHERE sm.product_id = ?
-                               ORDER BY sm.created_at DESC, sm.id DESC");
-        if (!$stmt) {
+        $stmt = null;
+        try {
+            $stmt = $conn->prepare(
+                "SELECT sm.*, p.name as product_name, s.full_name as staff_name
+                 FROM `StockMovement` sm
+                 JOIN Product p ON sm.product_id = p.id
+                 JOIN Staff s ON sm.staff_id = s.id
+                 WHERE sm.product_id = ?
+                 ORDER BY sm.created_at DESC, sm.id DESC"
+            );
+            if (!$stmt) {
+                error_log('Scoped stock movement prepare failed: ' . $conn->error);
+                return [];
+            }
+            if (!$stmt->bind_param('i', $product_id)) {
+                error_log('Scoped stock movement bind failed: ' . $stmt->error);
+                return [];
+            }
+            if (!$stmt->execute()) {
+                error_log('Scoped stock movement execute failed: ' . $stmt->error);
+                return [];
+            }
+            $result = $stmt->get_result();
+            if (!$result) {
+                error_log('Scoped stock movement result failed: ' . $stmt->error);
+                return [];
+            }
+            return $result->fetch_all(MYSQLI_ASSOC);
+        } catch (Throwable $exception) {
+            error_log('Scoped stock movement query failed: ' . $exception->getMessage());
             return [];
+        } finally {
+            if ($stmt instanceof mysqli_stmt) {
+                $stmt->close();
+            }
         }
-        $stmt->bind_param("i", $product_id);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        $data = $result->fetch_all(MYSQLI_ASSOC);
-        $stmt->close();
-        return $data;
     } else {
         $sql = "SELECT sm.*, p.name as product_name, s.full_name as staff_name 
                 FROM `StockMovement` sm
                 JOIN Product p ON sm.product_id = p.id
                 JOIN Staff s ON sm.staff_id = s.id
                 ORDER BY sm.created_at DESC, sm.id DESC";
-        $result = $conn->query($sql);
-        if (!$result) {
+        try {
+            $result = $conn->query($sql);
+            if (!$result) {
+                error_log('Stock movement query failed: ' . $conn->error);
+                return [];
+            }
+            return $result->fetch_all(MYSQLI_ASSOC);
+        } catch (Throwable $exception) {
+            error_log('Stock movement query failed: ' . $exception->getMessage());
             return [];
         }
-        return $result->fetch_all(MYSQLI_ASSOC);
     }
 }
 
 function create_product($conn, $staff_id, $name, $description, $price, $stock, $image_path = null, $alert_threshold = 10, $category_id = null, $barcode = null)
 {
-    $conn->begin_transaction();
+    $transaction_started = false;
+    $stmt = null;
+
     try {
+        if (!$conn->begin_transaction()) {
+            error_log('create_product failed: unable to start transaction.');
+            return false;
+        }
+        $transaction_started = true;
+
         if ($category_id === null) {
-            $gen_stmt = $conn->query("SELECT id FROM Category WHERE name = 'General' LIMIT 1");
-            if ($gen_stmt && $gen_stmt->num_rows > 0) {
-                $category_id = intval($gen_stmt->fetch_assoc()['id']);
+            $general_result = $conn->query("SELECT id FROM Category WHERE name = 'General' LIMIT 1");
+            if (!$general_result) {
+                throw new Exception('Failed to load default category.');
             }
+            if ($general_result->num_rows > 0) {
+                $category_id = (int)$general_result->fetch_assoc()['id'];
+            }
+            $general_result->free();
         } else {
-            $category_id = intval($category_id);
+            $category_id = (int)$category_id;
         }
 
         // Clean empty barcode strings to NULL to avoid unique constraint violations
-        if (empty(trim($barcode))) {
+        if (empty(trim((string)$barcode))) {
             $barcode = null;
         } else {
-            $barcode = trim($barcode);
+            $barcode = trim((string)$barcode);
         }
 
-        $stmt = $conn->prepare("INSERT INTO Product (name, description, price, stock, image_path, alert_threshold, category_id, barcode) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt = $conn->prepare(
+            "INSERT INTO Product
+                (name, description, price, stock, image_path, alert_threshold, category_id, barcode)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+        );
         if (!$stmt) {
-            throw new Exception("Failed to prepare statement");
+            throw new Exception('Failed to prepare product insertion.');
         }
-        $stmt->bind_param("ssdisiis", $name, $description, $price, $stock, $image_path, $alert_threshold, $category_id, $barcode);
+        if (!$stmt->bind_param("ssdisiis", $name, $description, $price, $stock, $image_path, $alert_threshold, $category_id, $barcode)) {
+            throw new Exception('Failed to bind product insertion.');
+        }
         if (!$stmt->execute()) {
-            throw new Exception("Product insertion failed");
+            throw new Exception('Product insertion failed.');
+        }
+        if ($stmt->affected_rows !== 1) {
+            throw new Exception('Product insertion affected an unexpected number of rows.');
         }
         $product_id = $conn->insert_id;
+        if ($product_id <= 0) {
+            throw new Exception('Product ID was not created.');
+        }
         $stmt->close();
+        $stmt = null;
 
         if ($stock != 0) {
             if (!log_stock_movement($conn, $product_id, $staff_id, $stock, 'manual_adjustment', 'Initial stock allocation')) {
-                throw new Exception("Stock movement logging failed");
+                throw new Exception('Stock movement logging failed.');
             }
         }
 
         if (!$conn->commit()) {
-            throw new Exception("Product creation commit failed");
+            throw new Exception('Product creation commit failed.');
         }
+        $transaction_started = false;
         return true;
-    } catch (Exception $e) {
-        $conn->rollback();
-        error_log("create_product failed: " . $e->getMessage());
+    } catch (Throwable $e) {
+        if ($stmt instanceof mysqli_stmt) {
+            $stmt->close();
+        }
+        if ($transaction_started) {
+            try {
+                if (!$conn->rollback()) {
+                    error_log('create_product rollback failed: ' . $conn->error);
+                }
+            } catch (Throwable $rollback_exception) {
+                error_log('create_product rollback failed: ' . $rollback_exception->getMessage());
+            }
+        }
+        error_log('create_product failed: ' . $e->getMessage());
         return false;
     }
 }
@@ -836,11 +985,18 @@ function update_product($conn, $staff_id, $id, $name, $description, $price, $sto
         return false;
     }
 
-    if (!$conn->begin_transaction()) {
-        error_log('update_product failed: unable to start transaction.');
+    try {
+        if (!$conn->begin_transaction()) {
+            error_log('update_product failed: unable to start transaction.');
+            return false;
+        }
+    } catch (Throwable $exception) {
+        error_log('update_product transaction start failed: ' . $exception->getMessage());
         return false;
     }
 
+    $product_stmt = null;
+    $stmt = null;
     try {
         $product_stmt = $conn->prepare("SELECT stock FROM Product WHERE id = ? FOR UPDATE");
         if (!$product_stmt) {
@@ -859,6 +1015,7 @@ function update_product($conn, $staff_id, $id, $name, $description, $price, $sto
         }
         $product = $product_result->fetch_assoc();
         $product_stmt->close();
+        $product_stmt = null;
 
         if (!$product) {
             throw new Exception("Product not found");
@@ -881,15 +1038,16 @@ function update_product($conn, $staff_id, $id, $name, $description, $price, $sto
             if ($gen_stmt->num_rows > 0) {
                 $category_id = intval($gen_stmt->fetch_assoc()['id']);
             }
+            $gen_stmt->free();
         } else {
             $category_id = intval($category_id);
         }
 
         // Clean empty barcode strings to NULL to avoid unique constraint violations
-        if (empty(trim($barcode))) {
+        if (empty(trim((string)$barcode))) {
             $barcode = null;
         } else {
-            $barcode = trim($barcode);
+            $barcode = trim((string)$barcode);
         }
 
         if ($image_path) {
@@ -917,6 +1075,7 @@ function update_product($conn, $staff_id, $id, $name, $description, $price, $sto
             throw new Exception("Product update affected an unexpected number of rows");
         }
         $stmt->close();
+        $stmt = null;
 
         if ($delta != 0) {
             $reason = "Manual stock adjustment (from " . $old_stock . " to " . $stock . ")";
@@ -930,8 +1089,18 @@ function update_product($conn, $staff_id, $id, $name, $description, $price, $sto
         }
         return true;
     } catch (Throwable $e) {
-        if (!$conn->rollback()) {
-            error_log('update_product rollback failed: ' . $conn->error);
+        if ($product_stmt instanceof mysqli_stmt) {
+            $product_stmt->close();
+        }
+        if ($stmt instanceof mysqli_stmt) {
+            $stmt->close();
+        }
+        try {
+            if (!$conn->rollback()) {
+                error_log('update_product rollback failed: ' . $conn->error);
+            }
+        } catch (Throwable $rollback_exception) {
+            error_log('update_product rollback failed: ' . $rollback_exception->getMessage());
         }
         error_log("update_product failed: " . $e->getMessage());
         return false;
@@ -945,11 +1114,21 @@ function delete_product($conn, $id)
         return false;
     }
 
-    if (!$conn->begin_transaction()) {
-        error_log('delete_product failed: unable to start transaction.');
+    try {
+        if (!$conn->begin_transaction()) {
+            error_log('delete_product failed: unable to start transaction.');
+            return false;
+        }
+    } catch (Throwable $exception) {
+        error_log('delete_product transaction start failed: ' . $exception->getMessage());
         return false;
     }
 
+    $transaction_started = true;
+    $product_stmt = null;
+    $order_detail_stmt = null;
+    $movement_stmt = null;
+    $delete_stmt = null;
     try {
         $product_stmt = $conn->prepare("SELECT id FROM Product WHERE id = ? FOR UPDATE");
         if (!$product_stmt) {
@@ -970,6 +1149,7 @@ function delete_product($conn, $id)
             throw new Exception("Product not found");
         }
         $product_stmt->close();
+        $product_stmt = null;
 
         $order_detail_stmt = $conn->prepare("SELECT id FROM OrderDetail WHERE product_id = ? LIMIT 1");
         if (!$order_detail_stmt) {
@@ -987,6 +1167,7 @@ function delete_product($conn, $id)
         }
         $has_order_history = $order_detail_result->num_rows > 0;
         $order_detail_stmt->close();
+        $order_detail_stmt = null;
         if ($has_order_history) {
             throw new Exception("Product has historical order details");
         }
@@ -1007,6 +1188,7 @@ function delete_product($conn, $id)
         }
         $has_stock_history = $movement_result->num_rows > 0;
         $movement_stmt->close();
+        $movement_stmt = null;
         if ($has_stock_history) {
             throw new Exception("Product has historical stock movements");
         }
@@ -1025,14 +1207,27 @@ function delete_product($conn, $id)
             throw new Exception("Product deletion affected an unexpected number of rows");
         }
         $delete_stmt->close();
+        $delete_stmt = null;
 
         if (!$conn->commit()) {
             throw new Exception("Failed to commit product deletion");
         }
+        $transaction_started = false;
         return true;
     } catch (Throwable $e) {
-        if (!$conn->rollback()) {
-            error_log('delete_product rollback failed: ' . $conn->error);
+        foreach ([$product_stmt, $order_detail_stmt, $movement_stmt, $delete_stmt] as $open_stmt) {
+            if ($open_stmt instanceof mysqli_stmt) {
+                $open_stmt->close();
+            }
+        }
+        if ($transaction_started) {
+            try {
+                if (!$conn->rollback()) {
+                    error_log('delete_product rollback failed: ' . $conn->error);
+                }
+            } catch (Throwable $rollback_exception) {
+                error_log('delete_product rollback failed: ' . $rollback_exception->getMessage());
+            }
         }
         error_log("delete_product failed: " . $e->getMessage());
         return false;
@@ -1105,10 +1300,23 @@ function create_order($conn, $staff_id, $items, $order_type = 'sale', $customer_
         return false;
     }
 
-    if (!$conn->begin_transaction()) {
-        error_log('create_order failed: unable to start transaction.');
+    try {
+        if (!$conn->begin_transaction()) {
+            error_log('create_order failed: unable to start transaction.');
+            return false;
+        }
+    } catch (Throwable $exception) {
+        error_log('create_order transaction start failed: ' . $exception->getMessage());
         return false;
     }
+
+    $transaction_started = true;
+    $staff_stmt = null;
+    $party_stmt = null;
+    $product_stmt = null;
+    $order_stmt = null;
+    $detail_stmt = null;
+    $stock_stmt = null;
 
     try {
         $staff_stmt = $conn->prepare(
@@ -1129,6 +1337,7 @@ function create_order($conn, $staff_id, $items, $order_type = 'sale', $customer_
         }
         $staff_record = $staff_result->fetch_assoc();
         $staff_stmt->close();
+        $staff_stmt = null;
 
         if (
             !$staff_record
@@ -1159,6 +1368,7 @@ function create_order($conn, $staff_id, $items, $order_type = 'sale', $customer_
             throw new Exception('Selected party does not exist.');
         }
         $party_stmt->close();
+        $party_stmt = null;
 
         $product_stmt = $conn->prepare(
             "SELECT id, price, stock FROM Product WHERE id = ? FOR UPDATE"
@@ -1227,6 +1437,7 @@ function create_order($conn, $staff_id, $items, $order_type = 'sale', $customer_
             ];
         }
         $product_stmt->close();
+        $product_stmt = null;
 
         foreach ($locked_items as $locked_item) {
             if ($locked_item['new_stock'] < 0 || $locked_item['new_stock'] > $max_stock) {
@@ -1268,6 +1479,7 @@ function create_order($conn, $staff_id, $items, $order_type = 'sale', $customer_
             throw new Exception('Order ID was not created.');
         }
         $order_stmt->close();
+        $order_stmt = null;
 
         $detail_stmt = $conn->prepare(
             "INSERT INTO OrderDetail (order_id, product_id, quantity, unit_price, subtotal) VALUES (?, ?, ?, ?, ?)"
@@ -1337,17 +1549,31 @@ function create_order($conn, $staff_id, $items, $order_type = 'sale', $customer_
         }
 
         $detail_stmt->close();
+        $detail_stmt = null;
         $stock_stmt->close();
+        $stock_stmt = null;
 
         if (!$conn->commit()) {
             throw new Exception('Failed to commit order transaction.');
         }
+        $transaction_started = false;
         return $order_id;
     } catch (Throwable $e) {
-        if (!$conn->rollback()) {
-            error_log('create_order rollback failed: ' . $conn->error);
+        foreach ([$staff_stmt, $party_stmt, $product_stmt, $order_stmt, $detail_stmt, $stock_stmt] as $open_stmt) {
+            if ($open_stmt instanceof mysqli_stmt) {
+                $open_stmt->close();
+            }
         }
-        error_log("CRITICAL ORDER ERROR: " . $e->getMessage());
+        if ($transaction_started) {
+            try {
+                if (!$conn->rollback()) {
+                    error_log('create_order rollback failed: ' . $conn->error);
+                }
+            } catch (Throwable $rollback_exception) {
+                error_log('create_order rollback failed: ' . $rollback_exception->getMessage());
+            }
+        }
+        error_log('create_order failed: ' . $e->getMessage());
         return false;
     }
 }
@@ -1360,7 +1586,17 @@ function get_orders($conn)
             LEFT JOIN Customer c ON o.customer_id = c.id
             LEFT JOIN Supplier sup ON o.supplier_id = sup.id
             ORDER BY o.order_date DESC";
-    return $conn->query($sql)->fetch_all(MYSQLI_ASSOC);
+    try {
+        $result = $conn->query($sql);
+        if (!$result) {
+            error_log('Order list query failed: ' . $conn->error);
+            return [];
+        }
+        return $result->fetch_all(MYSQLI_ASSOC);
+    } catch (Throwable $exception) {
+        error_log('Order list query failed: ' . $exception->getMessage());
+        return [];
+    }
 }
 
 function get_orders_for_staff($conn, $staff_id)
@@ -1370,38 +1606,43 @@ function get_orders_for_staff($conn, $staff_id)
         return [];
     }
 
-    $stmt = $conn->prepare(
-        "SELECT o.*, s.full_name as staff_name, c.name as customer_name, sup.name as supplier_name
-         FROM `Order` o
-         JOIN Staff s ON o.staff_id = s.id
-         LEFT JOIN Customer c ON o.customer_id = c.id
-         LEFT JOIN Supplier sup ON o.supplier_id = sup.id
-         WHERE o.staff_id = ?
-         ORDER BY o.order_date DESC"
-    );
-    if (!$stmt) {
-        error_log('Scoped order list prepare failed: ' . $conn->error);
+    $stmt = null;
+    try {
+        $stmt = $conn->prepare(
+            "SELECT o.*, s.full_name as staff_name, c.name as customer_name, sup.name as supplier_name
+             FROM `Order` o
+             JOIN Staff s ON o.staff_id = s.id
+             LEFT JOIN Customer c ON o.customer_id = c.id
+             LEFT JOIN Supplier sup ON o.supplier_id = sup.id
+             WHERE o.staff_id = ?
+             ORDER BY o.order_date DESC"
+        );
+        if (!$stmt) {
+            error_log('Scoped order list prepare failed: ' . $conn->error);
+            return [];
+        }
+        if (!$stmt->bind_param('i', $staff_id)) {
+            error_log('Scoped order list bind failed: ' . $stmt->error);
+            return [];
+        }
+        if (!$stmt->execute()) {
+            error_log('Scoped order list execute failed: ' . $stmt->error);
+            return [];
+        }
+        $result = $stmt->get_result();
+        if (!$result) {
+            error_log('Scoped order list result failed: ' . $stmt->error);
+            return [];
+        }
+        return $result->fetch_all(MYSQLI_ASSOC);
+    } catch (Throwable $exception) {
+        error_log('Scoped order list query failed: ' . $exception->getMessage());
         return [];
+    } finally {
+        if ($stmt instanceof mysqli_stmt) {
+            $stmt->close();
+        }
     }
-    if (!$stmt->bind_param('i', $staff_id)) {
-        error_log('Scoped order list bind failed: ' . $stmt->error);
-        $stmt->close();
-        return [];
-    }
-    if (!$stmt->execute()) {
-        error_log('Scoped order list execute failed: ' . $stmt->error);
-        $stmt->close();
-        return [];
-    }
-    $result = $stmt->get_result();
-    if (!$result) {
-        error_log('Scoped order list result failed: ' . $stmt->error);
-        $stmt->close();
-        return [];
-    }
-    $orders = $result->fetch_all(MYSQLI_ASSOC);
-    $stmt->close();
-    return $orders;
 }
 
 function get_order_by_id($conn, $order_id, $staff_id = null)
@@ -1427,36 +1668,40 @@ function get_order_by_id($conn, $order_id, $staff_id = null)
         $sql .= " AND o.staff_id = ?";
     }
 
-    $stmt = $conn->prepare($sql);
-    if (!$stmt) {
-        error_log('Order lookup prepare failed: ' . $conn->error);
-        return null;
-    }
-    if ($staff_id === null) {
-        if (!$stmt->bind_param('i', $order_id)) {
-            error_log('Order lookup bind failed: ' . $stmt->error);
-            $stmt->close();
+    $stmt = null;
+    try {
+        $stmt = $conn->prepare($sql);
+        if (!$stmt) {
+            error_log('Order lookup prepare failed: ' . $conn->error);
             return null;
         }
-    } elseif (!$stmt->bind_param('ii', $order_id, $staff_id)) {
-        error_log('Scoped order lookup bind failed: ' . $stmt->error);
-        $stmt->close();
+        if ($staff_id === null) {
+            if (!$stmt->bind_param('i', $order_id)) {
+                error_log('Order lookup bind failed: ' . $stmt->error);
+                return null;
+            }
+        } elseif (!$stmt->bind_param('ii', $order_id, $staff_id)) {
+            error_log('Scoped order lookup bind failed: ' . $stmt->error);
+            return null;
+        }
+        if (!$stmt->execute()) {
+            error_log('Order lookup execute failed: ' . $stmt->error);
+            return null;
+        }
+        $result = $stmt->get_result();
+        if (!$result) {
+            error_log('Order lookup result failed: ' . $stmt->error);
+            return null;
+        }
+        return $result->fetch_assoc() ?: null;
+    } catch (Throwable $exception) {
+        error_log('Order lookup failed: ' . $exception->getMessage());
         return null;
+    } finally {
+        if ($stmt instanceof mysqli_stmt) {
+            $stmt->close();
+        }
     }
-    if (!$stmt->execute()) {
-        error_log('Order lookup execute failed: ' . $stmt->error);
-        $stmt->close();
-        return null;
-    }
-    $result = $stmt->get_result();
-    if (!$result) {
-        error_log('Order lookup result failed: ' . $stmt->error);
-        $stmt->close();
-        return null;
-    }
-    $res = $result->fetch_assoc();
-    $stmt->close();
-    return $res;
 }
 
 function get_order_details($conn, $order_id, $staff_id = null)
@@ -1482,36 +1727,40 @@ function get_order_details($conn, $order_id, $staff_id = null)
                 WHERE od.order_id = ? AND o.staff_id = ?";
     }
 
-    $stmt = $conn->prepare($sql);
-    if (!$stmt) {
-        error_log('Order detail lookup prepare failed: ' . $conn->error);
-        return [];
-    }
-    if ($staff_id === null) {
-        if (!$stmt->bind_param('i', $order_id)) {
-            error_log('Order detail lookup bind failed: ' . $stmt->error);
-            $stmt->close();
+    $stmt = null;
+    try {
+        $stmt = $conn->prepare($sql);
+        if (!$stmt) {
+            error_log('Order detail lookup prepare failed: ' . $conn->error);
             return [];
         }
-    } elseif (!$stmt->bind_param('ii', $order_id, $staff_id)) {
-        error_log('Scoped order detail lookup bind failed: ' . $stmt->error);
-        $stmt->close();
+        if ($staff_id === null) {
+            if (!$stmt->bind_param('i', $order_id)) {
+                error_log('Order detail lookup bind failed: ' . $stmt->error);
+                return [];
+            }
+        } elseif (!$stmt->bind_param('ii', $order_id, $staff_id)) {
+            error_log('Scoped order detail lookup bind failed: ' . $stmt->error);
+            return [];
+        }
+        if (!$stmt->execute()) {
+            error_log('Order detail lookup execute failed: ' . $stmt->error);
+            return [];
+        }
+        $result = $stmt->get_result();
+        if (!$result) {
+            error_log('Order detail lookup result failed: ' . $stmt->error);
+            return [];
+        }
+        return $result->fetch_all(MYSQLI_ASSOC);
+    } catch (Throwable $exception) {
+        error_log('Order detail lookup failed: ' . $exception->getMessage());
         return [];
+    } finally {
+        if ($stmt instanceof mysqli_stmt) {
+            $stmt->close();
+        }
     }
-    if (!$stmt->execute()) {
-        error_log('Order detail lookup execute failed: ' . $stmt->error);
-        $stmt->close();
-        return [];
-    }
-    $result = $stmt->get_result();
-    if (!$result) {
-        error_log('Order detail lookup result failed: ' . $stmt->error);
-        $stmt->close();
-        return [];
-    }
-    $res = $result->fetch_all(MYSQLI_ASSOC);
-    $stmt->close();
-    return $res;
 }
 
 function get_dashboard_stats($conn, $staff_id = null)
@@ -1523,55 +1772,81 @@ function get_dashboard_stats($conn, $staff_id = null)
         'total_stock'    => 0
     ];
 
-    $result = $conn->query("SELECT COUNT(*) as count FROM Product");
-    if ($result) {
-        $stats['total_products'] = (int) $result->fetch_assoc()['count'];
-    }
-
-    if ($staff_id === null) {
-        $result = $conn->query("SELECT COUNT(*) as count FROM `Order`");
+    try {
+        $result = $conn->query("SELECT COUNT(*) as count FROM Product");
         if ($result) {
-            $stats['total_orders'] = (int) $result->fetch_assoc()['count'];
+            $stats['total_products'] = (int) $result->fetch_assoc()['count'];
+        } else {
+            error_log('Dashboard product count query failed: ' . $conn->error);
         }
 
-        // Only count revenue from SALES, not purchases.
-        $result = $conn->query("SELECT COALESCE(SUM(total_amount), 0) as total FROM `Order` WHERE order_type = 'sale'");
+        if ($staff_id === null) {
+            $result = $conn->query("SELECT COUNT(*) as count FROM `Order`");
+            if ($result) {
+                $stats['total_orders'] = (int) $result->fetch_assoc()['count'];
+            } else {
+                error_log('Dashboard order count query failed: ' . $conn->error);
+            }
+
+            // Only count revenue from SALES, not purchases.
+            $result = $conn->query("SELECT COALESCE(SUM(total_amount), 0) as total FROM `Order` WHERE order_type = 'sale'");
+            if ($result) {
+                $stats['total_sales'] = (float) $result->fetch_assoc()['total'];
+            } else {
+                error_log('Dashboard sales total query failed: ' . $conn->error);
+            }
+        } else {
+            // Cashier dashboards must not aggregate another staff member's orders.
+            $staff_id = (int)$staff_id;
+
+            $stmt = $conn->prepare("SELECT COUNT(*) as count FROM `Order` WHERE staff_id = ?");
+            if ($stmt) {
+                if (!$stmt->bind_param('i', $staff_id)) {
+                    error_log('Dashboard scoped order count bind failed: ' . $stmt->error);
+                } elseif (!$stmt->execute()) {
+                    error_log('Dashboard scoped order count execute failed: ' . $stmt->error);
+                } else {
+                    $result = $stmt->get_result();
+                    if ($result) {
+                        $stats['total_orders'] = (int)$result->fetch_assoc()['count'];
+                    } else {
+                        error_log('Dashboard scoped order count result failed: ' . $stmt->error);
+                    }
+                }
+                $stmt->close();
+            } else {
+                error_log('Dashboard scoped order count prepare failed: ' . $conn->error);
+            }
+
+            // Only count this cashier's sales, not purchases or other staff orders.
+            $stmt = $conn->prepare("SELECT COALESCE(SUM(total_amount), 0) as total FROM `Order` WHERE order_type = 'sale' AND staff_id = ?");
+            if ($stmt) {
+                if (!$stmt->bind_param('i', $staff_id)) {
+                    error_log('Dashboard scoped sales total bind failed: ' . $stmt->error);
+                } elseif (!$stmt->execute()) {
+                    error_log('Dashboard scoped sales total execute failed: ' . $stmt->error);
+                } else {
+                    $result = $stmt->get_result();
+                    if ($result) {
+                        $stats['total_sales'] = (float)$result->fetch_assoc()['total'];
+                    } else {
+                        error_log('Dashboard scoped sales total result failed: ' . $stmt->error);
+                    }
+                }
+                $stmt->close();
+            } else {
+                error_log('Dashboard scoped sales total prepare failed: ' . $conn->error);
+            }
+        }
+
+        $result = $conn->query("SELECT COALESCE(SUM(stock), 0) as total FROM Product");
         if ($result) {
-            $stats['total_sales'] = (float) $result->fetch_assoc()['total'];
+            $stats['total_stock'] = (int) $result->fetch_assoc()['total'];
+        } else {
+            error_log('Dashboard stock total query failed: ' . $conn->error);
         }
-    } else {
-        // Cashier dashboards must not aggregate another staff member's orders.
-        $staff_id = (int)$staff_id;
-
-        $stmt = $conn->prepare("SELECT COUNT(*) as count FROM `Order` WHERE staff_id = ?");
-        if ($stmt) {
-            $stmt->bind_param('i', $staff_id);
-            if ($stmt->execute()) {
-                $result = $stmt->get_result();
-                if ($result) {
-                    $stats['total_orders'] = (int)$result->fetch_assoc()['count'];
-                }
-            }
-            $stmt->close();
-        }
-
-        // Only count this cashier's sales, not purchases or other staff orders.
-        $stmt = $conn->prepare("SELECT COALESCE(SUM(total_amount), 0) as total FROM `Order` WHERE order_type = 'sale' AND staff_id = ?");
-        if ($stmt) {
-            $stmt->bind_param('i', $staff_id);
-            if ($stmt->execute()) {
-                $result = $stmt->get_result();
-                if ($result) {
-                    $stats['total_sales'] = (float)$result->fetch_assoc()['total'];
-                }
-            }
-            $stmt->close();
-        }
-    }
-
-    $result = $conn->query("SELECT COALESCE(SUM(stock), 0) as total FROM Product");
-    if ($result) {
-        $stats['total_stock'] = (int) $result->fetch_assoc()['total'];
+    } catch (Throwable $exception) {
+        error_log('Dashboard stats query failed: ' . $exception->getMessage());
     }
 
     return $stats;
@@ -1913,30 +2188,50 @@ function get_chart_data($conn, $days = 7, $staff_id = null)
     $query .= " GROUP BY DATE(order_date), order_type
                 ORDER BY DATE(order_date) ASC";
               
-    $stmt = $conn->prepare($query);
-    if ($stmt) {
+    $stmt = null;
+    try {
+        $stmt = $conn->prepare($query);
+        if (!$stmt) {
+            error_log('Chart data prepare failed: ' . $conn->error);
+            return array_values($data);
+        }
         if ($staff_id === null) {
-            $stmt->bind_param("i", $days);
+            if (!$stmt->bind_param('i', $days)) {
+                error_log('Chart data bind failed: ' . $stmt->error);
+                return array_values($data);
+            }
         } else {
             $staff_id = (int)$staff_id;
-            $stmt->bind_param("ii", $days, $staff_id);
+            if (!$stmt->bind_param('ii', $days, $staff_id)) {
+                error_log('Scoped chart data bind failed: ' . $stmt->error);
+                return array_values($data);
+            }
         }
-        if ($stmt->execute()) {
-            $result = $stmt->get_result();
-            if ($result) {
-                while ($row = $result->fetch_assoc()) {
-                    $day = $row['order_day'];
-                    if (isset($data[$day])) {
-                        if ($row['order_type'] === 'sale') {
-                            $data[$day]['sales'] = floatval($row['total']);
-                        } else if ($row['order_type'] === 'purchase') {
-                            $data[$day]['purchases'] = floatval($row['total']);
-                        }
-                    }
+        if (!$stmt->execute()) {
+            error_log('Chart data execute failed: ' . $stmt->error);
+            return array_values($data);
+        }
+        $result = $stmt->get_result();
+        if (!$result) {
+            error_log('Chart data result failed: ' . $stmt->error);
+            return array_values($data);
+        }
+        while ($row = $result->fetch_assoc()) {
+            $day = $row['order_day'];
+            if (isset($data[$day])) {
+                if ($row['order_type'] === 'sale') {
+                    $data[$day]['sales'] = floatval($row['total']);
+                } else if ($row['order_type'] === 'purchase') {
+                    $data[$day]['purchases'] = floatval($row['total']);
                 }
             }
         }
-        $stmt->close();
+    } catch (Throwable $exception) {
+        error_log('Chart data query failed: ' . $exception->getMessage());
+    } finally {
+        if ($stmt instanceof mysqli_stmt) {
+            $stmt->close();
+        }
     }
     
     return array_values($data);
@@ -1975,8 +2270,17 @@ function require_admin()
 function get_staff_members($conn)
 {
     $sql = "SELECT id, username, full_name, role, is_active, created_at FROM Staff ORDER BY created_at DESC";
-    $result = $conn->query($sql);
-    return $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
+    try {
+        $result = $conn->query($sql);
+        if (!$result) {
+            error_log('Staff list query failed: ' . $conn->error);
+            return [];
+        }
+        return $result->fetch_all(MYSQLI_ASSOC);
+    } catch (Throwable $exception) {
+        error_log('Staff list query failed: ' . $exception->getMessage());
+        return [];
+    }
 }
 
 /**
@@ -2001,18 +2305,35 @@ function create_staff_member($conn, $username, $password, $full_name, $role)
     if ($hashed_password === false) {
         return false;
     }
-    $stmt = $conn->prepare("INSERT INTO Staff (username, password, full_name, role) VALUES (?, ?, ?, ?)");
-    if (!$stmt) {
-        return false;
-    }
+    $stmt = null;
+    try {
+        $stmt = $conn->prepare("INSERT INTO Staff (username, password, full_name, role) VALUES (?, ?, ?, ?)");
+        if (!$stmt) {
+            error_log('Staff insert prepare failed: ' . $conn->error);
+            return false;
+        }
 
-    if (!$stmt->bind_param("ssss", $username, $hashed_password, $full_name, $role)) {
-        $stmt->close();
+        if (!$stmt->bind_param('ssss', $username, $hashed_password, $full_name, $role)) {
+            error_log('Staff insert bind failed: ' . $stmt->error);
+            return false;
+        }
+        if (!$stmt->execute()) {
+            error_log('Staff insert execute failed: ' . $stmt->error);
+            return false;
+        }
+        if ($stmt->affected_rows !== 1) {
+            error_log('Staff insert affected an unexpected number of rows.');
+            return false;
+        }
+        return true;
+    } catch (Throwable $exception) {
+        error_log('Staff creation failed: ' . $exception->getMessage());
         return false;
+    } finally {
+        if ($stmt instanceof mysqli_stmt) {
+            $stmt->close();
+        }
     }
-    $result = $stmt->execute();
-    $stmt->close();
-    return $result;
 }
 
 /**
@@ -2033,11 +2354,20 @@ function update_staff_member($conn, $id, $username, $full_name, $role, $password
         return false;
     }
 
-    if (!$conn->begin_transaction()) {
-        error_log('update_staff_member failed: unable to start transaction.');
+    try {
+        if (!$conn->begin_transaction()) {
+            error_log('update_staff_member failed: unable to start transaction.');
+            return false;
+        }
+    } catch (Throwable $exception) {
+        error_log('update_staff_member transaction start failed: ' . $exception->getMessage());
         return false;
     }
 
+    $transaction_started = true;
+    $target_stmt = null;
+    $admins_stmt = null;
+    $update_stmt = null;
     try {
         $target_stmt = $conn->prepare("SELECT role, is_active FROM Staff WHERE id = ? FOR UPDATE");
         if (!$target_stmt) {
@@ -2056,6 +2386,7 @@ function update_staff_member($conn, $id, $username, $full_name, $role, $password
         }
         $target = $target_result->fetch_assoc();
         $target_stmt->close();
+        $target_stmt = null;
 
         if (!$target) {
             throw new Exception('Target staff account does not exist.');
@@ -2078,6 +2409,7 @@ function update_staff_member($conn, $id, $username, $full_name, $role, $password
             }
             $active_admin_count = $admins_result->num_rows;
             $admins_stmt->close();
+            $admins_stmt = null;
 
             if ($active_admin_count <= 1) {
                 throw new Exception('The last active administrator cannot be demoted.');
@@ -2111,15 +2443,28 @@ function update_staff_member($conn, $id, $username, $full_name, $role, $password
             throw new Exception('Failed to update staff account.');
         }
         $update_stmt->close();
+        $update_stmt = null;
 
         if (!$conn->commit()) {
             throw new Exception('Failed to commit staff update.');
         }
+        $transaction_started = false;
 
         return true;
     } catch (Throwable $e) {
-        if (!$conn->rollback()) {
-            error_log('update_staff_member rollback failed: ' . $conn->error);
+        foreach ([$target_stmt, $admins_stmt, $update_stmt] as $open_stmt) {
+            if ($open_stmt instanceof mysqli_stmt) {
+                $open_stmt->close();
+            }
+        }
+        if ($transaction_started) {
+            try {
+                if (!$conn->rollback()) {
+                    error_log('update_staff_member rollback failed: ' . $conn->error);
+                }
+            } catch (Throwable $rollback_exception) {
+                error_log('update_staff_member rollback failed: ' . $rollback_exception->getMessage());
+            }
         }
         error_log('update_staff_member failed: ' . $e->getMessage());
         return false;
@@ -2138,11 +2483,20 @@ function delete_staff_member($conn, $id, $current_admin_id)
         return false;
     }
 
-    if (!$conn->begin_transaction()) {
-        error_log('delete_staff_member failed: unable to start transaction.');
+    try {
+        if (!$conn->begin_transaction()) {
+            error_log('delete_staff_member failed: unable to start transaction.');
+            return false;
+        }
+    } catch (Throwable $exception) {
+        error_log('delete_staff_member transaction start failed: ' . $exception->getMessage());
         return false;
     }
 
+    $transaction_started = true;
+    $target_stmt = null;
+    $admins_stmt = null;
+    $deactivate_stmt = null;
     try {
         $target_stmt = $conn->prepare("SELECT role, is_active FROM Staff WHERE id = ? FOR UPDATE");
         if (!$target_stmt) {
@@ -2161,6 +2515,7 @@ function delete_staff_member($conn, $id, $current_admin_id)
         }
         $target = $target_result->fetch_assoc();
         $target_stmt->close();
+        $target_stmt = null;
 
         if (!$target) {
             throw new Exception('Target staff account does not exist.');
@@ -2183,6 +2538,7 @@ function delete_staff_member($conn, $id, $current_admin_id)
             }
             $active_admin_count = $admins_result->num_rows;
             $admins_stmt->close();
+            $admins_stmt = null;
 
             if ($active_admin_count <= 1) {
                 throw new Exception('The last active administrator cannot be deactivated.');
@@ -2200,15 +2556,28 @@ function delete_staff_member($conn, $id, $current_admin_id)
             throw new Exception('Failed to deactivate staff account.');
         }
         $deactivate_stmt->close();
+        $deactivate_stmt = null;
 
         if (!$conn->commit()) {
             throw new Exception('Failed to commit staff deactivation.');
         }
+        $transaction_started = false;
 
         return true;
     } catch (Throwable $e) {
-        if (!$conn->rollback()) {
-            error_log('delete_staff_member rollback failed: ' . $conn->error);
+        foreach ([$target_stmt, $admins_stmt, $deactivate_stmt] as $open_stmt) {
+            if ($open_stmt instanceof mysqli_stmt) {
+                $open_stmt->close();
+            }
+        }
+        if ($transaction_started) {
+            try {
+                if (!$conn->rollback()) {
+                    error_log('delete_staff_member rollback failed: ' . $conn->error);
+                }
+            } catch (Throwable $rollback_exception) {
+                error_log('delete_staff_member rollback failed: ' . $rollback_exception->getMessage());
+            }
         }
         error_log('delete_staff_member failed: ' . $e->getMessage());
         return false;
@@ -2231,24 +2600,40 @@ function set_staff_active($conn, $id, $is_active, $current_admin_id)
         return false;
     }
 
-    if (!$conn->begin_transaction()) {
-        error_log('set_staff_active failed: unable to start transaction.');
+    try {
+        if (!$conn->begin_transaction()) {
+            error_log('set_staff_active failed: unable to start transaction.');
+            return false;
+        }
+    } catch (Throwable $exception) {
+        error_log('set_staff_active transaction start failed: ' . $exception->getMessage());
         return false;
     }
 
+    $transaction_started = true;
+    $target_stmt = null;
+    $admins_stmt = null;
+    $update_stmt = null;
     try {
         $target_stmt = $conn->prepare("SELECT role, is_active FROM Staff WHERE id = ? FOR UPDATE");
         if (!$target_stmt) {
             throw new Exception('Failed to prepare staff status query.');
         }
 
-        $target_stmt->bind_param("i", $id);
+        if (!$target_stmt->bind_param('i', $id)) {
+            throw new Exception('Failed to bind staff status query.');
+        }
         if (!$target_stmt->execute()) {
             throw new Exception('Failed to load staff status.');
         }
 
-        $target = $target_stmt->get_result()->fetch_assoc();
+        $target_result = $target_stmt->get_result();
+        if (!$target_result) {
+            throw new Exception('Failed to read staff status.');
+        }
+        $target = $target_result->fetch_assoc();
         $target_stmt->close();
+        $target_stmt = null;
 
         if (!$target) {
             throw new Exception('Staff account does not exist.');
@@ -2258,6 +2643,7 @@ function set_staff_active($conn, $id, $is_active, $current_admin_id)
             if (!$conn->commit()) {
                 throw new Exception('Failed to commit staff status.');
             }
+            $transaction_started = false;
             return true;
         }
 
@@ -2265,12 +2651,20 @@ function set_staff_active($conn, $id, $is_active, $current_admin_id)
             $admins_stmt = $conn->prepare(
                 "SELECT id FROM Staff WHERE role = 'admin' AND is_active = 1 FOR UPDATE"
             );
-            if (!$admins_stmt || !$admins_stmt->execute()) {
+            if (!$admins_stmt) {
+                throw new Exception('Failed to prepare active administrator query.');
+            }
+            if (!$admins_stmt->execute()) {
                 throw new Exception('Failed to verify active administrators.');
             }
 
-            $active_admin_count = $admins_stmt->get_result()->num_rows;
+            $admins_result = $admins_stmt->get_result();
+            if (!$admins_result) {
+                throw new Exception('Failed to read active administrators.');
+            }
+            $active_admin_count = $admins_result->num_rows;
             $admins_stmt->close();
+            $admins_stmt = null;
 
             if ($active_admin_count <= 1) {
                 throw new Exception('The last active administrator cannot be disabled.');
@@ -2282,19 +2676,34 @@ function set_staff_active($conn, $id, $is_active, $current_admin_id)
             throw new Exception('Failed to prepare staff status update.');
         }
 
-        $update_stmt->bind_param("ii", $is_active, $id);
+        if (!$update_stmt->bind_param('ii', $is_active, $id)) {
+            throw new Exception('Failed to bind staff status update.');
+        }
         if (!$update_stmt->execute()) {
             throw new Exception('Failed to update staff status.');
         }
         $update_stmt->close();
+        $update_stmt = null;
 
         if (!$conn->commit()) {
             throw new Exception('Failed to commit staff status.');
         }
+        $transaction_started = false;
         return true;
-    } catch (Exception $e) {
-        if (!$conn->rollback()) {
-            error_log('set_staff_active rollback failed: ' . $conn->error);
+    } catch (Throwable $e) {
+        foreach ([$target_stmt, $admins_stmt, $update_stmt] as $open_stmt) {
+            if ($open_stmt instanceof mysqli_stmt) {
+                $open_stmt->close();
+            }
+        }
+        if ($transaction_started) {
+            try {
+                if (!$conn->rollback()) {
+                    error_log('set_staff_active rollback failed: ' . $conn->error);
+                }
+            } catch (Throwable $rollback_exception) {
+                error_log('set_staff_active rollback failed: ' . $rollback_exception->getMessage());
+            }
         }
         error_log('set_staff_active failed: ' . $e->getMessage());
         return false;
@@ -2311,8 +2720,17 @@ function get_categories($conn)
             LEFT JOIN Product p ON c.id = p.category_id 
             GROUP BY c.id 
             ORDER BY c.name ASC";
-    $result = $conn->query($sql);
-    return $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
+    try {
+        $result = $conn->query($sql);
+        if (!$result) {
+            error_log('Category list query failed: ' . $conn->error);
+            return [];
+        }
+        return $result->fetch_all(MYSQLI_ASSOC);
+    } catch (Throwable $exception) {
+        error_log('Category list query failed: ' . $exception->getMessage());
+        return [];
+    }
 }
 
 /**
@@ -2320,15 +2738,40 @@ function get_categories($conn)
  */
 function get_category_by_id($conn, $id)
 {
-    $stmt = $conn->prepare("SELECT * FROM Category WHERE id = ?");
-    if (!$stmt) {
+    $id = (int)$id;
+    if ($id <= 0) {
         return null;
     }
-    $stmt->bind_param("i", $id);
-    $stmt->execute();
-    $res = $stmt->get_result()->fetch_assoc();
-    $stmt->close();
-    return $res;
+
+    $stmt = null;
+    try {
+        $stmt = $conn->prepare("SELECT * FROM Category WHERE id = ?");
+        if (!$stmt) {
+            error_log('Category lookup prepare failed: ' . $conn->error);
+            return null;
+        }
+        if (!$stmt->bind_param('i', $id)) {
+            error_log('Category lookup bind failed: ' . $stmt->error);
+            return null;
+        }
+        if (!$stmt->execute()) {
+            error_log('Category lookup execute failed: ' . $stmt->error);
+            return null;
+        }
+        $result = $stmt->get_result();
+        if (!$result) {
+            error_log('Category lookup result failed: ' . $stmt->error);
+            return null;
+        }
+        return $result->fetch_assoc() ?: null;
+    } catch (Throwable $exception) {
+        error_log('Category lookup failed: ' . $exception->getMessage());
+        return null;
+    } finally {
+        if ($stmt instanceof mysqli_stmt) {
+            $stmt->close();
+        }
+    }
 }
 
 /**
@@ -2344,26 +2787,58 @@ function create_category($conn, $name, $description)
     }
 
     // Verify uniqueness
-    $stmt = $conn->prepare("SELECT id FROM Category WHERE name = ? LIMIT 1");
-    if (!$stmt) {
-        return false;
-    }
-    $stmt->bind_param("s", $name);
-    $stmt->execute();
-    if ($stmt->get_result()->num_rows > 0) {
+    $stmt = null;
+    try {
+        $stmt = $conn->prepare("SELECT id FROM Category WHERE name = ? LIMIT 1");
+        if (!$stmt) {
+            error_log('Category uniqueness prepare failed: ' . $conn->error);
+            return false;
+        }
+        if (!$stmt->bind_param('s', $name)) {
+            error_log('Category uniqueness bind failed: ' . $stmt->error);
+            return false;
+        }
+        if (!$stmt->execute()) {
+            error_log('Category uniqueness execute failed: ' . $stmt->error);
+            return false;
+        }
+        $result = $stmt->get_result();
+        if (!$result) {
+            error_log('Category uniqueness result failed: ' . $stmt->error);
+            return false;
+        }
+        if ($result->num_rows > 0) {
+            return false;
+        }
         $stmt->close();
-        return false;
-    }
-    $stmt->close();
+        $stmt = null;
 
-    $stmt = $conn->prepare("INSERT INTO Category (name, description) VALUES (?, ?)");
-    if (!$stmt) {
+        $stmt = $conn->prepare("INSERT INTO Category (name, description) VALUES (?, ?)");
+        if (!$stmt) {
+            error_log('Category insert prepare failed: ' . $conn->error);
+            return false;
+        }
+        if (!$stmt->bind_param('ss', $name, $description)) {
+            error_log('Category insert bind failed: ' . $stmt->error);
+            return false;
+        }
+        if (!$stmt->execute()) {
+            error_log('Category insert execute failed: ' . $stmt->error);
+            return false;
+        }
+        if ($stmt->affected_rows !== 1) {
+            error_log('Category insert affected an unexpected number of rows.');
+            return false;
+        }
+        return true;
+    } catch (Throwable $exception) {
+        error_log('Category creation failed: ' . $exception->getMessage());
         return false;
+    } finally {
+        if ($stmt instanceof mysqli_stmt) {
+            $stmt->close();
+        }
     }
-    $stmt->bind_param("ss", $name, $description);
-    $res = $stmt->execute();
-    $stmt->close();
-    return $res;
 }
 
 /**
@@ -2380,38 +2855,81 @@ function update_category($conn, $id, $name, $description)
     }
 
     // Check if another category has the same name
-    $stmt = $conn->prepare("SELECT id FROM Category WHERE name = ? AND id != ? LIMIT 1");
-    if (!$stmt) {
-        return false;
-    }
-    $stmt->bind_param("si", $name, $id);
-    $stmt->execute();
-    if ($stmt->get_result()->num_rows > 0) {
+    $stmt = null;
+    try {
+        $stmt = $conn->prepare("SELECT id FROM Category WHERE name = ? AND id != ? LIMIT 1");
+        if (!$stmt) {
+            error_log('Category update uniqueness prepare failed: ' . $conn->error);
+            return false;
+        }
+        if (!$stmt->bind_param('si', $name, $id)) {
+            error_log('Category update uniqueness bind failed: ' . $stmt->error);
+            return false;
+        }
+        if (!$stmt->execute()) {
+            error_log('Category update uniqueness execute failed: ' . $stmt->error);
+            return false;
+        }
+        $result = $stmt->get_result();
+        if (!$result) {
+            error_log('Category update uniqueness result failed: ' . $stmt->error);
+            return false;
+        }
+        if ($result->num_rows > 0) {
+            return false;
+        }
         $stmt->close();
-        return false;
-    }
-    $stmt->close();
+        $stmt = null;
 
-    // Check if category is 'General' and we are trying to rename it
-    $stmt = $conn->prepare("SELECT name FROM Category WHERE id = ?");
-    $stmt->bind_param("i", $id);
-    $stmt->execute();
-    $old_name_res = $stmt->get_result()->fetch_assoc();
-    $stmt->close();
+        // Check if category is 'General' and we are trying to rename it.
+        $stmt = $conn->prepare("SELECT name FROM Category WHERE id = ?");
+        if (!$stmt) {
+            error_log('Category update lookup prepare failed: ' . $conn->error);
+            return false;
+        }
+        if (!$stmt->bind_param('i', $id)) {
+            error_log('Category update lookup bind failed: ' . $stmt->error);
+            return false;
+        }
+        if (!$stmt->execute()) {
+            error_log('Category update lookup execute failed: ' . $stmt->error);
+            return false;
+        }
+        $old_name_result = $stmt->get_result();
+        if (!$old_name_result) {
+            error_log('Category update lookup result failed: ' . $stmt->error);
+            return false;
+        }
+        $old_name_res = $old_name_result->fetch_assoc();
+        $stmt->close();
+        $stmt = null;
 
-    if ($old_name_res && $old_name_res['name'] === 'General' && $name !== 'General') {
-        // Prevent renaming the default category
-        return false;
-    }
+        if ($old_name_res && $old_name_res['name'] === 'General' && $name !== 'General') {
+            return false;
+        }
 
-    $stmt = $conn->prepare("UPDATE Category SET name = ?, description = ? WHERE id = ?");
-    if (!$stmt) {
+        $stmt = $conn->prepare("UPDATE Category SET name = ?, description = ? WHERE id = ?");
+        if (!$stmt) {
+            error_log('Category update prepare failed: ' . $conn->error);
+            return false;
+        }
+        if (!$stmt->bind_param('ssi', $name, $description, $id)) {
+            error_log('Category update bind failed: ' . $stmt->error);
+            return false;
+        }
+        if (!$stmt->execute()) {
+            error_log('Category update execute failed: ' . $stmt->error);
+            return false;
+        }
+        return true;
+    } catch (Throwable $exception) {
+        error_log('Category update failed: ' . $exception->getMessage());
         return false;
+    } finally {
+        if ($stmt instanceof mysqli_stmt) {
+            $stmt->close();
+        }
     }
-    $stmt->bind_param("ssi", $name, $description, $id);
-    $res = $stmt->execute();
-    $stmt->close();
-    return $res;
 }
 
 /**
@@ -2420,48 +2938,130 @@ function update_category($conn, $id, $name, $description)
 function delete_category($conn, $id)
 {
     $id = (int)$id;
-    
-    // Prevent deleting the default category
-    $stmt = $conn->prepare("SELECT name FROM Category WHERE id = ?");
-    if (!$stmt) {
+    if ($id <= 0) {
         return false;
     }
-    $stmt->bind_param("i", $id);
-    $stmt->execute();
-    $res = $stmt->get_result()->fetch_assoc();
-    $stmt->close();
+
+    // Prevent deleting the default category
+    $stmt = null;
+    try {
+        $stmt = $conn->prepare("SELECT name FROM Category WHERE id = ?");
+        if (!$stmt) {
+            error_log('Category deletion lookup prepare failed: ' . $conn->error);
+            return false;
+        }
+        if (!$stmt->bind_param('i', $id)) {
+            error_log('Category deletion lookup bind failed: ' . $stmt->error);
+            return false;
+        }
+        if (!$stmt->execute()) {
+            error_log('Category deletion lookup execute failed: ' . $stmt->error);
+            return false;
+        }
+        $result = $stmt->get_result();
+        if (!$result) {
+            error_log('Category deletion lookup result failed: ' . $stmt->error);
+            return false;
+        }
+        $res = $result->fetch_assoc();
+    } catch (Throwable $exception) {
+        error_log('Category deletion lookup failed: ' . $exception->getMessage());
+        return false;
+    } finally {
+        if ($stmt instanceof mysqli_stmt) {
+            $stmt->close();
+        }
+    }
 
     if (!$res || $res['name'] === 'General') {
         return false;
     }
 
-    $conn->begin_transaction();
+    $transaction_started = false;
+    $delete_stmt = null;
+    $general_stmt = null;
+    $reassign_stmt = null;
     try {
-        $gen_stmt = $conn->query("SELECT id FROM Category WHERE name = 'General' LIMIT 1");
-        $gen_cat_id = null;
-        if ($gen_stmt && $gen_stmt->num_rows > 0) {
-            $gen_cat_id = intval($gen_stmt->fetch_assoc()['id']);
+        if (!$conn->begin_transaction()) {
+            error_log('delete_category failed: unable to start transaction.');
+            return false;
         }
+        $transaction_started = true;
 
-        $del_stmt = $conn->prepare("DELETE FROM Category WHERE id = ?");
-        if (!$del_stmt) {
-            throw new Exception("Failed to prepare delete statement");
+        $general_stmt = $conn->prepare("SELECT id FROM Category WHERE name = 'General' LIMIT 1");
+        if (!$general_stmt) {
+            throw new Exception('Failed to prepare default category lookup.');
         }
-        $del_stmt->bind_param("i", $id);
-        if (!$del_stmt->execute()) {
-            throw new Exception("Failed to delete category");
+        if (!$general_stmt->execute()) {
+            throw new Exception('Failed to load default category.');
         }
-        $del_stmt->close();
+        $general_result = $general_stmt->get_result();
+        if (!$general_result) {
+            throw new Exception('Failed to read default category.');
+        }
+        $general_row = $general_result->fetch_assoc();
+        if (!$general_row) {
+            throw new Exception('Default category is missing.');
+        }
+        $gen_cat_id = (int)$general_row['id'];
+        $general_stmt->close();
+        $general_stmt = null;
 
-        if ($gen_cat_id !== null) {
-            $conn->query("UPDATE Product SET category_id = $gen_cat_id WHERE category_id IS NULL");
+        $delete_stmt = $conn->prepare("DELETE FROM Category WHERE id = ?");
+        if (!$delete_stmt) {
+            throw new Exception('Failed to prepare category deletion.');
         }
+        if (!$delete_stmt->bind_param('i', $id)) {
+            throw new Exception('Failed to bind category deletion.');
+        }
+        if (!$delete_stmt->execute()) {
+            throw new Exception('Failed to delete category.');
+        }
+        if ($delete_stmt->affected_rows !== 1) {
+            throw new Exception('Category deletion affected an unexpected number of rows.');
+        }
+        $delete_stmt->close();
+        $delete_stmt = null;
 
-        $conn->commit();
+        $reassign_stmt = $conn->prepare(
+            "UPDATE Product SET category_id = ? WHERE category_id IS NULL"
+        );
+        if (!$reassign_stmt) {
+            throw new Exception('Failed to prepare product reassignment.');
+        }
+        if (!$reassign_stmt->bind_param('i', $gen_cat_id)) {
+            throw new Exception('Failed to bind product reassignment.');
+        }
+        if (!$reassign_stmt->execute()) {
+            throw new Exception('Failed to reassign products.');
+        }
+        if ($reassign_stmt->affected_rows < 0) {
+            throw new Exception('Product reassignment affected-row check failed.');
+        }
+        $reassign_stmt->close();
+        $reassign_stmt = null;
+
+        if (!$conn->commit()) {
+            throw new Exception('Failed to commit category deletion.');
+        }
+        $transaction_started = false;
         return true;
-    } catch (Exception $e) {
-        $conn->rollback();
-        error_log("delete_category failed: " . $e->getMessage());
+    } catch (Throwable $e) {
+        foreach ([$general_stmt, $delete_stmt, $reassign_stmt] as $open_stmt) {
+            if ($open_stmt instanceof mysqli_stmt) {
+                $open_stmt->close();
+            }
+        }
+        if ($transaction_started) {
+            try {
+                if (!$conn->rollback()) {
+                    error_log('delete_category rollback failed: ' . $conn->error);
+                }
+            } catch (Throwable $rollback_exception) {
+                error_log('delete_category rollback failed: ' . $rollback_exception->getMessage());
+            }
+        }
+        error_log('delete_category failed: ' . $e->getMessage());
         return false;
     }
 }
@@ -2472,8 +3072,17 @@ function delete_category($conn, $id)
 function get_customers($conn)
 {
     $sql = "SELECT * FROM Customer ORDER BY name ASC";
-    $result = $conn->query($sql);
-    return $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
+    try {
+        $result = $conn->query($sql);
+        if (!$result) {
+            error_log('Customer list query failed: ' . $conn->error);
+            return [];
+        }
+        return $result->fetch_all(MYSQLI_ASSOC);
+    } catch (Throwable $exception) {
+        error_log('Customer list query failed: ' . $exception->getMessage());
+        return [];
+    }
 }
 
 /**
@@ -2482,15 +3091,39 @@ function get_customers($conn)
 function get_customer_by_id($conn, $id)
 {
     $id = (int)$id;
-    $stmt = $conn->prepare("SELECT * FROM Customer WHERE id = ?");
-    if (!$stmt) {
+    if ($id <= 0) {
         return null;
     }
-    $stmt->bind_param("i", $id);
-    $stmt->execute();
-    $res = $stmt->get_result()->fetch_assoc();
-    $stmt->close();
-    return $res;
+
+    $stmt = null;
+    try {
+        $stmt = $conn->prepare("SELECT * FROM Customer WHERE id = ?");
+        if (!$stmt) {
+            error_log('Customer lookup prepare failed: ' . $conn->error);
+            return null;
+        }
+        if (!$stmt->bind_param('i', $id)) {
+            error_log('Customer lookup bind failed: ' . $stmt->error);
+            return null;
+        }
+        if (!$stmt->execute()) {
+            error_log('Customer lookup execute failed: ' . $stmt->error);
+            return null;
+        }
+        $result = $stmt->get_result();
+        if (!$result) {
+            error_log('Customer lookup result failed: ' . $stmt->error);
+            return null;
+        }
+        return $result->fetch_assoc() ?: null;
+    } catch (Throwable $exception) {
+        error_log('Customer lookup failed: ' . $exception->getMessage());
+        return null;
+    } finally {
+        if ($stmt instanceof mysqli_stmt) {
+            $stmt->close();
+        }
+    }
 }
 
 /**
@@ -2507,14 +3140,34 @@ function create_customer($conn, $name, $phone, $email, $address)
         return false;
     }
 
-    $stmt = $conn->prepare("INSERT INTO Customer (name, phone, email, address) VALUES (?, ?, ?, ?)");
-    if (!$stmt) {
+    $stmt = null;
+    try {
+        $stmt = $conn->prepare("INSERT INTO Customer (name, phone, email, address) VALUES (?, ?, ?, ?)");
+        if (!$stmt) {
+            error_log('Customer insert prepare failed: ' . $conn->error);
+            return false;
+        }
+        if (!$stmt->bind_param('ssss', $name, $phone, $email, $address)) {
+            error_log('Customer insert bind failed: ' . $stmt->error);
+            return false;
+        }
+        if (!$stmt->execute()) {
+            error_log('Customer insert execute failed: ' . $stmt->error);
+            return false;
+        }
+        if ($stmt->affected_rows !== 1) {
+            error_log('Customer insert affected an unexpected number of rows.');
+            return false;
+        }
+        return true;
+    } catch (Throwable $exception) {
+        error_log('Customer creation failed: ' . $exception->getMessage());
         return false;
+    } finally {
+        if ($stmt instanceof mysqli_stmt) {
+            $stmt->close();
+        }
     }
-    $stmt->bind_param("ssss", $name, $phone, $email, $address);
-    $res = $stmt->execute();
-    $stmt->close();
-    return $res;
 }
 
 /**
@@ -2532,14 +3185,30 @@ function update_customer($conn, $id, $name, $phone, $email, $address)
         return false;
     }
 
-    $stmt = $conn->prepare("UPDATE Customer SET name = ?, phone = ?, email = ?, address = ? WHERE id = ?");
-    if (!$stmt) {
+    $stmt = null;
+    try {
+        $stmt = $conn->prepare("UPDATE Customer SET name = ?, phone = ?, email = ?, address = ? WHERE id = ?");
+        if (!$stmt) {
+            error_log('Customer update prepare failed: ' . $conn->error);
+            return false;
+        }
+        if (!$stmt->bind_param('ssssi', $name, $phone, $email, $address, $id)) {
+            error_log('Customer update bind failed: ' . $stmt->error);
+            return false;
+        }
+        if (!$stmt->execute()) {
+            error_log('Customer update execute failed: ' . $stmt->error);
+            return false;
+        }
+        return true;
+    } catch (Throwable $exception) {
+        error_log('Customer update failed: ' . $exception->getMessage());
         return false;
+    } finally {
+        if ($stmt instanceof mysqli_stmt) {
+            $stmt->close();
+        }
     }
-    $stmt->bind_param("ssssi", $name, $phone, $email, $address, $id);
-    $res = $stmt->execute();
-    $stmt->close();
-    return $res;
 }
 
 /**
@@ -2552,14 +3221,34 @@ function delete_customer($conn, $id)
         return false;
     }
 
-    $stmt = $conn->prepare("DELETE FROM Customer WHERE id = ?");
-    if (!$stmt) {
+    $stmt = null;
+    try {
+        $stmt = $conn->prepare("DELETE FROM Customer WHERE id = ?");
+        if (!$stmt) {
+            error_log('Customer deletion prepare failed: ' . $conn->error);
+            return false;
+        }
+        if (!$stmt->bind_param('i', $id)) {
+            error_log('Customer deletion bind failed: ' . $stmt->error);
+            return false;
+        }
+        if (!$stmt->execute()) {
+            error_log('Customer deletion execute failed: ' . $stmt->error);
+            return false;
+        }
+        if ($stmt->affected_rows !== 1) {
+            error_log('Customer deletion affected an unexpected number of rows.');
+            return false;
+        }
+        return true;
+    } catch (Throwable $exception) {
+        error_log('Customer deletion failed: ' . $exception->getMessage());
         return false;
+    } finally {
+        if ($stmt instanceof mysqli_stmt) {
+            $stmt->close();
+        }
     }
-    $stmt->bind_param("i", $id);
-    $res = $stmt->execute();
-    $stmt->close();
-    return $res;
 }
 
 /**
@@ -2568,8 +3257,17 @@ function delete_customer($conn, $id)
 function get_suppliers($conn)
 {
     $sql = "SELECT * FROM Supplier ORDER BY name ASC";
-    $result = $conn->query($sql);
-    return $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
+    try {
+        $result = $conn->query($sql);
+        if (!$result) {
+            error_log('Supplier list query failed: ' . $conn->error);
+            return [];
+        }
+        return $result->fetch_all(MYSQLI_ASSOC);
+    } catch (Throwable $exception) {
+        error_log('Supplier list query failed: ' . $exception->getMessage());
+        return [];
+    }
 }
 
 /**
@@ -2578,15 +3276,39 @@ function get_suppliers($conn)
 function get_supplier_by_id($conn, $id)
 {
     $id = (int)$id;
-    $stmt = $conn->prepare("SELECT * FROM Supplier WHERE id = ?");
-    if (!$stmt) {
+    if ($id <= 0) {
         return null;
     }
-    $stmt->bind_param("i", $id);
-    $stmt->execute();
-    $res = $stmt->get_result()->fetch_assoc();
-    $stmt->close();
-    return $res;
+
+    $stmt = null;
+    try {
+        $stmt = $conn->prepare("SELECT * FROM Supplier WHERE id = ?");
+        if (!$stmt) {
+            error_log('Supplier lookup prepare failed: ' . $conn->error);
+            return null;
+        }
+        if (!$stmt->bind_param('i', $id)) {
+            error_log('Supplier lookup bind failed: ' . $stmt->error);
+            return null;
+        }
+        if (!$stmt->execute()) {
+            error_log('Supplier lookup execute failed: ' . $stmt->error);
+            return null;
+        }
+        $result = $stmt->get_result();
+        if (!$result) {
+            error_log('Supplier lookup result failed: ' . $stmt->error);
+            return null;
+        }
+        return $result->fetch_assoc() ?: null;
+    } catch (Throwable $exception) {
+        error_log('Supplier lookup failed: ' . $exception->getMessage());
+        return null;
+    } finally {
+        if ($stmt instanceof mysqli_stmt) {
+            $stmt->close();
+        }
+    }
 }
 
 /**
@@ -2603,14 +3325,34 @@ function create_supplier($conn, $name, $phone, $email, $address)
         return false;
     }
 
-    $stmt = $conn->prepare("INSERT INTO Supplier (name, phone, email, address) VALUES (?, ?, ?, ?)");
-    if (!$stmt) {
+    $stmt = null;
+    try {
+        $stmt = $conn->prepare("INSERT INTO Supplier (name, phone, email, address) VALUES (?, ?, ?, ?)");
+        if (!$stmt) {
+            error_log('Supplier insert prepare failed: ' . $conn->error);
+            return false;
+        }
+        if (!$stmt->bind_param('ssss', $name, $phone, $email, $address)) {
+            error_log('Supplier insert bind failed: ' . $stmt->error);
+            return false;
+        }
+        if (!$stmt->execute()) {
+            error_log('Supplier insert execute failed: ' . $stmt->error);
+            return false;
+        }
+        if ($stmt->affected_rows !== 1) {
+            error_log('Supplier insert affected an unexpected number of rows.');
+            return false;
+        }
+        return true;
+    } catch (Throwable $exception) {
+        error_log('Supplier creation failed: ' . $exception->getMessage());
         return false;
+    } finally {
+        if ($stmt instanceof mysqli_stmt) {
+            $stmt->close();
+        }
     }
-    $stmt->bind_param("ssss", $name, $phone, $email, $address);
-    $res = $stmt->execute();
-    $stmt->close();
-    return $res;
 }
 
 /**
@@ -2628,14 +3370,30 @@ function update_supplier($conn, $id, $name, $phone, $email, $address)
         return false;
     }
 
-    $stmt = $conn->prepare("UPDATE Supplier SET name = ?, phone = ?, email = ?, address = ? WHERE id = ?");
-    if (!$stmt) {
+    $stmt = null;
+    try {
+        $stmt = $conn->prepare("UPDATE Supplier SET name = ?, phone = ?, email = ?, address = ? WHERE id = ?");
+        if (!$stmt) {
+            error_log('Supplier update prepare failed: ' . $conn->error);
+            return false;
+        }
+        if (!$stmt->bind_param('ssssi', $name, $phone, $email, $address, $id)) {
+            error_log('Supplier update bind failed: ' . $stmt->error);
+            return false;
+        }
+        if (!$stmt->execute()) {
+            error_log('Supplier update execute failed: ' . $stmt->error);
+            return false;
+        }
+        return true;
+    } catch (Throwable $exception) {
+        error_log('Supplier update failed: ' . $exception->getMessage());
         return false;
+    } finally {
+        if ($stmt instanceof mysqli_stmt) {
+            $stmt->close();
+        }
     }
-    $stmt->bind_param("ssssi", $name, $phone, $email, $address, $id);
-    $res = $stmt->execute();
-    $stmt->close();
-    return $res;
 }
 
 /**
@@ -2648,14 +3406,34 @@ function delete_supplier($conn, $id)
         return false;
     }
 
-    $stmt = $conn->prepare("DELETE FROM Supplier WHERE id = ?");
-    if (!$stmt) {
+    $stmt = null;
+    try {
+        $stmt = $conn->prepare("DELETE FROM Supplier WHERE id = ?");
+        if (!$stmt) {
+            error_log('Supplier deletion prepare failed: ' . $conn->error);
+            return false;
+        }
+        if (!$stmt->bind_param('i', $id)) {
+            error_log('Supplier deletion bind failed: ' . $stmt->error);
+            return false;
+        }
+        if (!$stmt->execute()) {
+            error_log('Supplier deletion execute failed: ' . $stmt->error);
+            return false;
+        }
+        if ($stmt->affected_rows !== 1) {
+            error_log('Supplier deletion affected an unexpected number of rows.');
+            return false;
+        }
+        return true;
+    } catch (Throwable $exception) {
+        error_log('Supplier deletion failed: ' . $exception->getMessage());
         return false;
+    } finally {
+        if ($stmt instanceof mysqli_stmt) {
+            $stmt->close();
+        }
     }
-    $stmt->bind_param("i", $id);
-    $res = $stmt->execute();
-    $stmt->close();
-    return $res;
 }
 
 /**
@@ -2664,10 +3442,15 @@ function delete_supplier($conn, $id)
 function get_inventory_valuation($conn)
 {
     $sql = "SELECT SUM(stock * price) as valuation FROM Product";
-    $result = $conn->query($sql);
-    if ($result) {
-        $row = $result->fetch_assoc();
-        return (float)($row['valuation'] ?? 0.0);
+    try {
+        $result = $conn->query($sql);
+        if ($result) {
+            $row = $result->fetch_assoc();
+            return (float)($row['valuation'] ?? 0.0);
+        }
+        error_log('Inventory valuation query failed: ' . $conn->error);
+    } catch (Throwable $exception) {
+        error_log('Inventory valuation query failed: ' . $exception->getMessage());
     }
     return 0.0;
 }
@@ -2691,20 +3474,35 @@ function get_top_selling_products($conn, $limit = 5, $staff_id = null)
               LIMIT ?";
     $stmt = $conn->prepare($sql);
     if (!$stmt) {
+        error_log('Top-selling products prepare failed: ' . $conn->error);
         return [];
     }
     if ($staff_id === null) {
-        $stmt->bind_param('i', $limit);
+        if (!$stmt->bind_param('i', $limit)) {
+            error_log('Top-selling products bind failed: ' . $stmt->error);
+            $stmt->close();
+            return [];
+        }
     } else {
         $staff_id = (int)$staff_id;
-        $stmt->bind_param('ii', $staff_id, $limit);
+        if (!$stmt->bind_param('ii', $staff_id, $limit)) {
+            error_log('Scoped top-selling products bind failed: ' . $stmt->error);
+            $stmt->close();
+            return [];
+        }
     }
     if (!$stmt->execute()) {
+        error_log('Top-selling products execute failed: ' . $stmt->error);
         $stmt->close();
         return [];
     }
     $result = $stmt->get_result();
-    $products = $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
+    if (!$result) {
+        error_log('Top-selling products result failed: ' . $stmt->error);
+        $stmt->close();
+        return [];
+    }
+    $products = $result->fetch_all(MYSQLI_ASSOC);
     $stmt->close();
     return $products;
 }
@@ -2727,22 +3525,42 @@ function get_category_sales_distribution($conn, $staff_id = null)
               ORDER BY total_sales DESC";
 
     if ($staff_id === null) {
-        $result = $conn->query($sql);
-        return $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
+        try {
+            $result = $conn->query($sql);
+            if (!$result) {
+                error_log('Category sales distribution query failed: ' . $conn->error);
+                return [];
+            }
+            return $result->fetch_all(MYSQLI_ASSOC);
+        } catch (Throwable $exception) {
+            error_log('Category sales distribution query failed: ' . $exception->getMessage());
+            return [];
+        }
     }
 
     $stmt = $conn->prepare($sql);
     if (!$stmt) {
+        error_log('Scoped category sales distribution prepare failed: ' . $conn->error);
         return [];
     }
     $staff_id = (int)$staff_id;
-    $stmt->bind_param('i', $staff_id);
+    if (!$stmt->bind_param('i', $staff_id)) {
+        error_log('Scoped category sales distribution bind failed: ' . $stmt->error);
+        $stmt->close();
+        return [];
+    }
     if (!$stmt->execute()) {
+        error_log('Scoped category sales distribution execute failed: ' . $stmt->error);
         $stmt->close();
         return [];
     }
     $result = $stmt->get_result();
-    $categories = $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
+    if (!$result) {
+        error_log('Scoped category sales distribution result failed: ' . $stmt->error);
+        $stmt->close();
+        return [];
+    }
+    $categories = $result->fetch_all(MYSQLI_ASSOC);
     $stmt->close();
     return $categories;
 }
