@@ -121,7 +121,7 @@ if ($selected_product_id !== null) {
 
 // Fetch stock movements
 $movements = get_stock_movements($conn, $selected_product_id);
-$products_list = get_products($conn); // for the dropdown filter
+$products_list = get_all_products($conn); // for the dropdown filter
 
 $page_title = 'Stock Ledger';
 $active_page = 'stock_movements';

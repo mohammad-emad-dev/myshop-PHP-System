@@ -107,14 +107,133 @@ function redirect($url)
     exit();
 }
 
-function get_products($conn)
+function build_product_filter_sql($search, $filter, &$search_pattern)
 {
-    $sql = "SELECT p.*, c.name as category_name 
-            FROM Product p 
-            LEFT JOIN Category c ON p.category_id = c.id 
-            ORDER BY p.created_at DESC";
+    $conditions = [];
+    $search_pattern = '';
+    $search = trim((string)$search);
+
+    if ($search !== '') {
+        $search_pattern = '%' . $search . '%';
+        $conditions[] = '(p.name LIKE ? OR c.name LIKE ? OR p.barcode LIKE ?)';
+    }
+
+    if ($filter === 'low_stock') {
+        $conditions[] = 'p.stock <= p.alert_threshold';
+    }
+
+    return empty($conditions) ? '' : ' WHERE ' . implode(' AND ', $conditions);
+}
+
+function get_all_products($conn)
+{
+    $sql = "SELECT p.*, c.name as category_name
+            FROM Product p
+            LEFT JOIN Category c ON p.category_id = c.id
+            ORDER BY p.created_at DESC, p.id DESC";
     $result = $conn->query($sql);
+
+    if (!$result) {
+        error_log('Product list query failed: ' . $conn->error);
+        return [];
+    }
+
     return $result->fetch_all(MYSQLI_ASSOC);
+}
+
+function count_products($conn, $search = '', $filter = '')
+{
+    $search_pattern = '';
+    $where_sql = build_product_filter_sql($search, $filter, $search_pattern);
+    $stmt = $conn->prepare(
+        "SELECT COUNT(*) AS total
+         FROM Product p
+         LEFT JOIN Category c ON p.category_id = c.id" . $where_sql
+    );
+
+    if (!$stmt) {
+        error_log('Product count prepare failed: ' . $conn->error);
+        return 0;
+    }
+
+    if ($search_pattern !== '') {
+        if (!$stmt->bind_param('sss', $search_pattern, $search_pattern, $search_pattern)) {
+            error_log('Product count bind failed: ' . $stmt->error);
+            $stmt->close();
+            return 0;
+        }
+    }
+
+    if (!$stmt->execute()) {
+        error_log('Product count execute failed: ' . $stmt->error);
+        $stmt->close();
+        return 0;
+    }
+
+    $result = $stmt->get_result();
+    if (!$result) {
+        error_log('Product count result retrieval failed: ' . $stmt->error);
+        $stmt->close();
+        return 0;
+    }
+
+    $row = $result->fetch_assoc();
+    $stmt->close();
+    return $row ? max(0, (int)$row['total']) : 0;
+}
+
+function get_products_page($conn, $search = '', $filter = '', $limit = 25, $offset = 0)
+{
+    $allowed_page_sizes = [10, 25, 50];
+    $limit = (int)$limit;
+    $offset = max(0, (int)$offset);
+    if (!in_array($limit, $allowed_page_sizes, true)) {
+        $limit = 25;
+    }
+
+    $search_pattern = '';
+    $where_sql = build_product_filter_sql($search, $filter, $search_pattern);
+    $stmt = $conn->prepare(
+        "SELECT p.*, c.name as category_name
+         FROM Product p
+         LEFT JOIN Category c ON p.category_id = c.id" . $where_sql . "
+         ORDER BY p.created_at DESC, p.id DESC
+         LIMIT ? OFFSET ?"
+    );
+
+    if (!$stmt) {
+        error_log('Product page prepare failed: ' . $conn->error);
+        return [];
+    }
+
+    if ($search_pattern !== '') {
+        if (!$stmt->bind_param('sssii', $search_pattern, $search_pattern, $search_pattern, $limit, $offset)) {
+            error_log('Product page bind failed: ' . $stmt->error);
+            $stmt->close();
+            return [];
+        }
+    } elseif (!$stmt->bind_param('ii', $limit, $offset)) {
+        error_log('Product page bind failed: ' . $stmt->error);
+        $stmt->close();
+        return [];
+    }
+
+    if (!$stmt->execute()) {
+        error_log('Product page execute failed: ' . $stmt->error);
+        $stmt->close();
+        return [];
+    }
+
+    $result = $stmt->get_result();
+    if (!$result) {
+        error_log('Product page result retrieval failed: ' . $stmt->error);
+        $stmt->close();
+        return [];
+    }
+
+    $products = $result->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+    return $products;
 }
 
 function get_product_by_id($conn, $id)

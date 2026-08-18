@@ -75,7 +75,7 @@ if (fwrite($output, "\xEF\xBB\xBF") === false) {
 switch ($entity) {
     case 'products':
         export_csv_write_row($output, ['ID', 'Product Name', 'Category', 'Price ($)', 'Current Stock', 'Alert Threshold', 'Valuation ($)']);
-        $products = get_products($conn);
+        $products = get_all_products($conn);
         foreach ($products as $product) {
             $price = (float)$product['price'];
             $stock = (int)$product['stock'];

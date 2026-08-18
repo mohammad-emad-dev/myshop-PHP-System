@@ -102,7 +102,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['complete_order'])) {
 }
 }
 
-$products = get_products($conn);
+$products = get_all_products($conn);
 $categories = get_categories($conn);
 $customers = get_customers($conn);
 $suppliers = get_suppliers($conn);

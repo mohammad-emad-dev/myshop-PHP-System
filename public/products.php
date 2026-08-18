@@ -88,13 +88,80 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     }
 }
 
-$filter = $_GET['filter'] ?? '';
-if ($filter === 'low_stock') {
-    $products = get_low_stock_products($conn);
-    $header_title = 'Low Stock Alerts';
+$allowed_page_sizes = [10, 25, 50];
+$raw_page_size = $_GET['page_size'] ?? 25;
+$page_size = is_scalar($raw_page_size) ? filter_var($raw_page_size, FILTER_VALIDATE_INT) : false;
+if ($page_size === false || !in_array($page_size, $allowed_page_sizes, true)) {
+    $page_size = 25;
+}
+
+$raw_page = $_GET['page'] ?? 1;
+$page = is_scalar($raw_page) ? filter_var($raw_page, FILTER_VALIDATE_INT) : false;
+if ($page === false || $page < 1) {
+    $page = 1;
+}
+
+$raw_search = $_GET['search'] ?? '';
+$search = is_string($raw_search) ? trim($raw_search) : '';
+if (function_exists('mb_substr')) {
+    $search = mb_substr($search, 0, 100, 'UTF-8');
 } else {
-    $products = get_products($conn);
-    $header_title = 'Product Management';
+    $search = substr($search, 0, 100);
+}
+
+$raw_filter = $_GET['filter'] ?? '';
+$filter = is_string($raw_filter) && $raw_filter === 'low_stock' ? 'low_stock' : '';
+$header_title = $filter === 'low_stock' ? 'Low Stock Alerts' : 'Product Management';
+$raw_highlight_id = $_GET['highlight'] ?? 0;
+$highlight_id = is_scalar($raw_highlight_id) ? filter_var($raw_highlight_id, FILTER_VALIDATE_INT) : false;
+$highlight_id = $highlight_id !== false && $highlight_id > 0 ? $highlight_id : 0;
+
+$total_products = count_products($conn, $search, $filter);
+$total_pages = max(1, (int)ceil($total_products / $page_size));
+if ($page > $total_pages) {
+    $page = $total_pages;
+}
+
+$offset = ($page - 1) * $page_size;
+$products = get_products_page($conn, $search, $filter, $page_size, $offset);
+$range_start = $total_products > 0 ? $offset + 1 : 0;
+$range_end = $total_products > 0 ? min($offset + count($products), $total_products) : 0;
+
+$product_page_url = static function ($target_page) use ($page_size, $search, $filter, $highlight_id) {
+    $query = [
+        'page' => max(1, (int)$target_page),
+        'page_size' => $page_size
+    ];
+    if ($search !== '') {
+        $query['search'] = $search;
+    }
+    if ($filter === 'low_stock') {
+        $query['filter'] = $filter;
+    }
+    if ($highlight_id > 0) {
+        $query['highlight'] = $highlight_id;
+    }
+
+    return 'products.php?' . http_build_query($query);
+};
+
+$pagination_pages = [];
+if ($total_pages <= 7) {
+    $pagination_pages = range(1, $total_pages);
+} else {
+    $pagination_pages[] = 1;
+    $window_start = max(2, $page - 2);
+    $window_end = min($total_pages - 1, $page + 2);
+    if ($window_start > 2) {
+        $pagination_pages[] = '...';
+    }
+    for ($pagination_page = $window_start; $pagination_page <= $window_end; $pagination_page++) {
+        $pagination_pages[] = $pagination_page;
+    }
+    if ($window_end < $total_pages - 1) {
+        $pagination_pages[] = '...';
+    }
+    $pagination_pages[] = $total_pages;
 }
 
 $categories = get_categories($conn);
@@ -120,7 +187,7 @@ require_once '../includes/layouts/header.php';
                             <div>
                                 <h1 class="h3 mb-0 fw-bold ui-page-heading">
                                     Inventory Catalog
-                                    <span class="badge bg-primary rounded-pill ms-2 align-middle ui-count-text-lg"><?php echo count($products); ?> Items</span>
+                                    <span class="badge bg-primary rounded-pill ms-2 align-middle ui-count-text-lg"><?php echo number_format($total_products); ?> Items</span>
                                 </h1>
                                 <p class="text-muted mb-0 mt-1">Manage all your products, pricing, and stock alerts.</p>
                             </div>
@@ -137,14 +204,36 @@ require_once '../includes/layouts/header.php';
                         </div>
                     </div>
                     <div class="card-body">
-                        <div class="row mb-3">
+                        <form method="GET" action="products.php" class="row mb-3 g-2 align-items-end">
                             <div class="col-md-4">
+                                <label for="searchProduct" class="form-label">Search products</label>
                                 <div class="input-group shadow-sm rounded-3 overflow-hidden border">
                                     <span class="input-group-text bg-white border-0"><i class="fas fa-search text-muted"></i></span>
-                                    <input type="text" id="searchProduct" placeholder="Search products by name, category..." aria-label="Search products by name or category" class="form-control border-0 px-2 ui-search-input">
+                                    <input type="search" id="searchProduct" name="search" value="<?php echo htmlspecialchars($search, ENT_QUOTES, 'UTF-8'); ?>" placeholder="Name, category, or barcode" class="form-control border-0 px-2 ui-search-input">
                                 </div>
                             </div>
-                        </div>
+                            <div class="col-sm-4 col-md-2">
+                                <label for="pageSize" class="form-label">Items per page</label>
+                                <select id="pageSize" name="page_size" class="form-select">
+                                    <?php foreach ($allowed_page_sizes as $allowed_page_size): ?>
+                                        <option value="<?php echo $allowed_page_size; ?>" <?php echo $page_size === $allowed_page_size ? 'selected' : ''; ?>><?php echo $allowed_page_size; ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <?php if ($filter === 'low_stock'): ?>
+                                <input type="hidden" name="filter" value="low_stock">
+                            <?php endif; ?>
+                            <?php if ($highlight_id > 0): ?>
+                                <input type="hidden" name="highlight" value="<?php echo $highlight_id; ?>">
+                            <?php endif; ?>
+                            <input type="hidden" name="page" value="1">
+                            <div class="col-auto">
+                                <button type="submit" class="btn btn-outline-primary">Apply</button>
+                            </div>
+                        </form>
+                        <?php if ($filter === 'low_stock'): ?>
+                            <p class="text-muted small mb-3">Showing products at or below their stock alert threshold.</p>
+                        <?php endif; ?>
                         <div class="table-responsive">
                             <table class="table table-hover align-middle" id="productsTable">
                                 <thead class="bg-light text-secondary">
@@ -161,9 +250,13 @@ require_once '../includes/layouts/header.php';
                                     </tr>
                                 </thead>
                                 <tbody>
+                                    <?php if (empty($products)): ?>
+                                        <tr>
+                                            <td colspan="9" class="text-center text-muted py-4">No products matched your search or filter.</td>
+                                        </tr>
+                                    <?php endif; ?>
                                     <?php foreach ($products as $product): ?>
                                         <?php
-                                        $highlight_id = isset($_GET['highlight']) ? intval($_GET['highlight']) : 0;
                                         $is_low = $product['stock'] <= $product['alert_threshold'];
                                         $row_class = '';
                                         if ($product['id'] == $highlight_id) {
@@ -243,6 +336,40 @@ require_once '../includes/layouts/header.php';
                                     <?php endforeach; ?>
                                 </tbody>
                             </table>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mt-4">
+                            <p class="text-muted small mb-0">
+                                Showing <?php echo number_format($range_start); ?>–<?php echo number_format($range_end); ?> of <?php echo number_format($total_products); ?> products
+                            </p>
+                            <?php if ($total_pages > 1): ?>
+                                <nav aria-label="Product catalog pagination">
+                                    <ul class="pagination pagination-sm mb-0">
+                                        <li class="page-item <?php echo $page <= 1 ? 'disabled' : ''; ?>">
+                                            <?php if ($page > 1): ?>
+                                                <a class="page-link" href="<?php echo htmlspecialchars($product_page_url($page - 1), ENT_QUOTES, 'UTF-8'); ?>" aria-label="Previous page">Previous</a>
+                                            <?php else: ?>
+                                                <span class="page-link" aria-disabled="true">Previous</span>
+                                            <?php endif; ?>
+                                        </li>
+                                        <?php foreach ($pagination_pages as $pagination_page): ?>
+                                            <?php if ($pagination_page === '...'): ?>
+                                                <li class="page-item disabled"><span class="page-link" aria-hidden="true">&hellip;</span></li>
+                                            <?php else: ?>
+                                                <li class="page-item <?php echo $page === $pagination_page ? 'active' : ''; ?>">
+                                                    <a class="page-link" href="<?php echo htmlspecialchars($product_page_url($pagination_page), ENT_QUOTES, 'UTF-8'); ?>" <?php echo $page === $pagination_page ? 'aria-current="page"' : ''; ?>><?php echo $pagination_page; ?></a>
+                                                </li>
+                                            <?php endif; ?>
+                                        <?php endforeach; ?>
+                                        <li class="page-item <?php echo $page >= $total_pages ? 'disabled' : ''; ?>">
+                                            <?php if ($page < $total_pages): ?>
+                                                <a class="page-link" href="<?php echo htmlspecialchars($product_page_url($page + 1), ENT_QUOTES, 'UTF-8'); ?>" aria-label="Next page">Next</a>
+                                            <?php else: ?>
+                                                <span class="page-link" aria-disabled="true">Next</span>
+                                            <?php endif; ?>
+                                        </li>
+                                    </ul>
+                                </nav>
+                            <?php endif; ?>
                         </div>
                     </div>
                 </div>
@@ -423,16 +550,6 @@ $extra_js = [
         });
     });
 
-    // Client-side search filtering
-    document.getElementById('searchProduct').addEventListener('keyup', function() {
-        let filter = this.value.toLowerCase();
-        let rows = document.querySelectorAll('#productsTable tbody tr');
-        
-        rows.forEach(row => {
-            let text = row.innerText.toLowerCase();
-            row.classList.toggle('table-row-hidden', !text.includes(filter));
-        });
-    });
 </script>
 
 <?php if (!empty($success)): ?>
