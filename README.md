@@ -385,6 +385,53 @@ or filesystem secrets. It is a download mechanism only; backup retention,
 encryption at rest, transfer protection, and restore verification remain
 deployment responsibilities.
 
+Batch 15 verified a real application-generated backup by restoring it into a
+uniquely named temporary MySQL database. The isolated restore matched the
+source table set, row counts, keys, foreign keys, indexes, and checks; the
+restored bcrypt password hashes remained usable for local administrator login.
+The temporary database, temporary restricted runtime account, container copy,
+and backup artifact were removed after verification. This is evidence for the
+local Docker setup only and is not a claim of production disaster-recovery
+readiness.
+
+### Backup and restore procedure
+
+For a backup, an active administrator must open Settings, enter the current
+password for re-authentication, and submit the protected backup form. Keep the
+download outside the document root and outside the repository. Never email,
+serve, or commit the file; it contains credential-bearing one-way Staff
+password hashes and must be treated as highly sensitive.
+
+For a controlled restore, use a deployment/schema account or a controlled root
+initialization path. Restore into a new, uniquely named database first, never
+directly over the live application database:
+
+```bash
+# Example names only; choose a unique temporary database and file location.
+RESTORE_DB=myshop_restore_qa_<timestamp>
+BACKUP_FILE=/secure/temporary/path/myshop_database_backup.sql
+
+mysql --host="$DB_HOST" --port="$DB_PORT" \
+  --user="$DB_SCHEMA_USER" --password --database="$RESTORE_DB" \
+  < "$BACKUP_FILE"
+```
+
+After importing, compare the source and restored table set, row counts,
+constraints, indexes, foreign keys, and password-hash format. If application
+verification is required, point a temporary application instance at the
+restore database using a restricted runtime account. Drop only the uniquely
+named temporary database and account after verification, and securely remove
+the temporary backup artifact. Do not run restore operations from PHP or a web
+request.
+
+Encryption at rest, encryption in transit, access control, retention duration,
+key management, backup rotation, and secure destruction are deployment-owner
+responsibilities. Suggested planning placeholders, which must be replaced by
+explicit deployment decisions, are:
+
+- RPO: `TBD_DEPLOYMENT_DECISION` (define the maximum acceptable data loss).
+- RTO: `TBD_DEPLOYMENT_DECISION` (define the maximum acceptable restoration time).
+
 ## Browser security boundary
 
 The public document root emits these enforced headers from `public/.htaccess`:
@@ -468,8 +515,9 @@ These controls still require runtime and deployment verification; they are not a
 claim of production readiness.
 
 Current limitations and deployment responsibilities include: no complete
-automated regression suite, no verified backup restore in this repository, no
-cross-browser or accessibility certification, Google Fonts remains an explicitly
+automated regression suite, no production disaster-recovery restore or
+cross-site backup drill, no cross-browser or accessibility certification,
+Google Fonts remains an explicitly
 documented external CSP/SRI exception until fonts are self-hosted, production
 HTTPS/HSTS and secret provisioning are deployment concerns, and order-detail
 visibility currently allows authenticated staff according to the application’s
@@ -486,6 +534,6 @@ does not certify deployment behavior or production readiness.
 
 The project still has no complete automated regression suite. Before any real
 deployment, run the Docker/browser smoke checklist, authentication and CSRF
-tests, concurrent inventory/order tests, upload and export tests, backup restore
-verification, and deployment-specific HTTPS and header checks against the
-target environment.
+tests, concurrent inventory/order tests, upload and export tests, a
+deployment-specific backup restore and disaster-recovery drill, and
+deployment-specific HTTPS and header checks against the target environment.
