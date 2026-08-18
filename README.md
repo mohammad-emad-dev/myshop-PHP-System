@@ -3,12 +3,15 @@
 Native PHP and MySQL inventory, point-of-sale, and order management application.
 
 The repository contains the completed application-hardening work through Batch
-10. The current codebase includes the database and installation foundation,
+13 and the Batch 14 migration and database least-privilege hardening. The
+current codebase includes the database and installation foundation,
 authentication and HTTP-boundary protections, inventory/order data-integrity
 controls, browser/XSS hardening, upload and CSV safeguards, protected backups,
-security headers/CSP, reproducible Docker setup, browser-QA fixes, and release
-hygiene. Batch 11 is the final local pre-commit gate; it does not redesign the
-UI or change stock and order business logic.
+security headers/CSP, reproducible Docker setup, browser-QA fixes, release
+hygiene, and server-side product pagination. Batch 14 keeps the canonical
+schema unchanged while making the active-staff migration safe across supported
+database baselines and restricting the normal PHP runtime account to CRUD
+privileges.
 
 ## Project overview and architecture
 
@@ -86,8 +89,10 @@ notepad .env
 ```
 
 The normal web service receives only `DB_HOST`, `DB_PORT`, `DB_NAME`,
-`DB_USER`, and `DB_PASSWORD`. The `BOOTSTRAP_ADMIN_*` variables are used only
-by the opt-in CLI bootstrap profile.
+`DB_USER`, and `DB_PASSWORD`. `DB_SCHEMA_USER` and `DB_SCHEMA_PASSWORD` are
+deployment-only documentation variables; they are not passed to the web
+service. The `BOOTSTRAP_ADMIN_*` variables are used only by the opt-in CLI
+bootstrap profile.
 
 ### 2. Validate and start the stack
 
@@ -100,9 +105,17 @@ docker compose --env-file .env ps
 ```
 
 On the first start of a new `mysql_data` volume, MySQL automatically imports
-`database/schema.sql` as `001-schema.sql`. This is the canonical Batch 1
-schema and contains no administrator password or demo user. Initialization
-scripts do not run again for an already initialized volume.
+`database/schema.sql` as `001-schema.sql`, then runs a root-only initialization
+hook that applies `database/batch14_runtime_privileges.sql` to the configured
+runtime account. This is the canonical schema and contains no administrator
+password or demo user. Initialization scripts do not run again for an already
+initialized volume.
+
+The normal PHP service uses only the runtime account. The clean-volume hook
+explicitly revokes the broad privileges initially granted by the official
+MySQL image and grants only `SELECT`, `INSERT`, `UPDATE`, and `DELETE` on the
+application database. Schema creation and migrations remain deployment/schema
+operations and are not performed by PHP requests.
 
 To inspect startup or health failures:
 
@@ -206,11 +219,11 @@ CREATE DATABASE ioms_db
     CHARACTER SET utf8mb4
     COLLATE utf8mb4_unicode_ci;
 
-CREATE USER 'ioms_app'@'127.0.0.1'
+CREATE USER 'myshop_runtime'@'%'
     IDENTIFIED BY 'REPLACE_WITH_A_LONG_RANDOM_PASSWORD';
 
 GRANT SELECT, INSERT, UPDATE, DELETE
-    ON ioms_db.* TO 'ioms_app'@'127.0.0.1';
+    ON ioms_db.* TO 'myshop_runtime'@'%';
 
 FLUSH PRIVILEGES;
 ```
@@ -228,12 +241,18 @@ process environment instead:
 DB_HOST=127.0.0.1
 DB_PORT=3306
 DB_NAME=ioms_db
-DB_USER=ioms_app
+DB_USER=myshop_runtime
 DB_PASSWORD=your_actual_local_password
 ```
 
 All five variables are required. The application does not fall back to a blank
-password, `root`, or another implicit local-development credential.
+password, `root`, or another implicit local-development credential. The
+runtime account must not receive `CREATE`, `ALTER`, `DROP`, `INDEX`,
+`GRANT OPTION`, or global administrative privileges.
+
+Use a separate deployment/schema account for imports and migrations, or use
+the controlled root initialization path in Docker. The schema account is never
+passed to the normal PHP service.
 
 ### 3. Import the canonical schema
 
@@ -264,18 +283,39 @@ deployment/schema account:
 
 1. `database/batch2_staff_active.sql`
 2. `database/batch3_product_history.sql`
+3. `database/batch14_runtime_privileges.sql`
 
-Run the first migration successfully before starting the second. These files
+Run each migration successfully before starting the next. These files
 must be executed from a controlled CLI/deployment process and must never be
 included from PHP, `config/db.php`, a web request, or an application startup
 path. Do not run them with a client option that ignores SQL errors. Stop on the
 first failure, preserve the error output, and inspect the database before
 retrying; do not blindly rerun a partially applied migration.
 
+Batch 2 is an idempotent baseline bridge. It conditionally adds the
+`Staff.is_active` column, `chk_staff_is_active` check, and `idx_staff_active`
+index only when they are missing. It is therefore safe to run against both an
+old Batch 1 database and a current database created from `database/schema.sql`.
+An unexpected existing index definition or unrelated DDL failure stops the
+migration; failures are not ignored.
+
 Before running the migrations, take a verified backup and confirm that the
-database uses InnoDB and was created from the canonical Batch 1 schema. Batch 2
-adds the `Staff.is_active` column and active-staff index. Batch 3 changes the
-history-preserving foreign keys for `OrderDetail` and `StockMovement`.
+database uses InnoDB and was created from the canonical Batch 1 schema. Batch 3
+changes the history-preserving foreign keys for `OrderDetail` and
+`StockMovement`. Batch 14 revokes excessive privileges from the runtime account
+and grants only the application CRUD set. It requires the deployment account
+to set the runtime account variables before sourcing the file:
+
+```bash
+mysql --host="$DB_HOST" --port="$DB_PORT" \
+  --user="$DB_SCHEMA_USER" --password --database="$DB_NAME" \
+  --init-command="SET @myshop_runtime_user = '$DB_USER'; SET @myshop_runtime_host = '%';" \
+  < database/batch14_runtime_privileges.sql
+```
+
+Use the actual MySQL account host if an existing deployment does not use `%`.
+The schema account password is entered interactively or supplied by the
+deployment secret manager; no migration credential belongs in this repository.
 
 Databases created by versions older than Batch 1 may have different tables,
 columns, or foreign-key names. Stop and perform a manual schema and data

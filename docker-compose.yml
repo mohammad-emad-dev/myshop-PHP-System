@@ -47,6 +47,16 @@ services:
         source: ./database/schema.sql
         target: /docker-entrypoint-initdb.d/001-schema.sql
         read_only: true
+      # The official image initially grants MYSQL_USER broad database access.
+      # This root-run init hook replaces those grants with runtime CRUD only.
+      - type: bind
+        source: ./database/002-restrict-runtime-user.sh
+        target: /docker-entrypoint-initdb.d/002-restrict-runtime-user.sh
+        read_only: true
+      - type: bind
+        source: ./database/batch14_runtime_privileges.sql
+        target: /usr/local/share/myshop/batch14_runtime_privileges.sql
+        read_only: true
     healthcheck:
       test: ["CMD-SHELL", "MYSQL_PWD=\"$${MYSQL_ROOT_PASSWORD}\" mysqladmin ping --host=127.0.0.1 --user=root --silent"]
       interval: 5s
