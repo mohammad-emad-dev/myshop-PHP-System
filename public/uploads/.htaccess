@@ -7,13 +7,6 @@ Options -Indexes -ExecCGI
     </FilesMatch>
 </IfModule>
 
-<IfModule !mod_authz_core.c>
-    <FilesMatch "\.(?:php|php[0-9]?|phtml|phar|cgi|pl|py|sh)$">
-        Order allow,deny
-        Deny from all
-    </FilesMatch>
-</IfModule>
-
 <IfModule mod_mime.c>
     RemoveHandler .php .php3 .php4 .php5 .php7 .php8 .phtml .phar .cgi .pl .py .sh
     RemoveType .php .php3 .php4 .php5 .php7 .php8 .phtml .phar .cgi .pl .py .sh
