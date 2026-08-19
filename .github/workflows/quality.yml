@@ -77,27 +77,36 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
+      - name: Set up PHP for production preflight
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: none
+
       - name: Create temporary production configuration
         shell: bash
         run: |
           set -Eeuo pipefail
           production_env="$RUNNER_TEMP/myshop-production.env"
           runtime_password="$(openssl rand -hex 24)"
+          schema_password="$(openssl rand -hex 24)"
           root_password="$(openssl rand -hex 24)"
           {
             printf 'DB_NAME=myshop_ci\n'
             printf 'DB_USER=myshop_ci_runtime\n'
             printf 'DB_PASSWORD=%s\n' "$runtime_password"
+            printf 'DB_SCHEMA_USER=myshop_ci_schema\n'
+            printf 'DB_SCHEMA_PASSWORD=%s\n' "$schema_password"
             printf 'MYSQL_ROOT_PASSWORD=%s\n' "$root_password"
             printf 'PHP_BASE_IMAGE=php:8.3-apache-bookworm@sha256:69e641a40929c9db9d1ce43b982d46f6701ccdd5f7b4c32d5bd773cae6882393\n'
             printf 'PRODUCTION_APP_IMAGE=myshop-app:ci-%s\n' "$GITHUB_SHA"
             printf 'PRODUCTION_MYSQL_IMAGE=%s\n' "$MYSQL_CI_IMAGE"
-            printf 'TRUSTED_PROXY_IPS=\n'
-            printf 'HSTS_ENABLED=false\n'
+            printf 'TRUSTED_PROXY_IPS=127.0.0.1\n'
+            printf 'HSTS_ENABLED=true\n'
             printf 'HSTS_MAX_AGE=31536000\n'
           } > "$production_env"
           chmod 600 "$production_env"
-          unset runtime_password root_password
+          unset runtime_password schema_password root_password
 
       - name: Validate production Compose configuration
         shell: bash
@@ -116,6 +125,24 @@ jobs:
             --env-file "$RUNNER_TEMP/myshop-production.env" \
             --file docker-compose.production.yml \
             build --pull app
+
+      - name: Run fail-closed production preflight
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          production_env="$RUNNER_TEMP/myshop-production.env"
+          preflight_env="$RUNNER_TEMP/myshop-production-preflight.env"
+          app_image_id="$(docker image inspect "myshop-app:ci-$GITHUB_SHA" --format '{{.Id}}')"
+          app_digest="${app_image_id#sha256:}"
+          if [[ ! "$app_digest" =~ ^[0-9a-f]{64}$ ]]; then
+            echo 'Built production image did not expose a valid immutable image identifier.' >&2
+            exit 1
+          fi
+          cp "$production_env" "$preflight_env"
+          sed -i "s#^PRODUCTION_APP_IMAGE=.*#PRODUCTION_APP_IMAGE=myshop-app@sha256:$app_digest#" "$preflight_env"
+          php scripts/production-preflight.php \
+            --env-file "$preflight_env" \
+            --compose-file docker-compose.production.yml
 
   browser-qa:
     name: Disposable Browser QA and accessibility regression

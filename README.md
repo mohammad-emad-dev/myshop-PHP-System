@@ -139,6 +139,14 @@ The production application image copies the reviewed source at build time and ha
 
 Fresh-volume database initialization uses the canonical schema and the restricted runtime-account initializer. Existing databases still require the controlled schema-account migration process documented above; do not treat container startup as a migration mechanism. The CLI-only bootstrap can be run as a controlled one-shot using deployment-injected `BOOTSTRAP_ADMIN_*` variables; never put those values in the image, repository, command history, or logs.
 
+The fail-closed production preflight validates required production settings, rejects placeholder credentials and mutable image tags, checks HSTS and trusted-proxy configuration, and confirms that root/schema credentials are not passed to the normal app service:
+
+~~~powershell
+php scripts/production-preflight.php --env-file .env.production --compose-file docker-compose.production.yml
+~~~
+
+See [docs/PRODUCTION-DEPLOYMENT.md](docs/PRODUCTION-DEPLOYMENT.md) for the complete deployment, backup, migration, readiness, rollback, HSTS, logging, and external-operations runbook. This repository remains a production-deployable baseline rather than a standalone production operation.
+
 ### Production environment and TLS contract
 
 The production environment must provide, through a secret manager or protected deployment configuration:
@@ -146,10 +154,10 @@ The production environment must provide, through a secret manager or protected d
 - `DB_NAME`, restricted CRUD-only `DB_USER`, and `DB_PASSWORD`.
 - `MYSQL_ROOT_PASSWORD` only to the database initialization/deployment boundary; never to the normal application service.
 - `PHP_BASE_IMAGE`, reviewed at the exact PHP 8.3 Apache release/digest used for the build.
-- `PRODUCTION_APP_IMAGE`, preferably an immutable registry digest for the reviewed application image.
+- `PRODUCTION_APP_IMAGE`, an immutable registry digest for the reviewed application image.
 - `PRODUCTION_MYSQL_IMAGE`, pinned to the reviewed MySQL version/digest. The example currently records the reviewed MySQL 8.4.3 digest; refresh it deliberately during patching.
-- `TRUSTED_PROXY_IPS`, a comma-separated exact-IP allow-list. Leave it empty unless a fixed reverse proxy is the direct peer.
-- `HSTS_ENABLED=false` during local HTTP development. Set it to `true` only after HTTPS is guaranteed for the complete hostname and subdomain policy; set `HSTS_MAX_AGE` deliberately.
+- `TRUSTED_PROXY_IPS`, a comma-separated exact-IP allow-list for the fixed reverse proxy; production preflight requires it when HSTS is enabled.
+- `HSTS_ENABLED=false` during local HTTP development. Production preflight requires `true` after HTTPS is guaranteed for the complete hostname and subdomain policy; set `HSTS_MAX_AGE` deliberately.
 
 The PHP session marks cookies `Secure` when the request is HTTPS. `X-Forwarded-Proto: https` is honored only when `REMOTE_ADDR` is in `TRUSTED_PROXY_IPS`; arbitrary client-supplied forwarding headers are ignored. TLS certificates, HTTPS redirects, proxy source-IP preservation, trusted-proxy network policy, HSTS preload/subdomain decisions, and external firewalling remain deployment responsibilities. The repository does not force HTTPS in local development.
 
