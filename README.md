@@ -49,6 +49,18 @@ screenshots/            Curated documentation images
 
 Only public/ should be exposed as the web document root. The repository root, config/, database/, backups, and local environment files must not be publicly served.
 
+### Shared service ownership
+
+`includes/functions.php` remains the compatibility facade. Existing pages and CLI utilities should continue requiring it; it loads the focused shared modules exactly once and preserves the legacy global function names and return contracts.
+
+- `includes/security.php` owns sessions, CSRF, security headers/CSP, trusted-proxy HTTPS detection, request correlation, source-IP helpers, and asset integrity metadata.
+- `includes/audit.php` owns bounded audit metadata handling, audit writes, filters, and paginated audit-log reads.
+- `includes/pagination.php` owns page/page-size normalization and bounded list-search normalization.
+- `includes/backup.php` remains separate because backup streaming has its own operational and authorization boundary.
+- Database/business workflows, including authentication rate limiting, products, inventory, orders, staff, and reference-data CRUD, remain in the facade until a future refactor establishes and tests their dependency boundaries.
+
+Future features should place new code in the smallest cohesive module that owns its dependencies, then expose it through the facade only when existing callers require the compatibility surface. Modules must not require the facade back, and functions must not be duplicated across modules.
+
 ## Run locally with Docker
 
 ### Requirements
