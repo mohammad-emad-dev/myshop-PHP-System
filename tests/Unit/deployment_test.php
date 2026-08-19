@@ -39,6 +39,7 @@ function run_deployment_unit_tests(): int
     $uploadHtaccess = file_get_contents($repository . '/public/uploads/.htaccess');
     $healthEndpoint = file_get_contents($repository . '/public/health.php');
     $readinessEndpoint = file_get_contents($repository . '/public/ready.php');
+    $databaseConfig = file_get_contents($repository . '/config/db.php');
     $gitignore = file_get_contents($repository . '/.gitignore');
     $environmentExample = file_get_contents($repository . '/.env.example');
     $qualityWorkflow = file_get_contents($repository . '/.github/workflows/quality.yml');
@@ -57,6 +58,7 @@ function run_deployment_unit_tests(): int
         $uploadHtaccess,
         $healthEndpoint,
         $readinessEndpoint,
+        $databaseConfig,
         $gitignore,
         $environmentExample,
         $qualityWorkflow,
@@ -118,6 +120,8 @@ function run_deployment_unit_tests(): int
     $tests->assertFalse(strpos($healthEndpoint, "config/db.php") !== false, 'Liveness endpoint must not require database availability.');
     $tests->assertContains('SELECT 1', $readinessEndpoint, 'Readiness endpoint must probe database availability.');
     $tests->assertContains('http_response_code(503)', $readinessEndpoint, 'Readiness endpoint must fail with HTTP 503 when the database is unavailable.');
+    $tests->assertContains('Content-Type: application/json; charset=utf-8', $databaseConfig, 'Database initialization readiness failures must declare JSON content type.');
+    $tests->assertContains('exit(\'{"status":"not_ready","check":"database"}\')', $databaseConfig, 'Database initialization readiness failures must use the exact generic JSON contract.');
     $tests->assertContains('PRODUCTION_APP_IMAGE', $preflightScript, 'Production preflight must validate the application image reference.');
     $tests->assertContains('MYSQL_ROOT_PASSWORD', $preflightScript, 'Production preflight must validate root credential boundaries.');
     $tests->assertContains('immutable sha256 digest', $preflightScript, 'Production preflight must require immutable image references.');

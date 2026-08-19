@@ -224,7 +224,7 @@ services:
 
     Invoke-Compose -CommandArguments @('stop', 'db') | Out-Null
     Wait-ForHttpResponse -Url "$baseUrl/health.php" -ExpectedStatus 200 -ExpectedBody '{"status":"ok","check":"liveness"}' -Attempts 30
-    Wait-ForHttpResponse -Url "$baseUrl/ready.php" -ExpectedStatus 503 -ExpectedBody '{"status":"not_ready"}' -Attempts 30
+    Wait-ForHttpResponse -Url "$baseUrl/ready.php" -ExpectedStatus 503 -ExpectedBody '{"status":"not_ready","check":"database"}' -Attempts 30
 
     Invoke-Compose -CommandArguments @('start', 'db') | Out-Null
     Wait-ForHttpResponse -Url "$baseUrl/ready.php" -ExpectedStatus 200 -ExpectedBody '{"status":"ready","check":"database"}' -Attempts 60

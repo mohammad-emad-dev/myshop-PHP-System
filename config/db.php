@@ -24,7 +24,7 @@ $fail_database_connection = static function ($technical_message) {
     if (defined('DB_FAILURE_RESPONSE_JSON') && DB_FAILURE_RESPONSE_JSON && PHP_SAPI !== 'cli') {
         header('Content-Type: application/json; charset=utf-8');
         header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
-        exit('{"status":"not_ready"}');
+        exit('{"status":"not_ready","check":"database"}');
     }
 
     exit('Database connection is unavailable.');

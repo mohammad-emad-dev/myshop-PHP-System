@@ -27,10 +27,13 @@ function run_operational_scenario(TestContext $tests): void
             'Liveness response must include one server-generated request ID.'
         );
 
-        [$readyStatus, $readyBody] = test_http_get($server[1], '/ready.php');
+        [$readyStatus, $readyBody, $readyHeaders] = test_http_get($server[1], '/ready.php');
         $tests->assertSame(200, $readyStatus, 'Healthy readiness endpoint must return HTTP 200.');
-        $tests->assertContains('"status":"ready"', $readyBody, 'Readiness endpoint did not report ready.');
-        $tests->assertContains('"check":"database"', $readyBody, 'Readiness endpoint did not identify its database check.');
+        $tests->assertSame('{"status":"ready","check":"database"}', $readyBody, 'Readiness endpoint returned an unexpected healthy body.');
+        $tests->assertTrue(
+            count(array_filter($readyHeaders, static fn(string $header): bool => stripos($header, 'Content-Type: application/json; charset=utf-8') === 0)) === 1,
+            'Healthy readiness response must declare its JSON content type.'
+        );
         $tests->assertFalse(stripos($readyBody, 'SQL') !== false, 'Readiness response must not expose SQL diagnostics.');
 
         [$notFoundStatus, $notFoundBody] = test_http_get($server[1], '/qa-batch26-missing-route.php');
@@ -47,9 +50,13 @@ function run_operational_scenario(TestContext $tests): void
 
         $missingDatabase = 'myshop_health_missing_' . gmdate('YmdHis') . '_' . bin2hex(random_bytes(3));
         $servers[] = test_start_local_server(['DB_NAME' => $missingDatabase]);
-        [$failedReadyStatus, $failedReadyBody] = test_http_get($servers[1][1], '/ready.php');
+        [$failedReadyStatus, $failedReadyBody, $failedReadyHeaders] = test_http_get($servers[1][1], '/ready.php');
         $tests->assertSame(503, $failedReadyStatus, 'Database-failure readiness must return HTTP 503.');
-        $tests->assertContains('"status":"not_ready"', $failedReadyBody, 'Database-failure readiness response must be generic.');
+        $tests->assertSame('{"status":"not_ready","check":"database"}', $failedReadyBody, 'Database-failure readiness response must use the exact generic contract.');
+        $tests->assertTrue(
+            count(array_filter($failedReadyHeaders, static fn(string $header): bool => stripos($header, 'Content-Type: application/json; charset=utf-8') === 0)) === 1,
+            'Database-failure readiness response must declare its JSON content type.'
+        );
         $tests->assertFalse(stripos($failedReadyBody, 'mysqli') !== false, 'Readiness response must not expose driver errors.');
         $tests->assertFalse(stripos($failedReadyBody, $missingDatabase) !== false, 'Readiness response must not expose database names.');
         $tests->assertFalse(stripos($failedReadyBody, 'password') !== false, 'Readiness response must not expose credentials.');
