@@ -180,7 +180,26 @@ docker compose --env-file .env run --rm --no-deps app sh -c 'find config databas
 
 The reviewed baseline has also been checked with disposable database integration tests, authorization/CSRF HTTP checks, Docker health checks, JavaScript syntax checks, and database-failure return-contract tests.
 
-Every push to `main` or `security-hardening-baseline`, and every pull request, runs the repository Quality Gate in GitHub Actions. It validates PHP syntax, JavaScript syntax, Docker Compose configuration, and the disposable database regression suite.
+Every push to `main` or `security-hardening-baseline`, and every pull request, runs the repository Quality Gate in GitHub Actions. It validates tracked PHP and JavaScript syntax, development and production Docker Compose configuration, the production image build, the canonical schema/migration chain, a dependency-free tracked-file secret/configuration scan, and the full disposable MySQL regression suite. The CI MySQL container uses the reviewed immutable `mysql:8.4.3@sha256:106d5197fd8e4892980469ad42eb20f7a336bd81509aae4ee175d852f5cc4565` reference.
+
+The repository security check intentionally scans only Git-tracked files. It ignores the safe `.env.example`, documentation examples, and test fixtures, never prints matched values, and reports only high-confidence secrets, committed private keys, or unsafe production/workflow configuration:
+
+~~~powershell
+php scripts/repository-security-check.php
+~~~
+
+To exercise the production Compose checks locally with disposable values, copy the example environment to a file under the system temporary directory, replace only the application image with a local CI tag, then remove the file after validation:
+
+~~~powershell
+$productionEnv = Join-Path $env:TEMP 'myshop-production-ci.env'
+Copy-Item .env.example $productionEnv
+(Get-Content $productionEnv) -replace '^PRODUCTION_APP_IMAGE=.*$', 'PRODUCTION_APP_IMAGE=myshop-app:ci-local' | Set-Content $productionEnv
+docker compose --env-file $productionEnv --file docker-compose.production.yml config --quiet
+docker compose --env-file $productionEnv --file docker-compose.production.yml build --pull app
+Remove-Item -LiteralPath $productionEnv -Force
+~~~
+
+The temporary values are placeholders only; with `TEST_DB_*` variables pointed at a separate disposable MySQL container, run `php tests/validate_schema.php` for the schema/migration check or `php tests/run.php` for the full suite, as described below. Neither command targets the normal `ioms_db` database.
 
 ### Automated regression tests
 

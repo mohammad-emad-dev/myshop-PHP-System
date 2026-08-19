@@ -7,13 +7,22 @@ on:
       - security-hardening-baseline
   pull_request:
 
+concurrency:
+  group: quality-gate-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
+
+env:
+  MYSQL_CI_IMAGE: 'mysql:8.4.3@sha256:106d5197fd8e4892980469ad42eb20f7a336bd81509aae4ee175d852f5cc4565'
 
 jobs:
   static-validation:
     name: Static validation
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
       - name: Check out repository
@@ -29,21 +38,141 @@ jobs:
       - name: Lint PHP sources
         shell: bash
         run: |
-          find config database includes public tests -type f -name '*.php' -print0 \
-            | xargs -0 -n1 php -l
+          set -Eeuo pipefail
+          git ls-files -z -- '*.php' \
+            | while IFS= read -r -d '' file; do
+                php -l "$file"
+              done
 
       - name: Validate JavaScript syntax
         shell: bash
         run: |
-          for file in public/assets/js/*.js; do
-            node --check "$file"
-          done
+          set -Eeuo pipefail
+          git ls-files -z -- '*.js' \
+            | while IFS= read -r -d '' file; do
+                node --check "$file"
+              done
 
-      - name: Validate Docker Compose configuration
+      - name: Validate development Compose configuration
         shell: bash
         run: |
-          cp .env.example .env
-          docker compose --env-file .env config --quiet
+          set -Eeuo pipefail
+          development_env="$RUNNER_TEMP/myshop-development.env"
+          cp .env.example "$development_env"
+          docker compose --env-file "$development_env" config --quiet
+
+      - name: Run dependency-free repository security check
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          php scripts/repository-security-check.php
+
+  production-validation:
+    name: Production Compose and image validation
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Create temporary production configuration
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          production_env="$RUNNER_TEMP/myshop-production.env"
+          runtime_password="$(openssl rand -hex 24)"
+          root_password="$(openssl rand -hex 24)"
+          {
+            printf 'DB_NAME=myshop_ci\n'
+            printf 'DB_USER=myshop_ci_runtime\n'
+            printf 'DB_PASSWORD=%s\n' "$runtime_password"
+            printf 'MYSQL_ROOT_PASSWORD=%s\n' "$root_password"
+            printf 'PHP_BASE_IMAGE=php:8.3-apache-bookworm@sha256:69e641a40929c9db9d1ce43b982d46f6701ccdd5f7b4c32d5bd773cae6882393\n'
+            printf 'PRODUCTION_APP_IMAGE=myshop-app:ci-%s\n' "$GITHUB_SHA"
+            printf 'PRODUCTION_MYSQL_IMAGE=%s\n' "$MYSQL_CI_IMAGE"
+            printf 'TRUSTED_PROXY_IPS=\n'
+            printf 'HSTS_ENABLED=false\n'
+            printf 'HSTS_MAX_AGE=31536000\n'
+          } > "$production_env"
+          chmod 600 "$production_env"
+          unset runtime_password root_password
+
+      - name: Validate production Compose configuration
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          docker compose \
+            --env-file "$RUNNER_TEMP/myshop-production.env" \
+            --file docker-compose.production.yml \
+            config --quiet
+
+      - name: Build production Docker image
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          docker compose \
+            --env-file "$RUNNER_TEMP/myshop-production.env" \
+            --file docker-compose.production.yml \
+            build --pull app
+
+  migration-schema-validation:
+    name: Disposable schema and migration validation
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mysqli, mbstring, gd, fileinfo
+          coverage: none
+
+      - name: Start isolated MySQL
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test_db_password="$(openssl rand -hex 24)"
+          echo "TEST_DB_PASSWORD=${test_db_password}" >> "$GITHUB_ENV"
+          docker run --detach --name myshop-schema-mysql \
+            --publish 127.0.0.1:33307:3306 \
+            --env MYSQL_ROOT_PASSWORD="$test_db_password" \
+            --env MYSQL_DATABASE=mysql \
+            "$MYSQL_CI_IMAGE" >/dev/null
+
+          for attempt in {1..60}; do
+            if docker exec myshop-schema-mysql \
+              mysqladmin ping --host=127.0.0.1 --user=root \
+              --password="$test_db_password" --silent >/dev/null 2>&1; then
+              exit 0
+            fi
+            sleep 2
+          done
+
+          echo 'Disposable MySQL did not become ready.' >&2
+          exit 1
+
+      - name: Validate canonical schema and migration order
+        shell: bash
+        env:
+          TEST_DB_HOST: 127.0.0.1
+          TEST_DB_PORT: '33307'
+          TEST_DB_ROOT_USER: root
+        run: |
+          set -Eeuo pipefail
+          TEST_DB_ROOT_PASSWORD="$TEST_DB_PASSWORD" php tests/validate_schema.php
+
+      - name: Remove isolated MySQL
+        if: always()
+        shell: bash
+        run: |
+          docker rm --force --volumes myshop-schema-mysql >/dev/null 2>&1 || true
 
   regression-tests:
     name: Disposable database regression tests
@@ -70,14 +199,14 @@ jobs:
           echo "TEST_DB_PASSWORD=${test_db_password}" >> "$GITHUB_ENV"
           docker run --detach --name myshop-regression-mysql \
             --publish 127.0.0.1:33306:3306 \
-            --env MYSQL_ROOT_PASSWORD="${test_db_password}" \
+            --env MYSQL_ROOT_PASSWORD="$test_db_password" \
             --env MYSQL_DATABASE=mysql \
-            mysql:8.4.3 >/dev/null
+            "$MYSQL_CI_IMAGE" >/dev/null
 
           for attempt in {1..60}; do
             if docker exec myshop-regression-mysql \
               mysqladmin ping --host=127.0.0.1 --user=root \
-              --password="${test_db_password}" --silent >/dev/null 2>&1; then
+              --password="$test_db_password" --silent >/dev/null 2>&1; then
               exit 0
             fi
             sleep 2
@@ -86,14 +215,15 @@ jobs:
           echo 'Disposable MySQL did not become ready.' >&2
           exit 1
 
-      - name: Run unit and integration regression tests
+      - name: Run full unit and integration regression suite
         shell: bash
         env:
           TEST_DB_HOST: 127.0.0.1
           TEST_DB_PORT: '33306'
           TEST_DB_ROOT_USER: root
         run: |
-          TEST_DB_ROOT_PASSWORD="${TEST_DB_PASSWORD}" php tests/run.php
+          set -Eeuo pipefail
+          TEST_DB_ROOT_PASSWORD="$TEST_DB_PASSWORD" php tests/run.php
 
       - name: Remove isolated MySQL
         if: always()

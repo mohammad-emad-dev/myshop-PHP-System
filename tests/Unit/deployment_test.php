@@ -17,6 +17,7 @@ function run_deployment_unit_tests(): int
     $uploadHtaccess = file_get_contents($repository . '/public/uploads/.htaccess');
     $gitignore = file_get_contents($repository . '/.gitignore');
     $environmentExample = file_get_contents($repository . '/.env.example');
+    $qualityWorkflow = file_get_contents($repository . '/.github/workflows/quality.yml');
 
     foreach ([
         $productionCompose,
@@ -27,6 +28,7 @@ function run_deployment_unit_tests(): int
         $uploadHtaccess,
         $gitignore,
         $environmentExample,
+        $qualityWorkflow,
     ] as $fixture) {
         $tests->assertTrue(is_string($fixture), 'Deployment fixture could not be read.');
     }
@@ -62,6 +64,12 @@ function run_deployment_unit_tests(): int
     $tests->assertContains('!.env.example', $gitignore, 'The safe environment template must remain reviewable.');
     $tests->assertContains('TRUSTED_PROXY_IPS=', $environmentExample, 'Trusted proxy configuration must be documented.');
     $tests->assertContains('HSTS_ENABLED=false', $environmentExample, 'HSTS must default off for local HTTP development.');
+    $tests->assertContains('cancel-in-progress: true', $qualityWorkflow, 'Obsolete Quality Gate runs must be cancelled.');
+    $tests->assertContains('contents: read', $qualityWorkflow, 'Quality Gate jobs need read-only repository permissions.');
+    $tests->assertContains('mysql:8.4.3@sha256:106d5197fd8e4892980469ad42eb20f7a336bd81509aae4ee175d852f5cc4565', $qualityWorkflow, 'CI MySQL must use the reviewed immutable digest.');
+    $tests->assertContains('scripts/repository-security-check.php', $qualityWorkflow, 'Quality Gate must run the dependency-free repository security check.');
+    $tests->assertContains('docker-compose.production.yml', $qualityWorkflow, 'Quality Gate must validate the production Compose file.');
+    $tests->assertContains('tests/validate_schema.php', $qualityWorkflow, 'Quality Gate must validate the schema and migration chain.');
 
     $originalServer = $_SERVER;
     $originalTrustedProxyIps = getenv('TRUSTED_PROXY_IPS');
