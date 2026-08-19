@@ -45,6 +45,7 @@ function run_deployment_unit_tests(): int
     $preflightScript = file_get_contents($repository . '/scripts/production-preflight.php');
     $supplyChainScript = file_get_contents($repository . '/scripts/ci-supply-chain-check.php');
     $releaseIntegrityScript = file_get_contents($repository . '/scripts/release-integrity-check.php');
+    $productionSmokeScript = file_get_contents($repository . '/scripts/run-production-smoke.ps1');
     $productionRunbook = file_get_contents($repository . '/docs/PRODUCTION-DEPLOYMENT.md');
 
     foreach ([
@@ -62,6 +63,7 @@ function run_deployment_unit_tests(): int
         $preflightScript,
         $supplyChainScript,
         $releaseIntegrityScript,
+        $productionSmokeScript,
         $productionRunbook,
     ] as $fixture) {
         $tests->assertTrue(is_string($fixture), 'Deployment fixture could not be read.');
@@ -104,6 +106,8 @@ function run_deployment_unit_tests(): int
     $tests->assertContains('scripts/repository-security-check.php', $qualityWorkflow, 'Quality Gate must run the dependency-free repository security check.');
     $tests->assertContains('scripts/ci-supply-chain-check.php', $qualityWorkflow, 'Quality Gate must run the dependency-free CI supply-chain policy check.');
     $tests->assertContains('scripts/release-integrity-check.php', $qualityWorkflow, 'Quality Gate must emit safe release integrity evidence.');
+    $tests->assertContains('production-runtime-smoke', $qualityWorkflow, 'Quality Gate must run the disposable production runtime smoke job.');
+    $tests->assertContains('scripts/run-production-smoke.ps1', $qualityWorkflow, 'Quality Gate must invoke the production runtime smoke runner.');
     $tests->assertContains('docker-compose.production.yml', $qualityWorkflow, 'Quality Gate must validate the production Compose file.');
     $tests->assertContains('tests/validate_schema.php', $qualityWorkflow, 'Quality Gate must validate the schema and migration chain.');
     $tests->assertContains('production-preflight.php', $qualityWorkflow, 'Quality Gate must run the production preflight check.');
@@ -119,6 +123,12 @@ function run_deployment_unit_tests(): int
     $tests->assertContains('immutable sha256 digest', $preflightScript, 'Production preflight must require immutable image references.');
     $tests->assertContains('full commit SHA', $supplyChainScript, 'CI supply-chain policy must require full action commit SHAs.');
     $tests->assertContains('schema_migration_version', $releaseIntegrityScript, 'Release integrity evidence must record the schema/migration version.');
+    $tests->assertContains('/health.php', $productionSmokeScript, 'Production smoke must exercise the liveness endpoint.');
+    $tests->assertContains('ExpectedStatus 503', $productionSmokeScript, 'Production smoke must verify readiness failure when MySQL is stopped.');
+    $tests->assertContains('ReadonlyRootfs', $productionSmokeScript, 'Production smoke must inspect the read-only application root.');
+    $tests->assertContains('no-new-privileges:true', $productionSmokeScript, 'Production smoke must inspect no-new-privileges.');
+    $tests->assertContains('command -v git', $productionSmokeScript, 'Production smoke must verify Git is absent from the production image.');
+    $tests->assertContains('display_errors', $productionSmokeScript, 'Production smoke must verify PHP error display is disabled.');
     $tests->assertContains('back up the database', strtolower($productionRunbook), 'Production runbook must require a database backup before migrations.');
     $tests->assertContains('rollback', strtolower($productionRunbook), 'Production runbook must document rollback behavior.');
 

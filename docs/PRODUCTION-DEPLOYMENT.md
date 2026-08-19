@@ -38,7 +38,34 @@ mutable image tags, invalid HSTS values, invalid proxy addresses, and root or
 schema credentials in the normal `app` service. It does not contact a
 registry, database, secret manager, or production host.
 
-## 2. Verify the immutable release and release evidence
+## 2. Disposable production runtime smoke
+
+Before a deployment change is accepted, run the disposable runtime smoke from
+the repository root:
+
+```text
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-production-smoke.ps1
+```
+
+The runner creates a unique Compose project and fresh named volumes, builds
+the current production image, injects generated temporary database
+credentials, and publishes only the app to a temporary loopback port. It
+verifies `/health.php` and `/ready.php`, stops MySQL to require a generic HTTP
+503 from readiness, starts MySQL again to require HTTP 200, and inspects the
+runtime for a read-only root, the intended uploads volume, no host database
+port, `no-new-privileges`, restricted app environment, no Git executable or
+repository metadata, and disabled PHP error display.
+
+The runner performs no business mutations and never uses `.env`, `ioms_db`,
+production credentials, GitHub secrets, or persistent deployment volumes. It
+removes its image, containers, volumes, network, temporary environment, and
+HTTP scratch file in a `finally` cleanup path; cleanup failure is fatal. The
+smoke proves only this repository's disposable Docker runtime boundary. It
+does not verify external TLS, firewalling, registry promotion or signing,
+secret-manager delivery, monitoring, backup storage, migration ownership, or
+rollback infrastructure.
+
+## 3. Verify the immutable release and release evidence
 
 Resolve and review the application, PHP base, and MySQL image digests before
 the change window. Confirm that the application digest is the reviewed image
@@ -86,7 +113,7 @@ The production image has no repository bind mount. The application root is
 read-only; only the named `production_uploads` volume is writable by the
 application. MySQL has no published host port.
 
-## 3. Back up the database before schema changes
+## 4. Back up the database before schema changes
 
 Before applying any migration to an existing database:
 
@@ -103,7 +130,7 @@ Never place them under `public/`, in a Docker bind mount serving the app, or in
 Git. The repository streams the SQL backup but does not encrypt or replicate
 it; those are external operations.
 
-## 4. Apply migrations in order
+## 5. Apply migrations in order
 
 Use the controlled schema/deployment account, never `DB_USER`, and never run
 migrations from an HTTP request or application startup. For a database created
@@ -125,7 +152,7 @@ target where possible. A database restore or rollback must use a controlled
 schema account and a verified backup; it must not use a browser-accessible
 restore route.
 
-## 5. Start and verify the release
+## 6. Start and verify the release
 
 Start the reviewed Compose release only after preflight, image, backup, and
 migration checks pass:
@@ -155,7 +182,7 @@ perform destructive or business-volume actions as a smoke test. Confirm that
 existing uploads are present through the named `production_uploads` volume and
 that new validated uploads do not require a writable application root.
 
-## 6. HSTS and reverse proxy requirements
+## 7. HSTS and reverse proxy requirements
 
 Terminate TLS at the approved reverse proxy or platform edge, preserve the
 direct proxy source IP, and forward HTTPS state only from an address in
@@ -168,7 +195,7 @@ The repository does not provision certificates, redirect HTTP to HTTPS,
 configure DNS, preserve proxy source addresses, manage firewall rules, or
 decide HSTS preload/subdomain policy.
 
-## 7. Rollback and database limitations
+## 8. Rollback and database limitations
 
 For an application-only regression, select the previously reviewed immutable
 `PRODUCTION_APP_IMAGE` in the protected deployment configuration and redeploy
@@ -190,7 +217,7 @@ The repository does not implement automatic database rollback, blue/green
 cutover, point-in-time recovery, replication failover, or zero-downtime
 orchestration.
 
-## 8. Logging, monitoring, and incident ownership
+## 9. Logging, monitoring, and incident ownership
 
 Collect Apache access logs from stdout and Apache/PHP technical errors from
 stderr. Retain and restrict them according to operational policy. Request IDs

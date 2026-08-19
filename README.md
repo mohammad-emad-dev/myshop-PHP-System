@@ -147,6 +147,29 @@ php scripts/production-preflight.php --env-file .env.production --compose-file d
 
 See [docs/PRODUCTION-DEPLOYMENT.md](docs/PRODUCTION-DEPLOYMENT.md) for the complete deployment, backup, migration, readiness, rollback, HSTS, logging, and external-operations runbook. This repository remains a production-deployable baseline rather than a standalone production operation.
 
+### Disposable production runtime smoke
+
+Run the production Compose baseline against a fresh, uniquely named disposable
+project without reading `.env` or using `ioms_db`:
+
+~~~powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-production-smoke.ps1
+~~~
+
+The runner builds the production stage from the current checkout, injects only
+generated temporary credentials, exposes the app on a loopback-only port, and
+does not publish MySQL. It verifies generic liveness/readiness responses,
+readiness `503` while MySQL is stopped and recovery to `200`, read-only root
+filesystem and writable-volume boundaries, `no-new-privileges`, forbidden
+credential absence from the app environment, Git absence, and disabled PHP
+error display. It removes the project, volumes, network, image, and temporary
+files in cleanup; cleanup failure fails the run.
+
+The Quality Gate runs this smoke as a separate 15-minute read-only job. This is
+not a deployment and does not verify external TLS, firewalling, registry
+promotion/signing, secret-manager delivery, monitoring, backup storage, or
+rollback infrastructure.
+
 ### Production environment and TLS contract
 
 The production environment must provide, through a secret manager or protected deployment configuration:
@@ -211,7 +234,7 @@ docker compose --env-file .env run --rm --no-deps app sh -c 'find config databas
 
 The reviewed baseline has also been checked with disposable database integration tests, authorization/CSRF HTTP checks, Docker health checks, JavaScript syntax checks, and database-failure return-contract tests.
 
-Every push to `main` or `security-hardening-baseline`, and every pull request, runs the repository Quality Gate in GitHub Actions. It validates tracked PHP and JavaScript syntax, development and production Docker Compose configuration, the production image build and preflight, safe release metadata, the canonical schema/migration chain, dependency-free tracked-file secret/configuration and CI supply-chain policy scans, and the full disposable MySQL regression suite. The CI MySQL container uses the reviewed immutable `mysql:8.4.3@sha256:106d5197fd8e4892980469ad42eb20f7a336bd81509aae4ee175d852f5cc4565` reference.
+Every push to `main` or `security-hardening-baseline`, and every pull request, runs the repository Quality Gate in GitHub Actions. It validates tracked PHP and JavaScript syntax, development and production Docker Compose configuration, the production image build and preflight, the disposable production runtime smoke/isolation boundary, safe release metadata, the canonical schema/migration chain, dependency-free tracked-file secret/configuration and CI supply-chain policy scans, and the full disposable MySQL regression suite. The CI MySQL container uses the reviewed immutable `mysql:8.4.3@sha256:106d5197fd8e4892980469ad42eb20f7a336bd81509aae4ee175d852f5cc4565` reference.
 
 The repository security check intentionally scans only Git-tracked files. It ignores the safe `.env.example`, documentation examples, and test fixtures, never prints matched values, and reports only high-confidence secrets, committed private keys, or unsafe production/workflow configuration:
 

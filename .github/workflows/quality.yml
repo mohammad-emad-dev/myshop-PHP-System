@@ -237,6 +237,64 @@ jobs:
             exit 1
           fi
 
+  production-runtime-smoke:
+    name: Disposable production runtime smoke and isolation
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Verify smoke-test prerequisites
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          command -v pwsh
+          command -v curl
+          command -v docker
+          docker compose version
+
+      - name: Run disposable production runtime smoke
+        shell: pwsh
+        run: ./scripts/run-production-smoke.ps1
+
+      - name: Clean up leftover disposable production smoke resources
+        if: always()
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          cleanup_failed=0
+
+          mapfile -t containers < <(docker ps -aq --filter 'name=myshop-production-smoke-')
+          if ((${#containers[@]} > 0)); then
+            docker rm --force --volumes "${containers[@]}" || cleanup_failed=1
+          fi
+
+          mapfile -t volumes < <(docker volume ls -q --filter 'name=myshop-production-smoke-')
+          if ((${#volumes[@]} > 0)); then
+            docker volume rm "${volumes[@]}" || cleanup_failed=1
+          fi
+
+          mapfile -t networks < <(docker network ls -q --filter 'name=myshop-production-smoke-')
+          if ((${#networks[@]} > 0)); then
+            docker network rm "${networks[@]}" || cleanup_failed=1
+          fi
+
+          mapfile -t images < <(docker image ls -q --filter 'reference=myshop-production-smoke-*' | sort -u)
+          if ((${#images[@]} > 0)); then
+            docker image rm --force "${images[@]}" || cleanup_failed=1
+          fi
+
+          if ((cleanup_failed != 0)); then
+            echo 'Disposable production smoke cleanup failed.' >&2
+            exit 1
+          fi
+
   migration-schema-validation:
     name: Disposable schema and migration validation
     runs-on: ubuntu-latest
