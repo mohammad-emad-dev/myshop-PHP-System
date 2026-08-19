@@ -1,10 +1,14 @@
 <!-- Page Content Wrapper -->
 <div id="page-content-wrapper">
-    <nav class="navbar navbar-expand-lg navbar-light px-4 ui-navbar">
+    <nav class="navbar navbar-expand-lg navbar-light px-4 ui-navbar" aria-label="Top navigation">
+        <a class="visually-hidden-focusable ui-skip-link" href="#main-content">Skip to main content</a>
         <div class="d-flex align-items-center">
-            <i class="fas fa-bars fs-5 me-3" id="menu-toggle"></i>
+            <button type="button" class="btn btn-link p-0 me-3" id="menu-toggle"
+                aria-controls="sidebar-wrapper" aria-expanded="true" aria-label="Toggle sidebar navigation">
+                <i class="fas fa-bars fs-5" aria-hidden="true"></i>
+            </button>
             <div>
-                <h2 class="m-0"><?php echo isset($header_title) ? htmlspecialchars($header_title) : 'Dashboard'; ?></h2>
+                <h1 class="m-0"><?php echo isset($header_title) ? htmlspecialchars($header_title) : 'Dashboard'; ?></h1>
             </div>
         </div>
 
@@ -122,3 +126,4 @@
             </ul>
         </div>
     </nav>
+    <main id="main-content" tabindex="-1">

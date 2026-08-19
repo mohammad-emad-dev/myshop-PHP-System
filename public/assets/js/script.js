@@ -3,6 +3,7 @@ var toggleButton = document.getElementById('menu-toggle');
 if (toggleButton && wrapper) {
     toggleButton.addEventListener('click', function () {
         wrapper.classList.toggle('toggled');
+        toggleButton.setAttribute('aria-expanded', String(!wrapper.classList.contains('toggled')));
     });
 }
 

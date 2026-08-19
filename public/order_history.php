@@ -78,7 +78,7 @@ require_once '../includes/layouts/header.php';
             <div class="col-md-4">
                 <div class="p-3 bg-white shadow-sm d-flex justify-content-between align-items-center rounded-3 dashboard-card border-left-primary">
                     <div>
-                        <h4 class="fs-3 mb-0 fw-bold history-kpi-value"><?php echo $total_orders_count; ?></h4>
+                        <h2 class="fs-3 mb-0 fw-bold history-kpi-value"><?php echo $total_orders_count; ?></h2>
                         <p class="text-muted mb-0 small fw-medium">Total Orders</p>
                     </div>
                     <div class="rounded-full primary-bg p-3 d-flex align-items-center justify-content-center history-kpi-icon"><i class="fas fa-receipt primary-text"></i></div>
@@ -87,7 +87,7 @@ require_once '../includes/layouts/header.php';
             <div class="col-md-4">
                 <div class="p-3 bg-white shadow-sm d-flex justify-content-between align-items-center rounded-3 dashboard-card border-left-success">
                     <div>
-                        <h4 class="fs-3 mb-0 fw-bold history-kpi-value">$<?php echo number_format($total_sales_amount, 2); ?></h4>
+                        <h2 class="fs-3 mb-0 fw-bold history-kpi-value">$<?php echo number_format($total_sales_amount, 2); ?></h2>
                         <p class="text-muted mb-0 small fw-medium">Sales (<?php echo $sales_count; ?>)</p>
                     </div>
                     <div class="rounded-full success-bg p-3 d-flex align-items-center justify-content-center history-kpi-icon"><i class="fas fa-arrow-up success-text"></i></div>
@@ -96,7 +96,7 @@ require_once '../includes/layouts/header.php';
             <div class="col-md-4">
                 <div class="p-3 bg-white shadow-sm d-flex justify-content-between align-items-center rounded-3 dashboard-card border-left-warning">
                     <div>
-                        <h4 class="fs-3 mb-0 fw-bold history-kpi-value">$<?php echo number_format($total_purchases_amount, 2); ?></h4>
+                        <h2 class="fs-3 mb-0 fw-bold history-kpi-value">$<?php echo number_format($total_purchases_amount, 2); ?></h2>
                         <p class="text-muted mb-0 small fw-medium">Purchases (<?php echo $purchases_count; ?>)</p>
                     </div>
                     <div class="rounded-full warning-bg p-3 d-flex align-items-center justify-content-center history-kpi-icon"><i class="fas fa-arrow-down warning-text"></i></div>
@@ -107,7 +107,7 @@ require_once '../includes/layouts/header.php';
             <div class="col-md-12">
                 <div class="card shadow-sm border-0 rounded-4">
                     <div class="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center flex-wrap g-2">
-                        <h4 class="mb-0 text-secondary fw-bold">Transaction History</h4>
+                        <h2 class="h4 mb-0 text-secondary fw-bold">Transaction History</h2>
                         <div class="d-flex align-items-center gap-2">
                             <div class="btn-group" role="group" aria-label="Order filters">
                                 <a href="<?php echo htmlspecialchars('order_history.php?' . http_build_query(['type' => 'all', 'page_size' => $page_size, 'page' => 1]), ENT_QUOTES, 'UTF-8'); ?>" class="btn btn-outline-primary <?php echo $filter_type === 'all' ? 'active' : ''; ?>">All</a>

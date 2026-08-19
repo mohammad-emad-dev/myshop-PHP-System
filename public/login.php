@@ -170,12 +170,12 @@ if (!$is_logout_request && $_SERVER['REQUEST_METHOD'] === 'POST') {
 </head>
 <body class="bg-gradient-primary login-page d-flex align-items-center justify-content-center min-vh-100">
 
-    <div class="container">
+    <main class="container" id="main-content">
         <div class="row justify-content-center">
             <div class="col-md-6 col-lg-4">
                 <div class="card shadow-lg border-0 rounded-lg mt-5">
                     <div class="card-header bg-white border-0 text-center pt-4 pb-0">
-                        <h3 class="font-weight-light my-2 text-primary fw-bold">myshop</h3>
+                        <h1 class="font-weight-light my-2 text-primary fw-bold">myshop</h1>
                         <p class="text-muted small">Inventory & Order Management</p>
                     </div>
                     <div class="card-body px-5 py-4">
@@ -209,7 +209,7 @@ if (!$is_logout_request && $_SERVER['REQUEST_METHOD'] === 'POST') {
                 </div>
             </div>
         </div>
-    </div>
+    </main>
 
     <!-- Bootstrap 5 Bundle JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" integrity="<?php echo htmlspecialchars(get_asset_integrity('https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js'), ENT_QUOTES, 'UTF-8'); ?>" crossorigin="anonymous"></script>

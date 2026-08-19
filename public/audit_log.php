@@ -93,7 +93,7 @@ require_once '../includes/layouts/header.php';
     <div class="container-fluid px-4 py-4">
         <div class="card shadow-sm border-0 rounded-4">
             <div class="card-header bg-white border-0 py-3">
-                <h4 class="mb-0 fw-bold ui-page-heading"><i class="fas fa-shield-halved me-2 text-primary"></i>Security Audit Log</h4>
+                <h2 class="h4 mb-0 fw-bold ui-page-heading"><i class="fas fa-shield-halved me-2 text-primary"></i>Security Audit Log</h2>
                 <p class="text-muted small mb-0 mt-1">Administrative view of bounded security and business-critical events.</p>
             </div>
             <div class="card-body">

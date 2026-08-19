@@ -175,7 +175,8 @@ require_once '../includes/layouts/header.php';
                 </div>
 
                 <!-- Product Grid -->
-                <div class="product-grid-container" id="productGrid">
+                <h2 class="visually-hidden">Product catalog</h2>
+                <div class="product-grid-container" id="productGrid" role="region" aria-label="Product catalog" tabindex="0">
                     <div class="row g-3">
                         <?php foreach ($products as $product): ?>
                             <?php
@@ -211,7 +212,7 @@ require_once '../includes/layouts/header.php';
                                             <?php endif; ?>
                                         </div>
 
-                                        <h5 class="card-title text-dark fw-bold mb-1 pos-product-title"><?php echo htmlspecialchars($product['name']); ?></h5>
+                                        <h3 class="h5 card-title text-dark fw-bold mb-1 pos-product-title"><?php echo htmlspecialchars($product['name']); ?></h3>
                                         <p class="card-text text-primary fs-5 fw-bold mb-0">$<?php echo number_format($product['price'], 2); ?></p>
                                     </div>
                                     <?php if (!$hasStock): ?>
@@ -228,7 +229,7 @@ require_once '../includes/layouts/header.php';
             <div class="col-lg-4 h-100">
                 <div class="card shadow-sm border-0 rounded-4 cart-panel">
                     <div class="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center border-bottom">
-                        <h5 class="mb-0 text-secondary fw-bold pos-section-title"><i class="fas fa-shopping-cart me-2 text-primary"></i>Current Order</h5>
+                        <h2 class="h5 mb-0 text-secondary fw-bold pos-section-title"><i class="fas fa-shopping-cart me-2 text-primary"></i>Current Order</h2>
                         <div class="d-flex align-items-center gap-2">
                             <button type="button" class="btn btn-sm btn-outline-danger rounded-pill px-2 py-1 cart-clear-button" id="clearCartBtn">
                                 <i class="fas fa-times me-1"></i>Clear

@@ -2,7 +2,7 @@
 $current_page = $active_page ?? 'dashboard';
 ?>
 <!-- Sidebar -->
-<div id="sidebar-wrapper">
+<aside id="sidebar-wrapper" aria-label="Primary navigation">
     <div class="sidebar-heading">
         <i class="fas fa-store"></i>myshop
     </div>
@@ -56,5 +56,5 @@ $current_page = $active_page ?? 'dashboard';
             </button>
         </form>
     </div>
-</div>
+</aside>
 <!-- /#sidebar-wrapper -->

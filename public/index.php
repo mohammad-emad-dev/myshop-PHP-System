@@ -88,7 +88,7 @@ require_once '../includes/layouts/header.php';
             <div class="col-xl col-md-4 col-sm-6">
                 <div class="p-4 bg-white shadow-sm d-flex justify-content-between align-items-center rounded-3 dashboard-card border-left-<?php echo $card['color']; ?> h-100">
                     <div>
-                        <h3 class="fs-2 mb-1 dashboard-kpi-value"><?php echo $card['value']; ?></h3>
+                        <h2 class="fs-2 mb-1 dashboard-kpi-value"><?php echo $card['value']; ?></h2>
                         <p class="fs-6 text-muted mb-0 fw-medium"><?php echo $card['label']; ?></p>
                     </div>
                     <div class="rounded-full <?php echo $card['color']; ?>-bg p-3 d-flex align-items-center justify-content-center dashboard-kpi-icon">
@@ -107,9 +107,9 @@ require_once '../includes/layouts/header.php';
                 <div class="card shadow-sm border-0 rounded-4">
                     <div class="card-body p-4">
                         <div class="d-flex justify-content-between align-items-center mb-4">
-                            <h5 class="card-title text-secondary mb-0 fw-bold dashboard-section-title">
+                            <h2 class="h5 card-title text-secondary mb-0 fw-bold dashboard-section-title">
                                 <i class="fas fa-chart-line me-2 text-primary"></i>Sales &amp; Purchases Flow
-                            </h5>
+                            </h2>
                             <span class="badge bg-light text-dark border">
                                 <i class="fas fa-calendar-days me-1 text-primary"></i> Last 7 Days
                             </span>
@@ -130,9 +130,9 @@ require_once '../includes/layouts/header.php';
             <div class="col-lg-7 col-md-12">
                 <div class="card shadow-sm border-0 h-100 rounded-4">
                     <div class="card-header bg-white border-0 py-3">
-                        <h5 class="mb-0 text-secondary fw-bold dashboard-section-title">
+                        <h2 class="h5 mb-0 text-secondary fw-bold dashboard-section-title">
                             <i class="fas fa-trophy text-warning me-2"></i>Top Selling Products
-                        </h5>
+                        </h2>
                     </div>
                     <div class="card-body p-4">
                         <?php if (!empty($top_selling_products)): ?>
@@ -173,9 +173,9 @@ require_once '../includes/layouts/header.php';
             <div class="col-lg-5 col-md-12">
                 <div class="card shadow-sm border-0 h-100 rounded-4">
                     <div class="card-header bg-white border-0 py-3">
-                        <h5 class="mb-0 text-secondary fw-bold dashboard-section-title">
+                        <h2 class="h5 mb-0 text-secondary fw-bold dashboard-section-title">
                             <i class="fas fa-chart-pie text-info me-2"></i>Category Distribution
-                        </h5>
+                        </h2>
                     </div>
                     <div class="card-body p-4 d-flex flex-column justify-content-center">
                         <?php if (!empty($category_sales)): ?>
@@ -200,9 +200,9 @@ require_once '../includes/layouts/header.php';
             <div class="col-md-12">
                 <div class="card shadow-sm border-0 rounded-4">
                     <div class="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0 text-secondary fw-bold dashboard-section-title">
+                        <h2 class="h5 mb-0 text-secondary fw-bold dashboard-section-title">
                             <i class="fas fa-triangle-exclamation text-danger me-2"></i>Low Stock Alerts
-                        </h5>
+                        </h2>
                         <?php if ($total_low_stock > 0): ?>
                             <span class="badge bg-danger rounded-pill px-3 py-2"><?php echo $total_low_stock; ?> Action Required</span>
                         <?php else: ?>
@@ -271,9 +271,9 @@ require_once '../includes/layouts/header.php';
              SECTION 5: QUICK ACTIONS
              ═══════════════════════════════════════════ -->
         <div class="row my-4">
-            <h3 class="fs-5 mb-3 fw-bold dashboard-quick-heading">
+            <h2 class="fs-5 mb-3 fw-bold dashboard-quick-heading">
                 <i class="fas fa-bolt me-2 text-warning"></i>Quick Actions
-            </h3>
+            </h2>
             <?php
             $actions = [
                 ['href' => 'products.php',      'icon' => 'fa-box',           'title' => 'Products',     'desc' => 'Add, edit & manage inventory items',       'class' => 'quick-action-products'],
@@ -292,7 +292,7 @@ require_once '../includes/layouts/header.php';
                                     <i class="fas <?php echo $action['icon']; ?> fs-5"></i>
                                 </div>
                             </div>
-                            <h5 class="fw-bold mb-1 quick-action-title"><?php echo $action['title']; ?></h5>
+                            <h3 class="h5 fw-bold mb-1 quick-action-title"><?php echo $action['title']; ?></h3>
                             <p class="mb-0 small quick-action-description"><?php echo $action['desc']; ?></p>
                         </div>
                     </div>

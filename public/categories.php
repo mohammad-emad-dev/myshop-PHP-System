@@ -121,10 +121,10 @@ require_once '../includes/layouts/header.php';
             <div class="col-md-12">
                 <div class="card shadow-sm border-0 rounded-4">
                     <div class="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center">
-                        <h4 class="mb-0 fw-bold ui-page-heading">
+                        <h2 class="h4 mb-0 fw-bold ui-page-heading">
                             <i class="fas fa-tags me-2 text-primary"></i>Product Categories
                             <span class="badge bg-primary rounded-pill ms-2 ui-count-text"><?php echo number_format($total_categories); ?></span>
-                        </h4>
+                        </h2>
                         <button class="btn btn-primary shadow-sm fw-bold px-4 rounded-pill pulse-btn ui-transition" data-bs-toggle="modal" data-bs-target="#addCategoryModal">
                             <i class="fas fa-plus-circle me-2 fs-5 align-middle"></i>Add Category
                         </button>

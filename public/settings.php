@@ -279,7 +279,7 @@ require_once '../includes/layouts/header.php';
             <div class="col-lg-6 col-md-8">
                 <div class="card shadow-sm border-0 rounded-4">
                     <div class="card-header bg-white border-0 py-3">
-                        <h4 class="mb-0 text-secondary fw-bold"><i class="fas fa-user-edit me-2 text-primary"></i>My Profile Settings</h4>
+                        <h2 class="h4 mb-0 text-secondary fw-bold"><i class="fas fa-user-edit me-2 text-primary"></i>My Profile Settings</h2>
                     </div>
                     <div class="card-body p-4">
                         <form method="POST" action="">
@@ -298,7 +298,7 @@ require_once '../includes/layouts/header.php';
 
                             <hr class="my-4">
                             
-                            <h5 class="text-secondary mb-3 fw-bold"><i class="fas fa-key me-2 text-warning"></i>Change Password</h5>
+                            <h3 class="h5 text-secondary mb-3 fw-bold"><i class="fas fa-key me-2 text-warning"></i>Change Password</h3>
                             
                             <div class="mb-3">
                                 <label for="new_password" class="form-label fw-bold">New Password (leave empty to keep current)</label>
@@ -335,12 +335,12 @@ require_once '../includes/layouts/header.php';
                 <!-- System Backups (Admin Only) -->
                 <div class="card shadow-sm border-0 rounded-4 mb-4 border-start border-danger border-4">
                     <div class="card-header bg-white border-0 py-3">
-                        <h4 class="mb-0 text-secondary fw-bold"><i class="fas fa-server me-2 text-danger"></i>System Administration & Backups</h4>
+                        <h2 class="h4 mb-0 text-secondary fw-bold"><i class="fas fa-server me-2 text-danger"></i>System Administration & Backups</h2>
                     </div>
                     <div class="card-body p-4 bg-danger-subtle bg-opacity-10 rounded-bottom-4">
                         <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
                             <div>
-                                <h5 class="fw-bold text-dark mb-1">Database Backup (.sql)</h5>
+                                <h3 class="h5 fw-bold text-dark mb-1">Database Backup (.sql)</h3>
                                 <p class="text-muted mb-0 small">Download a full snapshot of the entire database including products, orders, and one-way staff password hashes.</p>
                                 <p class="text-danger small fw-bold mt-1 mb-0"><i class="fas fa-exclamation-triangle me-1"></i>Re-enter your current password. Keep the downloaded file highly secure.</p>
                             </div>
@@ -358,7 +358,7 @@ require_once '../includes/layouts/header.php';
 
                 <div class="card shadow-sm border-0 rounded-4">
                     <div class="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center">
-                        <h4 class="mb-0 text-secondary fw-bold"><i class="fas fa-users me-2 text-primary"></i>Manage Staff Accounts</h4>
+                        <h2 class="h4 mb-0 text-secondary fw-bold"><i class="fas fa-users me-2 text-primary"></i>Manage Staff Accounts</h2>
                         <button class="btn btn-primary btn-sm shadow-sm px-3 rounded-pill pulse-btn ui-transition" data-bs-toggle="modal" data-bs-target="#addStaffModal">
                             <i class="fas fa-user-plus me-1"></i> Add Staff
                         </button>

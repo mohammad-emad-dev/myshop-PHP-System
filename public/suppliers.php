@@ -128,10 +128,10 @@ require_once '../includes/layouts/header.php';
                 <div class="card shadow-sm border-0 rounded-4">
                     <div class="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
                         <div class="d-flex align-items-center">
-                            <h4 class="mb-0 fw-bold ui-page-heading">
+                            <h2 class="h4 mb-0 fw-bold ui-page-heading">
                                 <i class="fas fa-truck me-2 text-success"></i>Suppliers
                                 <span class="badge bg-success rounded-pill ms-2 ui-count-text"><?php echo number_format($total_suppliers); ?></span>
-                            </h4>
+                            </h2>
                         </div>
                         <div class="d-flex gap-2">
                             <?php if (is_admin()): ?>
