@@ -33,73 +33,90 @@ function repository_security_scan_files(array $paths, string $repositoryRoot): a
             continue;
         }
 
-        $isExample = repository_security_is_example_path($relativePath);
-        repository_security_check_filename($relativePath, $isExample, $findings);
+        $findings = array_merge($findings, repository_security_scan_content($relativePath, $contents));
+    }
 
-        // Avoid interpreting binary assets as text. The tracked-file list still
-        // includes them, but secret/configuration rules do not apply to them.
-        if (strpos($contents, "\0") !== false) {
+    return repository_security_sort_findings($findings);
+}
+
+/**
+ * Scan content under a caller-provided virtual repository-relative path.
+ * This keeps path-based exemptions testable without writing fixtures into the
+ * repository or requiring Git.
+ */
+function repository_security_scan_content(string $relativePath, string $contents): array
+{
+    $findings = [];
+    $isExample = repository_security_is_example_path($relativePath);
+    repository_security_check_filename($relativePath, $isExample, $findings);
+
+    // Avoid interpreting binary assets as text. The tracked-file list still
+    // includes them, but secret/configuration rules do not apply to them.
+    if (strpos($contents, "\0") !== false) {
+        return repository_security_sort_findings($findings);
+    }
+
+    if (!$isExample && !repository_security_is_fixture_path($relativePath) && preg_match('/-----BEGIN (?:RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----/i', $contents, $match, PREG_OFFSET_CAPTURE) === 1) {
+        repository_security_add_finding(
+            $findings,
+            $relativePath,
+            repository_security_line_number($contents, (int)$match[0][1]),
+            'committed private key material'
+        );
+    }
+
+    $lines = preg_split('/\R/', $contents);
+    if (!is_array($lines)) {
+        $lines = [$contents];
+    }
+
+    foreach ($lines as $index => $line) {
+        if (!is_string($line) || $line === '' || $isExample || repository_security_is_fixture_path($relativePath)) {
             continue;
         }
 
-        if (!$isExample && !repository_security_is_fixture_path($relativePath) && preg_match('/-----BEGIN (?:RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----/i', $contents, $match, PREG_OFFSET_CAPTURE) === 1) {
-            repository_security_add_finding(
-                $findings,
-                $relativePath,
-                repository_security_line_number($contents, (int)$match[0][1]),
-                'committed private key material'
-            );
+        // Shell/YAML parameter expansion is an environment indirection; do
+        // not match the variable name inside ${VARIABLE:?message}.
+        if (strpos($line, '${') !== false) {
+            continue;
         }
 
-        $lines = preg_split('/\R/', $contents);
-        if (!is_array($lines)) {
-            $lines = [$contents];
+        if (preg_match('/\b(?:ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|sk_(?:live|test)_[A-Za-z0-9]{16,}|xox[baprs]-[A-Za-z0-9-]{20,}|AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{20,}|npm_[A-Za-z0-9]{20,})\b/', $line) === 1) {
+            repository_security_add_finding($findings, $relativePath, $index + 1, 'high-confidence secret token');
+            continue;
         }
 
-        foreach ($lines as $index => $line) {
-            if (!is_string($line) || $line === '' || $isExample || repository_security_is_fixture_path($relativePath)) {
-                continue;
-            }
+        if (preg_match(
+            '/\b(?:[A-Za-z_][A-Za-z0-9_-]*_)?(?:password|passwd|secret|token|api[_-]?key|access[_-]?key|private[_-]?key|client[_-]?secret)\b\s*[:=]\s*(?:"([^"]*)"|\'([^\']*)\'|([^\s#;,]+))/i',
+            $line,
+            $matches
+        ) !== 1) {
+            continue;
+        }
 
-            // Shell/YAML parameter expansion is an environment indirection;
-            // do not match the variable name inside ${VARIABLE:?message}.
-            if (strpos($line, '${') !== false) {
-                continue;
-            }
-
-            if (preg_match('/\b(?:ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|sk_(?:live|test)_[A-Za-z0-9]{16,}|xox[baprs]-[A-Za-z0-9-]{20,}|AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{20,}|npm_[A-Za-z0-9]{20,})\b/', $line) === 1) {
-                repository_security_add_finding($findings, $relativePath, $index + 1, 'high-confidence secret token');
-                continue;
-            }
-
-            if (preg_match(
-                '/\b(?:[A-Za-z_][A-Za-z0-9_-]*_)?(?:password|passwd|secret|token|api[_-]?key|access[_-]?key|private[_-]?key|client[_-]?secret)\b\s*[:=]\s*(?:"([^"]*)"|\'([^\']*)\'|([^\s#;,]+))/i',
-                $line,
-                $matches
-            ) !== 1) {
-                continue;
-            }
-
-            $value = '';
-            foreach ([1, 2, 3] as $matchIndex) {
-                if (isset($matches[$matchIndex]) && $matches[$matchIndex] !== '') {
-                    $value = trim((string)$matches[$matchIndex]);
-                    break;
-                }
-            }
-
-            if (repository_security_is_likely_placeholder($value)) {
-                continue;
-            }
-
-            if (strlen($value) >= 20) {
-                repository_security_add_finding($findings, $relativePath, $index + 1, 'likely secret assignment');
+        $value = '';
+        foreach ([1, 2, 3] as $matchIndex) {
+            if (isset($matches[$matchIndex]) && $matches[$matchIndex] !== '') {
+                $value = trim((string)$matches[$matchIndex]);
+                break;
             }
         }
 
-        repository_security_check_configuration($relativePath, $contents, $findings);
+        if (repository_security_is_likely_placeholder($value)) {
+            continue;
+        }
+
+        if (strlen($value) >= 20) {
+            repository_security_add_finding($findings, $relativePath, $index + 1, 'likely secret assignment');
+        }
     }
 
+    repository_security_check_configuration($relativePath, $contents, $findings);
+    return repository_security_sort_findings($findings);
+}
+
+function repository_security_sort_findings(array $findings): array
+{
     usort($findings, static function (array $left, array $right): int {
         return [$left['path'], $left['line'], $left['reason']] <=> [$right['path'], $right['line'], $right['reason']];
     });
