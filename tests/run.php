@@ -6,6 +6,8 @@ require_once __DIR__ . '/Unit/validation_test.php';
 require_once __DIR__ . '/Unit/deployment_test.php';
 require_once __DIR__ . '/Unit/http_harness_test.php';
 require_once __DIR__ . '/Unit/repository_security_scan_test.php';
+require_once __DIR__ . '/Unit/ci_supply_chain_test.php';
+require_once __DIR__ . '/Unit/release_integrity_test.php';
 require_once __DIR__ . '/Integration/database_test.php';
 require_once __DIR__ . '/Integration/backup_restore_test.php';
 require_once __DIR__ . '/Integration/operational_test.php';
@@ -18,13 +20,15 @@ try {
     $deploymentAssertions = run_deployment_unit_tests();
     $httpHarnessAssertions = run_http_harness_unit_tests();
     $securityScanAssertions = run_repository_security_scan_unit_tests();
+    $supplyChainAssertions = run_ci_supply_chain_unit_tests();
+    $releaseIntegrityAssertions = run_release_integrity_unit_tests();
     $integrationAssertions = run_integration_tests();
     $backupAssertions = run_backup_restore_tests();
     $operationalAssertions = run_operational_tests();
     $exportAssertions = run_export_streaming_tests();
-    $totalAssertions = $unitAssertions + $deploymentAssertions + $httpHarnessAssertions + $securityScanAssertions + $integrationAssertions + $backupAssertions + $operationalAssertions + $exportAssertions;
+    $totalAssertions = $unitAssertions + $deploymentAssertions + $httpHarnessAssertions + $securityScanAssertions + $supplyChainAssertions + $releaseIntegrityAssertions + $integrationAssertions + $backupAssertions + $operationalAssertions + $exportAssertions;
     $duration = number_format(microtime(true) - $started, 2);
-    echo "PASS: {$totalAssertions} assertions (" . ($unitAssertions + $deploymentAssertions + $httpHarnessAssertions + $securityScanAssertions) . " unit, " .
+    echo "PASS: {$totalAssertions} assertions (" . ($unitAssertions + $deploymentAssertions + $httpHarnessAssertions + $securityScanAssertions + $supplyChainAssertions + $releaseIntegrityAssertions) . " unit, " .
         ($integrationAssertions + $backupAssertions + $operationalAssertions + $exportAssertions) . " integration) in {$duration}s\n";
     exit(0);
 } catch (Throwable $exception) {

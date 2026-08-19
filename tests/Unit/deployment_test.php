@@ -43,6 +43,8 @@ function run_deployment_unit_tests(): int
     $environmentExample = file_get_contents($repository . '/.env.example');
     $qualityWorkflow = file_get_contents($repository . '/.github/workflows/quality.yml');
     $preflightScript = file_get_contents($repository . '/scripts/production-preflight.php');
+    $supplyChainScript = file_get_contents($repository . '/scripts/ci-supply-chain-check.php');
+    $releaseIntegrityScript = file_get_contents($repository . '/scripts/release-integrity-check.php');
     $productionRunbook = file_get_contents($repository . '/docs/PRODUCTION-DEPLOYMENT.md');
 
     foreach ([
@@ -58,6 +60,8 @@ function run_deployment_unit_tests(): int
         $environmentExample,
         $qualityWorkflow,
         $preflightScript,
+        $supplyChainScript,
+        $releaseIntegrityScript,
         $productionRunbook,
     ] as $fixture) {
         $tests->assertTrue(is_string($fixture), 'Deployment fixture could not be read.');
@@ -98,6 +102,8 @@ function run_deployment_unit_tests(): int
     $tests->assertContains('contents: read', $qualityWorkflow, 'Quality Gate jobs need read-only repository permissions.');
     $tests->assertContains('mysql:8.4.3@sha256:106d5197fd8e4892980469ad42eb20f7a336bd81509aae4ee175d852f5cc4565', $qualityWorkflow, 'CI MySQL must use the reviewed immutable digest.');
     $tests->assertContains('scripts/repository-security-check.php', $qualityWorkflow, 'Quality Gate must run the dependency-free repository security check.');
+    $tests->assertContains('scripts/ci-supply-chain-check.php', $qualityWorkflow, 'Quality Gate must run the dependency-free CI supply-chain policy check.');
+    $tests->assertContains('scripts/release-integrity-check.php', $qualityWorkflow, 'Quality Gate must emit safe release integrity evidence.');
     $tests->assertContains('docker-compose.production.yml', $qualityWorkflow, 'Quality Gate must validate the production Compose file.');
     $tests->assertContains('tests/validate_schema.php', $qualityWorkflow, 'Quality Gate must validate the schema and migration chain.');
     $tests->assertContains('production-preflight.php', $qualityWorkflow, 'Quality Gate must run the production preflight check.');
@@ -111,6 +117,8 @@ function run_deployment_unit_tests(): int
     $tests->assertContains('PRODUCTION_APP_IMAGE', $preflightScript, 'Production preflight must validate the application image reference.');
     $tests->assertContains('MYSQL_ROOT_PASSWORD', $preflightScript, 'Production preflight must validate root credential boundaries.');
     $tests->assertContains('immutable sha256 digest', $preflightScript, 'Production preflight must require immutable image references.');
+    $tests->assertContains('full commit SHA', $supplyChainScript, 'CI supply-chain policy must require full action commit SHAs.');
+    $tests->assertContains('schema_migration_version', $releaseIntegrityScript, 'Release integrity evidence must record the schema/migration version.');
     $tests->assertContains('back up the database', strtolower($productionRunbook), 'Production runbook must require a database backup before migrations.');
     $tests->assertContains('rollback', strtolower($productionRunbook), 'Production runbook must document rollback behavior.');
 

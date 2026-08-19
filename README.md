@@ -177,6 +177,29 @@ At minimum, alert on readiness failures, sustained HTTP 5xx rates, elevated late
 
 Review PHP/Apache, MySQL, Debian, and extension security advisories; select a compatible exact version; resolve and record immutable image digests; rebuild the production stage; run Compose validation, syntax checks, regression/restore tests, and a staging smoke test; then roll out with a rollback image reference retained. The example pins the reviewed PHP base and MySQL image digests for the current build architecture; release automation must re-resolve and review architecture-appropriate digests when the platform or versions change. No external registry, monitoring vendor, or production deployment was configured by this batch.
 
+### CI and release integrity
+
+Every third-party GitHub Action in `.github/workflows/` is pinned to a full 40-character commit SHA with an inline official release comment. The current verified pins are `actions/checkout` `11d5960a326750d5838078e36cf38b85af677262` (v4.4.0), `actions/setup-node` `49933ea5288caeca8642d1e84afbd3f7d6820020` (v4.4.0), and `shivammathur/setup-php` `f3e473d116dcccaddc5834248c87452386958240` (2.37.2). The Quality Gate runs a dependency-free policy check over tracked workflow files and the production Compose file; it rejects mutable action refs and deployable image tags without printing credentials.
+
+The production job may use a temporary `myshop-app:ci-$GITHUB_SHA` tag solely while building a disposable CI image. That tag is never deployable: the job resolves the built image ID to a digest, runs the fail-closed production preflight, and emits safe release evidence with `php scripts/release-integrity-check.php`. Production configuration must use `name@sha256:<64 hex chars>` for the PHP base, application, and MySQL images.
+
+Run the policy and release checks locally without committing a manifest:
+
+~~~powershell
+# Run the policy from a Git-enabled PHP CLI checkout. The normal app image
+# intentionally does not contain Git.
+php scripts/ci-supply-chain-check.php
+$env:RELEASE_COMMIT_SHA = (git rev-parse HEAD)
+$env:RELEASE_WORKFLOW = 'local-verification'
+$env:RELEASE_REF = 'local'
+$env:RELEASE_IMAGE_REFERENCE = 'registry.example/myshop@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+$env:RELEASE_VERIFICATION_STATUS = 'verified'
+php scripts/release-integrity-check.php
+Remove-Item Env:RELEASE_COMMIT_SHA, Env:RELEASE_WORKFLOW, Env:RELEASE_REF, Env:RELEASE_IMAGE_REFERENCE, Env:RELEASE_VERIFICATION_STATUS
+~~~
+
+To deliberately update an action, inspect the official repository tag with `git ls-remote`, review the release and commit, replace the ref with the exact 40-character SHA and release comment, then run the policy check and complete Quality Gate. For a base-image update, resolve the official image digest for the target architecture, update the reviewed value, rebuild and scan the image, and record the digest and verification result in the deployment change record. Never substitute `@latest`, a major tag, or an unreviewed registry reference.
+
 ## Verification
 
 Validate the Compose model and lint the PHP sources with the same runtime used by Docker:
@@ -188,7 +211,7 @@ docker compose --env-file .env run --rm --no-deps app sh -c 'find config databas
 
 The reviewed baseline has also been checked with disposable database integration tests, authorization/CSRF HTTP checks, Docker health checks, JavaScript syntax checks, and database-failure return-contract tests.
 
-Every push to `main` or `security-hardening-baseline`, and every pull request, runs the repository Quality Gate in GitHub Actions. It validates tracked PHP and JavaScript syntax, development and production Docker Compose configuration, the production image build, the canonical schema/migration chain, a dependency-free tracked-file secret/configuration scan, and the full disposable MySQL regression suite. The CI MySQL container uses the reviewed immutable `mysql:8.4.3@sha256:106d5197fd8e4892980469ad42eb20f7a336bd81509aae4ee175d852f5cc4565` reference.
+Every push to `main` or `security-hardening-baseline`, and every pull request, runs the repository Quality Gate in GitHub Actions. It validates tracked PHP and JavaScript syntax, development and production Docker Compose configuration, the production image build and preflight, safe release metadata, the canonical schema/migration chain, dependency-free tracked-file secret/configuration and CI supply-chain policy scans, and the full disposable MySQL regression suite. The CI MySQL container uses the reviewed immutable `mysql:8.4.3@sha256:106d5197fd8e4892980469ad42eb20f7a336bd81509aae4ee175d852f5cc4565` reference.
 
 The repository security check intentionally scans only Git-tracked files. It ignores the safe `.env.example`, documentation examples, and test fixtures, never prints matched values, and reports only high-confidence secrets, committed private keys, or unsafe production/workflow configuration:
 

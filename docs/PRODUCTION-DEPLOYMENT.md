@@ -38,13 +38,20 @@ mutable image tags, invalid HSTS values, invalid proxy addresses, and root or
 schema credentials in the normal `app` service. It does not contact a
 registry, database, secret manager, or production host.
 
-## 2. Verify the immutable release
+## 2. Verify the immutable release and release evidence
 
 Resolve and review the application, PHP base, and MySQL image digests before
 the change window. Confirm that the application digest is the reviewed image
 containing the intended commit, and retain the previous application digest for
 rollback. Do not replace a digest with `latest`, a branch tag, or a mutable CI
 tag during deployment.
+
+The repository policy also requires every third-party GitHub Action to use a
+full 40-character commit SHA and an inline official release comment. To update
+one deliberately, inspect the official tag and commit with `git ls-remote`,
+review the release notes, replace the workflow reference with that exact SHA,
+and run `php scripts/ci-supply-chain-check.php` plus the complete Quality Gate.
+Do not infer or copy an action SHA from an untrusted example.
 
 Validate the resolved Compose model and build the reviewed application image:
 
@@ -54,6 +61,26 @@ docker compose --env-file /protected/myshop/production.env \
 docker compose --env-file /protected/myshop/production.env \
   --file docker-compose.production.yml build --pull app
 ```
+
+After the reviewed image digest and verification checks are complete, generate
+the safe release manifest/check. It records only the commit, workflow/ref,
+image digest, migration version/list, and `verified` status; it does not read
+or emit credentials, environment files, PII, database data, or backup contents.
+The CI job prints this JSON as evidence and does not publish it externally.
+
+```text
+RELEASE_IMAGE_REFERENCE=registry.example/myshop@sha256:<reviewed-digest> \
+RELEASE_VERIFICATION_STATUS=verified \
+RELEASE_COMMIT_SHA=<reviewed-commit> \
+RELEASE_WORKFLOW=production-verification \
+RELEASE_REF=<reviewed-ref> \
+php scripts/release-integrity-check.php
+```
+
+Retain the previous application image by its complete digest in the protected
+deployment record and keep it available in the registry or deployment cache
+until the new release is accepted. A CI build tag is an intermediate label,
+not rollback evidence or a deployable release reference.
 
 The production image has no repository bind mount. The application root is
 read-only; only the named `production_uploads` volume is writable by the
