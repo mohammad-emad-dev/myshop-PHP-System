@@ -55,6 +55,20 @@ The runner removes its temporary environment files and Playwright output after
 the run. The generated admin and cashier accounts therefore disappear with the
 disposable database. A cleanup failure makes the run fail; it is not ignored.
 
+## GitHub Actions
+
+The `Quality Gate` workflow runs the Browser QA job on every push to `main` or
+`security-hardening-baseline` and on every pull request. It uses a clean
+GitHub-hosted Ubuntu runner, the pinned Node.js 20.19.5 runtime, the locked
+Playwright Test 1.62.1 and axe-core 4.13.0 dependencies, and Chromium with its
+Linux prerequisites. The job invokes this same PowerShell runner used locally;
+it never reads repository `.env` files, GitHub secrets, production data, or the
+normal development database.
+
+The job has a 20-minute timeout. The runner's unconditional cleanup is backed
+by an `always()` workflow cleanup step that removes only resources with the
+`myshop-browser-qa-` prefix. A failed test or cleanup makes the job fail.
+
 ## Coverage
 
 The suite covers login/logout and invalid login, unauthenticated redirects,
@@ -69,11 +83,11 @@ inputs, selects, text areas, and KPI values masked. They are deleted during
 cleanup and are never committed. No committed visual baselines currently
 exist, so visual comparison is reported as **INCONCLUSIVE** rather than passed.
 
-The axe result is an automated signal, not a full WCAG audit. Critical findings
-fail the run. Serious and lower-impact findings are printed and attached as
-explicit test annotations for remediation review; they are not silently
-treated as compliance. Summaries contain only rule/target information, never
-page HTML or data values. Third-party
+The axe result is an automated signal, not a full manual WCAG audit. Critical
+findings fail the run. Serious and lower-impact findings are printed and
+attached as explicit test annotations for remediation review; they are not
+silently treated as compliance. Summaries contain only rule/target
+information, never page HTML or data values. Third-party
 asset request noise is limited to the documented CDN/font hosts in the test;
 same-origin 4xx/5xx responses and failures always fail the run.
 
