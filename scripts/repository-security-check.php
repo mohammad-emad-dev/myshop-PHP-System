@@ -61,10 +61,9 @@ function repository_security_scan_files(array $paths, string $repositoryRoot): a
                 continue;
             }
 
-            // A shell/YAML/PHP variable reference is an indirection, not a
-            // committed credential value. This also avoids matching the
-            // variable name inside ${VARIABLE:?message} expressions.
-            if (preg_match('/\$\{?|\$[A-Za-z_][A-Za-z0-9_]*/', $line) === 1) {
+            // Shell/YAML parameter expansion is an environment indirection;
+            // do not match the variable name inside ${VARIABLE:?message}.
+            if (strpos($line, '${') !== false) {
                 continue;
             }
 
