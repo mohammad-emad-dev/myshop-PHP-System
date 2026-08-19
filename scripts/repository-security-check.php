@@ -232,11 +232,26 @@ function repository_security_is_likely_placeholder(string $value): bool
         return true;
     }
 
+    if (repository_security_is_safe_reference($normalizedValue)) {
+        return true;
+    }
+
     if (preg_match('/^(?:\$\(|\$\{?[A-Za-z_][A-Za-z0-9_]*.*\}?\}|\$[A-Za-z_][A-Za-z0-9_]*|getenv\(|env\(|process\.env\.|os\.environ|bin2hex\(|random_|openssl\s+rand|password_hash\(|hash\(|sprintf\()/', $normalizedValue) === 1) {
         return true;
     }
 
     return preg_match('/(?:replace[_-]?with|change[_-]?me|changeit|placeholder|redact|example|dummy|fake|fixture|test[_-]?only|ci[_-]?(?:only|placeholder)|your[_-]?|<[^>]+>|\*{3,})/', $normalizedValue) === 1;
+}
+
+/**
+ * Recognize code/configuration references without treating arbitrary long
+ * values as placeholders. A dotted identifier chain ending in a credential
+ * field is a reference such as adminCredentials.password or
+ * config.database.password, not a credential.
+ */
+function repository_security_is_safe_reference(string $normalizedValue): bool
+{
+    return preg_match('/^(?:[a-z_][a-z0-9_]*\.)+(?:[a-z_][a-z0-9_]*_)?(?:password|passwd|secret|token|api[_-]?key|access[_-]?key|private[_-]?key|client[_-]?secret)$/i', $normalizedValue) === 1;
 }
 
 function repository_security_line_number(string $contents, int $offset): int

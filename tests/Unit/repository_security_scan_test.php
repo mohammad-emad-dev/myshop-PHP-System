@@ -56,17 +56,46 @@ function run_repository_security_scan_unit_tests(): int
             'quality-gate-hardcoded-password-case.php',
             '$' . 'password' . ' = "' . $hardcodedSecret . '";' . PHP_EOL
         );
-        $tests->assertTrue($findings !== [], 'A hardcoded PHP password assignment must be reported.');
+        $tests->assertSame(1, count($findings), 'A hardcoded PHP password assignment must be reported exactly once.');
         $tests->assertFalse(
             strpos(json_encode($findings, JSON_THROW_ON_ERROR), $hardcodedSecret) !== false,
             'Security findings must never include secret contents.'
         );
 
         $findings = $scanFixture(
+            'e2e/tests/quality-gate-safe-javascript-references.spec.js',
+            "const credentials = {\n"
+            . "  QA_ADMIN_PASSWORD: adminCredentials.password,\n"
+            . "  QA_CASHIER_PASSWORD: cashierCredentials.password,\n"
+            . "  DATABASE_PASSWORD: config.database.password,\n"
+            . "  DB_PASSWORD: process.env.DB_PASSWORD,\n"
+            . "};\n"
+        );
+        $tests->assertSame([], $findings, 'JavaScript property and process.env references must not be reported as hardcoded secrets.');
+
+        $hardcodedJavaScriptSecret = str_repeat('b', 24);
+        $javascriptPasswordKey = 'QA_' . 'ADMIN_PASSWORD';
+        $findings = $scanFixture(
+            'e2e/tests/quality-gate-hardcoded-password-case.js',
+            'const credentials = { ' . $javascriptPasswordKey . ': "' . $hardcodedJavaScriptSecret . '" };' . PHP_EOL
+        );
+        $tests->assertSame(1, count($findings), 'A hardcoded JavaScript password assignment must be reported exactly once.');
+        $tests->assertFalse(
+            strpos(json_encode($findings, JSON_THROW_ON_ERROR), $hardcodedJavaScriptSecret) !== false,
+            'JavaScript security findings must never include secret contents.'
+        );
+
+        $findings = $scanFixture(
             'quality-gate-environment-reference-case.php',
-            "\$password = getenv('DB_PASSWORD');\n\$envPassword = \$_ENV['DB_PASSWORD'];\n"
+            "\$password = getenv('DB_PASSWORD');\n\$envPassword = \$_ENV['DB_PASSWORD'];\n\$password = \$environmentPassword;\n"
         );
         $tests->assertSame([], $findings, 'Environment and getenv references must not be reported as hardcoded secrets.');
+
+        $findings = $scanFixture(
+            'config/quality-gate-environment-reference.env',
+            "DB_PASSWORD=\${DB_PASSWORD}\n"
+        );
+        $tests->assertSame([], $findings, 'Shell environment substitutions must not be reported as hardcoded secrets.');
 
         $findings = $scanFixture(
             'docs/quality-gate-documentation-example.txt',
