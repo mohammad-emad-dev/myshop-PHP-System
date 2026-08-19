@@ -9,6 +9,7 @@ require_once __DIR__ . '/Unit/repository_security_scan_test.php';
 require_once __DIR__ . '/Integration/database_test.php';
 require_once __DIR__ . '/Integration/backup_restore_test.php';
 require_once __DIR__ . '/Integration/operational_test.php';
+require_once __DIR__ . '/Integration/export_streaming_test.php';
 
 $started = microtime(true);
 
@@ -20,10 +21,11 @@ try {
     $integrationAssertions = run_integration_tests();
     $backupAssertions = run_backup_restore_tests();
     $operationalAssertions = run_operational_tests();
-    $totalAssertions = $unitAssertions + $deploymentAssertions + $httpHarnessAssertions + $securityScanAssertions + $integrationAssertions + $backupAssertions + $operationalAssertions;
+    $exportAssertions = run_export_streaming_tests();
+    $totalAssertions = $unitAssertions + $deploymentAssertions + $httpHarnessAssertions + $securityScanAssertions + $integrationAssertions + $backupAssertions + $operationalAssertions + $exportAssertions;
     $duration = number_format(microtime(true) - $started, 2);
     echo "PASS: {$totalAssertions} assertions (" . ($unitAssertions + $deploymentAssertions + $httpHarnessAssertions + $securityScanAssertions) . " unit, " .
-        ($integrationAssertions + $backupAssertions + $operationalAssertions) . " integration) in {$duration}s\n";
+        ($integrationAssertions + $backupAssertions + $operationalAssertions + $exportAssertions) . " integration) in {$duration}s\n";
     exit(0);
 } catch (Throwable $exception) {
     fwrite(STDERR, 'FAIL: ' . $exception->getMessage() . PHP_EOL);
