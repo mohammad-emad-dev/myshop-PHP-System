@@ -193,6 +193,7 @@ final class DisposableDatabase
     private string $schemaPassword;
     private bool $databaseCreated = false;
     private bool $runtimeUserCreated = false;
+    private array $originalRuntimeEnvironment = [];
 
     public function __construct()
     {
@@ -208,6 +209,10 @@ final class DisposableDatabase
             throw new TestFailure('TEST_DB_ROOT_PASSWORD is required; no database test will run without it.');
         }
         $this->schemaPassword = $password;
+
+        foreach (['DB_HOST', 'DB_PORT', 'DB_NAME', 'DB_USER', 'DB_PASSWORD'] as $environmentKey) {
+            $this->originalRuntimeEnvironment[$environmentKey] = getenv($environmentKey);
+        }
 
         $suffix = gmdate('YmdHis') . '_' . bin2hex(random_bytes(5));
         $this->databaseName = 'myshop_test_' . $suffix;
@@ -257,7 +262,6 @@ final class DisposableDatabase
         test_load_sql_file($this->schemaConnection, $databaseDirectory . '/database/batch14_runtime_privileges.sql');
         test_load_sql_file($this->schemaConnection, $databaseDirectory . '/database/batch17_login_rate_limit.sql');
         test_load_sql_file($this->schemaConnection, $databaseDirectory . '/database/batch22_audit_log.sql');
-        test_load_sql_file($this->schemaConnection, $databaseDirectory . '/database/batch22_audit_log.sql');
 
         $this->runtime = new mysqli(
             $this->host,
@@ -294,32 +298,55 @@ final class DisposableDatabase
         return $this->port;
     }
 
+    private function restoreRuntimeEnvironment(): void
+    {
+        foreach ($this->originalRuntimeEnvironment as $environmentKey => $value) {
+            if ($value === false) {
+                putenv($environmentKey);
+            } else {
+                putenv($environmentKey . '=' . $value);
+            }
+        }
+    }
+
     public function cleanup(): void
     {
         $errors = [];
-        if (isset($this->runtime) && $this->runtime instanceof mysqli) {
-            $this->runtime->close();
-        }
-
-        if ($this->schemaConnection instanceof mysqli) {
-            try {
-                if ($this->databaseCreated) {
-                    $this->schemaConnection->query('DROP DATABASE ' . test_sql_identifier($this->databaseName));
+        try {
+            if (isset($this->runtime) && $this->runtime instanceof mysqli) {
+                try {
+                    $this->runtime->close();
+                } catch (Throwable $exception) {
+                    $errors[] = 'runtime connection';
                 }
-            } catch (Throwable $exception) {
-                $errors[] = 'database ' . $this->databaseName;
             }
 
-            try {
-                if ($this->runtimeUserCreated) {
-                    $user = test_sql_string($this->schemaConnection, $this->runtimeUsername);
-                    $this->schemaConnection->query('DROP USER IF EXISTS ' . $user . "@'%'");
+            if ($this->schemaConnection instanceof mysqli) {
+                try {
+                    if ($this->databaseCreated) {
+                        $this->schemaConnection->query('DROP DATABASE ' . test_sql_identifier($this->databaseName));
+                    }
+                } catch (Throwable $exception) {
+                    $errors[] = 'database ' . $this->databaseName;
                 }
-            } catch (Throwable $exception) {
-                $errors[] = 'runtime user ' . $this->runtimeUsername;
-            }
 
-            $this->schemaConnection->close();
+                try {
+                    if ($this->runtimeUserCreated) {
+                        $user = test_sql_string($this->schemaConnection, $this->runtimeUsername);
+                        $this->schemaConnection->query('DROP USER IF EXISTS ' . $user . "@'%'");
+                    }
+                } catch (Throwable $exception) {
+                    $errors[] = 'runtime user ' . $this->runtimeUsername;
+                }
+
+                try {
+                    $this->schemaConnection->close();
+                } catch (Throwable $exception) {
+                    $errors[] = 'schema connection';
+                }
+            }
+        } finally {
+            $this->restoreRuntimeEnvironment();
         }
 
         if ($errors !== []) {
@@ -328,99 +355,281 @@ final class DisposableDatabase
     }
 }
 
-function test_start_local_server(array $environment_overrides = []): array
+function test_http_server_environment_keys(): array
 {
-    $port = random_int(18000, 18999);
-    $nullDevice = PHP_OS_FAMILY === 'Windows' ? 'NUL' : '/dev/null';
-    $command = PHP_BINARY . ' -S 127.0.0.1:' . $port . ' -t ' .
-        escapeshellarg(dirname(__DIR__) . '/public');
-    $descriptors = [
-        0 => ['file', $nullDevice, 'r'],
-        1 => ['file', $nullDevice, 'a'],
-        2 => ['file', $nullDevice, 'a'],
+    return [
+        'APP_ENV',
+        'DB_HOST',
+        'DB_PORT',
+        'DB_NAME',
+        'DB_USER',
+        'DB_PASSWORD',
+        'TRUSTED_PROXY_IPS',
+        'HSTS_ENABLED',
+        'HSTS_MAX_AGE',
     ];
-    $server_environment = getenv();
-    foreach (['TEST_DB_ROOT_PASSWORD', 'MYSQL_ROOT_PASSWORD', 'BOOTSTRAP_ADMIN_PASSWORD'] as $secret_name) {
-        unset($server_environment[$secret_name]);
-    }
-    foreach ($environment_overrides as $key => $value) {
-        if ($value === null) {
-            unset($server_environment[$key]);
-        } else {
-            $server_environment[$key] = (string)$value;
-        }
-    }
-    $process = proc_open($command, $descriptors, $pipes, dirname(__DIR__), $server_environment);
-    if (!is_resource($process)) {
-        throw new TestFailure('Unable to start the temporary PHP HTTP server.');
-    }
-
-    $url = 'http://127.0.0.1:' . $port . '/login.php';
-    for ($attempt = 0; $attempt < 30; $attempt++) {
-        $context = stream_context_create(['http' => ['timeout' => 1, 'ignore_errors' => true]]);
-        @file_get_contents($url, false, $context);
-        if (isset($http_response_header[0])) {
-            return [$process, $port];
-        }
-        usleep(100000);
-    }
-
-    proc_terminate($process);
-    proc_close($process);
-    throw new TestFailure('Temporary PHP HTTP server did not become ready.');
 }
 
-function test_http_get(int $port, string $path): array
+function test_http_server_environment(array $environment_overrides = []): array
 {
-    $context = stream_context_create([
-        'http' => [
-            'method' => 'GET',
-            'ignore_errors' => true,
-            'timeout' => 5,
-        ],
-    ]);
+    $environment = [];
+    foreach (test_http_server_environment_keys() as $environmentKey) {
+        $value = getenv($environmentKey);
+        if ($value !== false) {
+            $environment[$environmentKey] = $value;
+        }
+    }
+
+    foreach ($environment_overrides as $environmentKey => $value) {
+        if (!in_array($environmentKey, test_http_server_environment_keys(), true)) {
+            continue;
+        }
+        if ($value === null) {
+            unset($environment[$environmentKey]);
+        } else {
+            $environment[$environmentKey] = (string)$value;
+        }
+    }
+
+    return $environment;
+}
+
+function test_tcp_port_is_available(int $port): bool
+{
+    if ($port < 1 || $port > 65535) {
+        return false;
+    }
+
+    $errorNumber = 0;
+    $errorMessage = '';
+    $socket = @fsockopen('127.0.0.1', $port, $errorNumber, $errorMessage, 0.2);
+    if (is_resource($socket)) {
+        fclose($socket);
+        return false;
+    }
+
+    return true;
+}
+
+function test_local_server_is_running($process): bool
+{
+    if (!is_resource($process)) {
+        return false;
+    }
+
+    $status = proc_get_status($process);
+    return is_array($status) && ($status['running'] ?? false) === true;
+}
+
+function test_server_diagnostics(array $paths): string
+{
+    $diagnosticLines = [];
+    foreach ($paths as $path) {
+        if (!is_string($path) || !is_file($path)) {
+            continue;
+        }
+        $contents = @file_get_contents($path);
+        if (!is_string($contents)) {
+            continue;
+        }
+
+        foreach (preg_split('/\R/', $contents) as $line) {
+            if (preg_match('/failed to listen|address already in use|could not bind|parse error|fatal error/i', $line) !== 1) {
+                continue;
+            }
+            $line = preg_replace('/(?i)(password|secret|token|cookie|authorization)[^\r\n]*/', '$1=[redacted]', $line);
+            $diagnosticLines[] = substr((string)$line, 0, 240);
+        }
+    }
+
+    if ($diagnosticLines === []) {
+        return 'no safe startup diagnostic was captured';
+    }
+
+    return substr(implode(' | ', $diagnosticLines), 0, 800);
+}
+
+function test_stop_local_server(array $server): void
+{
+    $process = $server[0] ?? null;
+    if (is_resource($process)) {
+        if (test_local_server_is_running($process)) {
+            @proc_terminate($process);
+            $deadline = microtime(true) + 2.0;
+            while (test_local_server_is_running($process) && microtime(true) < $deadline) {
+                usleep(10000);
+            }
+            if (test_local_server_is_running($process)) {
+                @proc_terminate($process, 9);
+                $forceDeadline = microtime(true) + 1.0;
+                while (test_local_server_is_running($process) && microtime(true) < $forceDeadline) {
+                    usleep(10000);
+                }
+            }
+        }
+        @proc_close($process);
+    }
+
+    foreach ([2, 3] as $pathIndex) {
+        $path = $server[$pathIndex] ?? null;
+        if (is_string($path) && $path !== '') {
+            @unlink($path);
+        }
+    }
+}
+
+function test_start_local_server(array $environment_overrides = [], ?int $preferred_port = null): array
+{
+    $firstPort = $preferred_port;
+    if ($firstPort !== null && ($firstPort < 1024 || $firstPort > 65535)) {
+        throw new TestFailure('The preferred temporary HTTP port is invalid.');
+    }
+
+    $environment = test_http_server_environment($environment_overrides);
+    $documentRoot = dirname(__DIR__) . '/public';
+    $nullDevice = PHP_OS_FAMILY === 'Windows' ? 'NUL' : '/dev/null';
+    $triedPorts = [];
+    $lastDiagnostic = 'no startup attempt was made';
+
+    for ($attempt = 0; $attempt < 8; $attempt++) {
+        if ($attempt === 0 && $firstPort !== null) {
+            $port = $firstPort;
+        } else {
+            $port = null;
+            $candidateStart = random_int(0, 999);
+            for ($candidateOffset = 0; $candidateOffset < 1000; $candidateOffset++) {
+                $candidatePort = 18000 + (($candidateStart + $candidateOffset) % 1000);
+                if (!isset($triedPorts[$candidatePort])) {
+                    $port = $candidatePort;
+                    break;
+                }
+            }
+            if ($port === null) {
+                break;
+            }
+        }
+        $triedPorts[$port] = true;
+
+        if (!test_tcp_port_is_available($port)) {
+            $lastDiagnostic = 'port ' . $port . ' is already occupied';
+            continue;
+        }
+
+        $stdoutPath = tempnam(sys_get_temp_dir(), 'myshop_http_out_');
+        $stderrPath = tempnam(sys_get_temp_dir(), 'myshop_http_err_');
+        if ($stdoutPath === false || $stderrPath === false) {
+            if (is_string($stdoutPath)) {
+                @unlink($stdoutPath);
+            }
+            if (is_string($stderrPath)) {
+                @unlink($stderrPath);
+            }
+            throw new TestFailure('Unable to create temporary HTTP server diagnostics files.');
+        }
+
+        $command = escapeshellarg(PHP_BINARY) . ' -S 127.0.0.1:' . $port . ' -t ' .
+            escapeshellarg($documentRoot);
+        $descriptors = [
+            0 => ['file', $nullDevice, 'r'],
+            1 => ['file', $stdoutPath, 'a'],
+            2 => ['file', $stderrPath, 'a'],
+        ];
+        $process = proc_open($command, $descriptors, $pipes, dirname(__DIR__), $environment);
+        if (!is_resource($process)) {
+            @unlink($stdoutPath);
+            @unlink($stderrPath);
+            $lastDiagnostic = 'the PHP process could not be created on port ' . $port;
+            continue;
+        }
+
+        $server = [$process, $port, $stdoutPath, $stderrPath];
+        $ready = false;
+        try {
+            for ($readyAttempt = 0; $readyAttempt < 40; $readyAttempt++) {
+                if (!test_local_server_is_running($process)) {
+                    break;
+                }
+
+                try {
+                    [$status, $body] = test_http_get($port, '/health.php');
+                    if (
+                        $status === 200
+                        && strpos($body, '"status":"ok"') !== false
+                        && strpos($body, '"check":"liveness"') !== false
+                    ) {
+                        $ready = true;
+                        break;
+                    }
+                } catch (TestFailure $exception) {
+                    // The listener may still be starting; the bounded loop below is the retry window.
+                }
+                usleep(100000);
+            }
+        } catch (Throwable $exception) {
+            test_stop_local_server($server);
+            throw $exception;
+        }
+
+        if ($ready) {
+            return $server;
+        }
+
+        $lastDiagnostic = 'temporary server on port ' . $port . ': ' . test_server_diagnostics([$stderrPath, $stdoutPath]);
+        test_stop_local_server($server);
+    }
+
+    throw new TestFailure('Temporary PHP HTTP server did not become ready after 8 bounded attempts: ' . $lastDiagnostic);
+}
+
+function test_parse_http_status(array $headers): ?int
+{
+    $status = null;
+    foreach ($headers as $header) {
+        if (preg_match('/^HTTP\/\S+\s+(\d+)/', $header, $matches) === 1) {
+            $status = (int)$matches[1];
+        }
+    }
+
+    return $status;
+}
+
+function test_http_request(int $port, string $method, string $path, array $parameters = []): array
+{
+    unset($http_response_header);
+    $httpOptions = [
+        'method' => $method,
+        'ignore_errors' => true,
+        'timeout' => 5,
+        'follow_location' => 0,
+        'max_redirects' => 0,
+    ];
+    if ($method === 'POST') {
+        $httpOptions['header'] = "Content-Type: application/x-www-form-urlencoded\r\n";
+        $httpOptions['content'] = http_build_query($parameters);
+    }
+
+    $context = stream_context_create(['http' => $httpOptions]);
     $response = @file_get_contents('http://127.0.0.1:' . $port . $path, false, $context);
     $headers = $http_response_header ?? [];
     if ($response === false && $headers === []) {
-        throw new TestFailure('Temporary PHP HTTP GET request failed.');
+        throw new TestFailure('Temporary PHP HTTP ' . $method . ' request failed for the expected test endpoint.');
     }
 
-    $status = null;
-    foreach ($headers as $header) {
-        if (preg_match('/^HTTP\/\S+\s+(\d+)/', $header, $matches)) {
-            $status = (int)$matches[1];
-            break;
-        }
-    }
+    $status = test_parse_http_status($headers);
     if ($status === null) {
-        throw new TestFailure('Temporary PHP HTTP GET response status was unavailable.');
+        throw new TestFailure('Temporary PHP HTTP ' . $method . ' response status was unavailable.');
     }
 
     return [$status, (string)$response, $headers];
 }
 
+function test_http_get(int $port, string $path): array
+{
+    return test_http_request($port, 'GET', $path);
+}
+
 function test_http_post(int $port, string $path, array $parameters): int
 {
-    $context = stream_context_create([
-        'http' => [
-            'method' => 'POST',
-            'header' => "Content-Type: application/x-www-form-urlencoded\r\n",
-            'content' => http_build_query($parameters),
-            'ignore_errors' => true,
-            'timeout' => 5,
-        ],
-    ]);
-    $response = @file_get_contents('http://127.0.0.1:' . $port . $path, false, $context);
-    $headers = $http_response_header ?? [];
-    if ($response === false && $headers === []) {
-        throw new TestFailure('Temporary PHP HTTP request failed.');
-    }
-
-    foreach ($headers as $header) {
-        if (preg_match('/^HTTP\/\S+\s+(\d+)/', $header, $matches)) {
-            return (int)$matches[1];
-        }
-    }
-
-    throw new TestFailure('Temporary PHP HTTP response status was unavailable.');
+    [$status] = test_http_request($port, 'POST', $path, $parameters);
+    return $status;
 }

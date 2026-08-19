@@ -375,9 +375,8 @@ function run_integration_tests(): int
 
         return $tests->assertions();
     } finally {
-        if ($server !== null && is_resource($server[0])) {
-            proc_terminate($server[0]);
-            proc_close($server[0]);
+        if ($server !== null) {
+            test_stop_local_server($server);
         }
         $database->cleanup();
     }
