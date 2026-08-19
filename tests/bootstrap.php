@@ -328,7 +328,7 @@ final class DisposableDatabase
     }
 }
 
-function test_start_local_server(): array
+function test_start_local_server(array $environment_overrides = []): array
 {
     $port = random_int(18000, 18999);
     $nullDevice = PHP_OS_FAMILY === 'Windows' ? 'NUL' : '/dev/null';
@@ -339,7 +339,18 @@ function test_start_local_server(): array
         1 => ['file', $nullDevice, 'a'],
         2 => ['file', $nullDevice, 'a'],
     ];
-    $process = proc_open($command, $descriptors, $pipes, dirname(__DIR__), getenv());
+    $server_environment = getenv();
+    foreach (['TEST_DB_ROOT_PASSWORD', 'MYSQL_ROOT_PASSWORD', 'BOOTSTRAP_ADMIN_PASSWORD'] as $secret_name) {
+        unset($server_environment[$secret_name]);
+    }
+    foreach ($environment_overrides as $key => $value) {
+        if ($value === null) {
+            unset($server_environment[$key]);
+        } else {
+            $server_environment[$key] = (string)$value;
+        }
+    }
+    $process = proc_open($command, $descriptors, $pipes, dirname(__DIR__), $server_environment);
     if (!is_resource($process)) {
         throw new TestFailure('Unable to start the temporary PHP HTTP server.');
     }
@@ -357,6 +368,35 @@ function test_start_local_server(): array
     proc_terminate($process);
     proc_close($process);
     throw new TestFailure('Temporary PHP HTTP server did not become ready.');
+}
+
+function test_http_get(int $port, string $path): array
+{
+    $context = stream_context_create([
+        'http' => [
+            'method' => 'GET',
+            'ignore_errors' => true,
+            'timeout' => 5,
+        ],
+    ]);
+    $response = @file_get_contents('http://127.0.0.1:' . $port . $path, false, $context);
+    $headers = $http_response_header ?? [];
+    if ($response === false && $headers === []) {
+        throw new TestFailure('Temporary PHP HTTP GET request failed.');
+    }
+
+    $status = null;
+    foreach ($headers as $header) {
+        if (preg_match('/^HTTP\/\S+\s+(\d+)/', $header, $matches)) {
+            $status = (int)$matches[1];
+            break;
+        }
+    }
+    if ($status === null) {
+        throw new TestFailure('Temporary PHP HTTP GET response status was unavailable.');
+    }
+
+    return [$status, (string)$response, $headers];
 }
 
 function test_http_post(int $port, string $path, array $parameters): int

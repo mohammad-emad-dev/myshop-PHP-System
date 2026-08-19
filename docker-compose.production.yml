@@ -1,0 +1,78 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+      args:
+        PHP_BASE_IMAGE: ${PHP_BASE_IMAGE:?Set PHP_BASE_IMAGE to the reviewed PHP 8.3 Apache image}
+    image: ${PRODUCTION_APP_IMAGE:?Set PRODUCTION_APP_IMAGE to an immutable application image tag or digest}
+    environment:
+      APP_ENV: production
+      DB_HOST: db
+      DB_PORT: "3306"
+      DB_NAME: ${DB_NAME:?Set DB_NAME in the production environment}
+      DB_USER: ${DB_USER:?Set the restricted runtime DB_USER in the production environment}
+      DB_PASSWORD: ${DB_PASSWORD:?Set the restricted runtime DB_PASSWORD in the production secret manager}
+      TRUSTED_PROXY_IPS: ${TRUSTED_PROXY_IPS:-}
+      HSTS_ENABLED: ${HSTS_ENABLED:-false}
+      HSTS_MAX_AGE: ${HSTS_MAX_AGE:-31536000}
+    expose:
+      - "80"
+    volumes:
+      - production_uploads:/var/www/html/public/uploads
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /run/apache2
+      - /var/lock/apache2
+      - /var/log/apache2
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail --silent --show-error http://127.0.0.1/ready.php >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      start_period: 20s
+      retries: 5
+    security_opt:
+      - no-new-privileges:true
+
+  db:
+    image: ${PRODUCTION_MYSQL_IMAGE:?Set PRODUCTION_MYSQL_IMAGE to the reviewed MySQL 8.4 image digest}
+    environment:
+      MYSQL_DATABASE: ${DB_NAME:?Set DB_NAME in the production environment}
+      MYSQL_USER: ${DB_USER:?Set the restricted runtime DB_USER in the production environment}
+      MYSQL_PASSWORD: ${DB_PASSWORD:?Set the restricted runtime DB_PASSWORD in the production secret manager}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD only in the deployment secret manager}
+    volumes:
+      - production_mysql_data:/var/lib/mysql
+      # Fresh-volume initialization is controlled here; existing databases
+      # still require the documented schema/migration deployment procedure.
+      - type: bind
+        source: ./database/schema.sql
+        target: /docker-entrypoint-initdb.d/001-schema.sql
+        read_only: true
+      - type: bind
+        source: ./database/002-restrict-runtime-user.sh
+        target: /docker-entrypoint-initdb.d/002-restrict-runtime-user.sh
+        read_only: true
+      - type: bind
+        source: ./database/batch14_runtime_privileges.sql
+        target: /usr/local/share/myshop/batch14_runtime_privileges.sql
+        read_only: true
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "MYSQL_PWD=\"$${MYSQL_ROOT_PASSWORD}\" mysqladmin ping --host=127.0.0.1 --user=root --silent"]
+      interval: 5s
+      timeout: 5s
+      start_period: 20s
+      retries: 10
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  production_uploads:
+  production_mysql_data:

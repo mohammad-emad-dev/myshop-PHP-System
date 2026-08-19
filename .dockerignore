@@ -10,3 +10,11 @@ database/backups/
 *.log
 *.tmp
 *.bak
+tests/
+docs/
+screenshots/
+raw screenshots/
+test-results/
+output/
+.playwright-cli/
+.github/

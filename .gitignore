@@ -28,6 +28,7 @@ myshop_database_backup.sql
 ## Local browser sessions and generated QA artifacts
 /.playwright-cli/
 /output/
+/raw screenshots/
 /screenshots/*
 # Keep only the intentionally curated documentation screenshots below.
 !/screenshots/Dashboard.png

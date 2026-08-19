@@ -2840,6 +2840,119 @@ function delete_newly_uploaded_image($relative_path)
     return @unlink($resolved_target) || !file_exists($resolved_target);
 }
 
+/**
+ * Create a server-generated correlation ID for the current HTTP request.
+ * Client-provided IDs are deliberately ignored to prevent log injection and
+ * collisions. The ID is safe for response headers and server logs only.
+ */
+function initialize_request_context()
+{
+    if (isset($GLOBALS['request_correlation_id'])) {
+        return $GLOBALS['request_correlation_id'];
+    }
+
+    try {
+        $request_id = bin2hex(random_bytes(16));
+    } catch (Throwable $exception) {
+        $request_id = hash('sha256', uniqid('', true) . mt_rand());
+    }
+
+    $GLOBALS['request_correlation_id'] = $request_id;
+
+    if (PHP_SAPI !== 'cli') {
+        if (!headers_sent()) {
+            header('X-Request-ID: ' . $request_id);
+        }
+
+        send_hsts_header();
+
+        $method = strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'UNKNOWN'));
+        $method = preg_replace('/[^A-Z]/', '', $method);
+        $path = parse_url((string)($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH);
+        $path = is_string($path) && $path !== '' ? $path : '/';
+        $path = substr(preg_replace('/[^A-Za-z0-9_\-\/.]/', '', $path), 0, 200);
+        error_log('[request_id=' . $request_id . '] request_started method=' . $method . ' path=' . $path);
+
+        register_shutdown_function(static function () use ($request_id) {
+            error_log('[request_id=' . $request_id . '] request_completed status=' . (int)http_response_code());
+        });
+    }
+
+    return $request_id;
+}
+
+function send_hsts_header()
+{
+    if (headers_sent()) {
+        return;
+    }
+
+    $hsts_enabled = filter_var(getenv('HSTS_ENABLED') ?: 'false', FILTER_VALIDATE_BOOLEAN);
+    $hsts_max_age = filter_var(
+        getenv('HSTS_MAX_AGE') ?: '31536000',
+        FILTER_VALIDATE_INT,
+        ['options' => ['min_range' => 300, 'max_range' => 63072000]]
+    );
+    if ($hsts_enabled && is_https_request() && $hsts_max_age !== false) {
+        header('Strict-Transport-Security: max-age=' . $hsts_max_age);
+    }
+}
+
+function get_request_correlation_id()
+{
+    return initialize_request_context();
+}
+
+/**
+ * Add the correlation ID to new operational error messages without logging
+ * request bodies, cookies, credentials, tokens, or authorization headers.
+ */
+function log_application_error($message)
+{
+    $message = is_scalar($message) ? (string)$message : 'Application error';
+    error_log('[request_id=' . get_request_correlation_id() . '] ' . $message);
+}
+
+function get_trusted_proxy_ips()
+{
+    $configured = getenv('TRUSTED_PROXY_IPS');
+    if ($configured === false || trim($configured) === '') {
+        return [];
+    }
+
+    $trusted_ips = [];
+    foreach (explode(',', $configured) as $candidate) {
+        $candidate = trim($candidate);
+        if (filter_var($candidate, FILTER_VALIDATE_IP) !== false) {
+            $trusted_ips[] = $candidate;
+        }
+    }
+
+    return array_values(array_unique($trusted_ips));
+}
+
+/**
+ * Trust forwarded HTTPS state only from explicitly configured proxy IPs.
+ */
+function is_https_request()
+{
+    if (
+        isset($_SERVER['HTTPS'])
+        && strtolower((string)$_SERVER['HTTPS']) !== 'off'
+        && $_SERVER['HTTPS'] !== ''
+    ) {
+        return true;
+    }
+
+    $remote_address = $_SERVER['REMOTE_ADDR'] ?? '';
+    if (!is_string($remote_address) || !in_array($remote_address, get_trusted_proxy_ips(), true)) {
+        return false;
+    }
+
+    $forwarded_protocol = strtolower(trim((string)($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '')));
+    return $forwarded_protocol === 'https';
+}
+
 if (!defined('SESSION_IDLE_TIMEOUT')) {
     define('SESSION_IDLE_TIMEOUT', 1800);
 }
@@ -2877,15 +2990,15 @@ function destroy_current_session()
  */
 function start_secure_session()
 {
+    initialize_request_context();
+
     if (session_status() === PHP_SESSION_NONE) {
         ini_set('session.cookie_httponly', '1');
         ini_set('session.use_only_cookies', '1');
         ini_set('session.use_strict_mode', '1');
         ini_set('session.use_trans_sid', '0');
 
-        $is_secure = isset($_SERVER['HTTPS'])
-            && strtolower((string)$_SERVER['HTTPS']) !== 'off'
-            && $_SERVER['HTTPS'] !== '';
+        $is_secure = is_https_request();
         ini_set('session.cookie_secure', $is_secure ? '1' : '0');
 
         session_start([

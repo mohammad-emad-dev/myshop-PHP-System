@@ -6,10 +6,25 @@
  * this request-time include; run database/schema.sql during deployment.
  */
 $fail_database_connection = static function ($technical_message) {
-    error_log('Database initialization failed: ' . $technical_message);
+    $request_id = function_exists('get_request_correlation_id')
+        ? get_request_correlation_id()
+        : 'startup';
+    if (function_exists('log_application_error')) {
+        log_application_error('Database initialization failed: ' . $technical_message);
+    } else {
+        error_log('[request_id=' . $request_id . '] Database initialization failed: ' . $technical_message);
+    }
 
     if (PHP_SAPI !== 'cli') {
-        http_response_code(500);
+        http_response_code(
+            defined('DB_FAILURE_RESPONSE_JSON') && DB_FAILURE_RESPONSE_JSON ? 503 : 500
+        );
+    }
+
+    if (defined('DB_FAILURE_RESPONSE_JSON') && DB_FAILURE_RESPONSE_JSON && PHP_SAPI !== 'cli') {
+        header('Content-Type: application/json; charset=utf-8');
+        header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+        exit('{"status":"not_ready"}');
     }
 
     exit('Database connection is unavailable.');

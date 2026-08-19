@@ -110,6 +110,53 @@ docker compose --env-file .env down
 
 Do not use down --volumes unless the local database is disposable.
 
+## Production Compose baseline
+
+`docker-compose.production.yml` is a deployment baseline, not an external deployment. It is selected explicitly and is never auto-merged with the development file:
+
+~~~powershell
+Copy-Item .env.example .env.production
+# Edit .env.production using the production secret manager and reviewed image references.
+docker compose --env-file .env.production -f docker-compose.production.yml config --quiet
+docker compose --env-file .env.production -f docker-compose.production.yml build --pull app
+docker compose --env-file .env.production -f docker-compose.production.yml up -d
+docker compose --env-file .env.production -f docker-compose.production.yml ps
+~~~
+
+The production application image copies the reviewed source at build time and has no repository bind mount. Only a named `production_uploads` volume is writable by the application. The application root is read-only, Apache runtime/log paths use tmpfs, and both services restart unless stopped. MySQL has no published host port; a reverse proxy must be attached to the deployment network or use the platform’s internal service routing. The production Compose file does not run a browser-accessible schema or restore operation.
+
+Fresh-volume database initialization uses the canonical schema and the restricted runtime-account initializer. Existing databases still require the controlled schema-account migration process documented above; do not treat container startup as a migration mechanism. The CLI-only bootstrap can be run as a controlled one-shot using deployment-injected `BOOTSTRAP_ADMIN_*` variables; never put those values in the image, repository, command history, or logs.
+
+### Production environment and TLS contract
+
+The production environment must provide, through a secret manager or protected deployment configuration:
+
+- `DB_NAME`, restricted CRUD-only `DB_USER`, and `DB_PASSWORD`.
+- `MYSQL_ROOT_PASSWORD` only to the database initialization/deployment boundary; never to the normal application service.
+- `PHP_BASE_IMAGE`, reviewed at the exact PHP 8.3 Apache release/digest used for the build.
+- `PRODUCTION_APP_IMAGE`, preferably an immutable registry digest for the reviewed application image.
+- `PRODUCTION_MYSQL_IMAGE`, pinned to the reviewed MySQL version/digest. The example currently records the reviewed MySQL 8.4.3 digest; refresh it deliberately during patching.
+- `TRUSTED_PROXY_IPS`, a comma-separated exact-IP allow-list. Leave it empty unless a fixed reverse proxy is the direct peer.
+- `HSTS_ENABLED=false` during local HTTP development. Set it to `true` only after HTTPS is guaranteed for the complete hostname and subdomain policy; set `HSTS_MAX_AGE` deliberately.
+
+The PHP session marks cookies `Secure` when the request is HTTPS. `X-Forwarded-Proto: https` is honored only when `REMOTE_ADDR` is in `TRUSTED_PROXY_IPS`; arbitrary client-supplied forwarding headers are ignored. TLS certificates, HTTPS redirects, proxy source-IP preservation, trusted-proxy network policy, HSTS preload/subdomain decisions, and external firewalling remain deployment responsibilities. The repository does not force HTTPS in local development.
+
+The PHP production configuration disables display errors and startup error display, sends technical errors to container stderr, hides exception arguments, and keeps strict HTTP-only session settings. User-facing health and database failures remain generic.
+
+### Health, logs, and alerts
+
+- `/health.php` is liveness-only and returns HTTP 200 without opening MySQL.
+- `/ready.php` is database readiness. It returns HTTP 200 only when `SELECT 1` succeeds and HTTP 503 with a generic body when the database is unavailable. It never returns SQL errors, credentials, paths, or stack traces.
+- The production application healthcheck uses `/ready.php`; the MySQL healthcheck uses `mysqladmin ping` locally inside the database container.
+- Apache access logs go to stdout and errors go to stderr. PHP technical errors go to stderr through `/proc/self/fd/2`. Docker or the deployment runtime must collect, restrict, rotate, and retain these streams according to operational policy.
+- Each HTTP request receives a server-generated `X-Request-ID`; request start/completion logs and Apache access logs include it. Client-provided correlation IDs, cookies, authorization headers, CSRF tokens, passwords, request bodies, and database credentials are not logged.
+
+At minimum, alert on readiness failures, sustained HTTP 5xx rates, elevated latency, authentication failure/rate-limit spikes, authorization-denied spikes, database connection/replication/storage failures, backup generation or restore-verification failures, upload storage exhaustion, and host/container disk pressure. Define log retention, access control, redaction review, rotation, and on-call escalation before production use.
+
+### Image patching process
+
+Review PHP/Apache, MySQL, Debian, and extension security advisories; select a compatible exact version; resolve and record immutable image digests; rebuild the production stage; run Compose validation, syntax checks, regression/restore tests, and a staging smoke test; then roll out with a rollback image reference retained. The example pins the reviewed PHP base and MySQL image digests for the current build architecture; release automation must re-resolve and review architecture-appropriate digests when the platform or versions change. No external registry, monitoring vendor, or production deployment was configured by this batch.
+
 ## Verification
 
 Validate the Compose model and lint the PHP sources with the same runtime used by Docker:
@@ -162,6 +209,8 @@ The GitHub Actions regression job creates its own disposable MySQL container wit
 - Database errors are logged server-side; SQL details and stack traces are not shown to users.
 - Security headers and a nonce-based CSP protect the browser boundary.
 - Audit-log reads are administrator-only and paginated; audit metadata is bounded and excludes passwords, CSRF tokens, session IDs, credentials, request bodies, and dump contents.
+- Liveness/readiness endpoints are generic and do not expose internal diagnostics.
+- Request correlation IDs are server-generated and safe for logs; sensitive request data is excluded.
 
 ## Database migrations
 
@@ -238,7 +287,7 @@ The current baseline is not certified for a large production deployment. Remaini
 
 - HTTPS, secure secret provisioning, production HSTS, firewalling, and monitoring.
 - Pagination or bounded search for large POS, report, history, and selector datasets.
-- Pinning Docker image digests and operating-system package versions after compatibility testing.
+- Resolving the PHP base and application image to immutable production digests, and patching Debian/Apache/PHP/MySQL through the documented release process.
 - CI checks for syntax, security scanning, migrations, Docker builds, and regression tests.
 - Fresh cross-browser and accessibility verification.
 - Splitting the large shared functions module into focused application services over time.
