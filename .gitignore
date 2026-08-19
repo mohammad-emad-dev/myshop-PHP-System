@@ -30,6 +30,7 @@ myshop_database_backup.sql
 /output/
 /raw screenshots/
 /screenshots/*
+e2e/node_modules/
 # Keep only the intentionally curated documentation screenshots below.
 !/screenshots/Dashboard.png
 !/screenshots/login.png

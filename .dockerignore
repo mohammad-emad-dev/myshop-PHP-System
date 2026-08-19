@@ -11,6 +11,9 @@ database/backups/
 *.tmp
 *.bak
 tests/
+e2e/
+scripts/browser-qa-seed.php
+scripts/run-browser-qa.ps1
 docs/
 screenshots/
 raw screenshots/

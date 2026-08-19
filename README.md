@@ -222,7 +222,7 @@ The test layers are deliberately separate:
 
 - `tests/Unit/` covers sanitization, identifiers, password policy, CSRF helpers, and validation that completes before database access.
 - `tests/Integration/` covers real MySQL schema, migrations, CRUD, transactions, stock/order integrity, authorization-sensitive order creation, rate limiting, and database-failure contracts.
-- Browser smoke tests remain a separate local verification layer. They require a running web server and browser automation; they are not represented as passing unit or integration tests.
+- Browser E2E and accessibility QA remains a separate layer from the PHP suite. Run `pwsh -File scripts/run-browser-qa.ps1` from a Windows developer shell to build a disposable Compose database, create temporary admin/cashier fixtures, run the pinned Playwright/Chromium suite at 375px, 768px, and 1440px, and remove the project and its volume in cleanup. The runner never reads `.env`, never targets `ioms_db`, keeps the source mount read-only, and stores sanitized screenshots/results only under a temporary directory. See [docs/BROWSER-QA.md](docs/BROWSER-QA.md) for prerequisites and troubleshooting.
 
 The GitHub Actions regression job creates its own disposable MySQL container with a generated root password, runs `php tests/run.php`, and removes the container and its volume even when the tests fail.
 

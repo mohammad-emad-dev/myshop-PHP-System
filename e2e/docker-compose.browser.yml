@@ -1,0 +1,8 @@
+services:
+  app:
+    build:
+      args:
+        PHP_BASE_IMAGE: ${PHP_BASE_IMAGE:?Set PHP_BASE_IMAGE for browser QA}
+
+  db:
+    image: ${BROWSER_QA_MYSQL_IMAGE:?Set BROWSER_QA_MYSQL_IMAGE for browser QA}

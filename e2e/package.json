@@ -1,0 +1,18 @@
+{
+  "name": "myshop-browser-qa",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Reproducible disposable browser QA for MyShop",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "install-browser": "playwright install chromium"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.62.1",
+    "axe-core": "4.13.0"
+  }
+}

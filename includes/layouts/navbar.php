@@ -26,7 +26,7 @@
                 ?>
                 <!-- Notification Bell Dropdown -->
                 <li class="nav-item dropdown me-2 align-self-center list-unstyled">
-                    <a class="nav-link position-relative" href="#" id="notificationDropdown"
+                    <a class="nav-link position-relative" href="#" id="notificationDropdown" aria-label="Notifications"
                         role="button" data-bs-toggle="dropdown" aria-expanded="false">
                         <i class="fas fa-bell fs-5 <?php echo $low_stock_count > 0 ? 'text-warning animate-bell' : 'text-secondary'; ?>"></i>
                         <?php if ($low_stock_count > 0): ?>
