@@ -7,6 +7,7 @@ require_once __DIR__ . '/Unit/architecture_baseline_test.php';
 require_once __DIR__ . '/Unit/catalog_read_test.php';
 require_once __DIR__ . '/Unit/product_write_test.php';
 require_once __DIR__ . '/Unit/order_write_test.php';
+require_once __DIR__ . '/Unit/order_read_test.php';
 require_once __DIR__ . '/Unit/people_read_test.php';
 require_once __DIR__ . '/Unit/inventory_read_test.php';
 require_once __DIR__ . '/Unit/inventory_adjustment_test.php';
@@ -29,6 +30,7 @@ try {
     $catalogAssertions = run_catalog_read_unit_tests();
     $productWriteAssertions = run_product_write_unit_tests();
     $orderWriteAssertions = run_order_write_unit_tests();
+    $orderReadAssertions = run_order_read_unit_tests();
     $peopleAssertions = run_people_read_unit_tests();
     $inventoryAssertions = run_inventory_read_unit_tests();
     $inventoryAdjustmentAssertions = run_inventory_adjustment_unit_tests();
@@ -42,9 +44,9 @@ try {
     $backupAssertions = run_backup_restore_tests();
     $operationalAssertions = run_operational_tests();
     $exportAssertions = run_export_streaming_tests();
-    $totalAssertions = $unitAssertions + $architectureAssertions + $catalogAssertions + $productWriteAssertions + $orderWriteAssertions + $peopleAssertions + $inventoryAssertions + $inventoryAdjustmentAssertions + $authAssertions + $deploymentAssertions + $httpHarnessAssertions + $securityScanAssertions + $supplyChainAssertions + $releaseIntegrityAssertions + $integrationAssertions + $backupAssertions + $operationalAssertions + $exportAssertions;
+    $totalAssertions = $unitAssertions + $architectureAssertions + $catalogAssertions + $productWriteAssertions + $orderWriteAssertions + $orderReadAssertions + $peopleAssertions + $inventoryAssertions + $inventoryAdjustmentAssertions + $authAssertions + $deploymentAssertions + $httpHarnessAssertions + $securityScanAssertions + $supplyChainAssertions + $releaseIntegrityAssertions + $integrationAssertions + $backupAssertions + $operationalAssertions + $exportAssertions;
     $duration = number_format(microtime(true) - $started, 2);
-    echo "PASS: {$totalAssertions} assertions (" . ($unitAssertions + $architectureAssertions + $catalogAssertions + $productWriteAssertions + $orderWriteAssertions + $peopleAssertions + $inventoryAssertions + $inventoryAdjustmentAssertions + $authAssertions + $deploymentAssertions + $httpHarnessAssertions + $securityScanAssertions + $supplyChainAssertions + $releaseIntegrityAssertions) . " unit, " .
+    echo "PASS: {$totalAssertions} assertions (" . ($unitAssertions + $architectureAssertions + $catalogAssertions + $productWriteAssertions + $orderWriteAssertions + $orderReadAssertions + $peopleAssertions + $inventoryAssertions + $inventoryAdjustmentAssertions + $authAssertions + $deploymentAssertions + $httpHarnessAssertions + $securityScanAssertions + $supplyChainAssertions + $releaseIntegrityAssertions) . " unit, " .
         ($integrationAssertions + $backupAssertions + $operationalAssertions + $exportAssertions) . " integration) in {$duration}s\n";
     exit(0);
 } catch (Throwable $exception) {
