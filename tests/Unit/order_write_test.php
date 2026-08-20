@@ -84,8 +84,9 @@ function run_order_write_unit_tests(): int
         $page,
         'Orders page must call orders_create with the established argument order and actor ID.'
     );
-    $tests->assertFalse(
-        preg_match('/\\bcreate_order\\s*\\(/', $page) === 1,
+    $tests->assertSame(
+        0,
+        preg_match('/\\bcreate_order\\s*\\(/', $page),
         'Orders page must not call the legacy create_order compatibility wrapper.'
     );
 
