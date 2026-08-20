@@ -252,6 +252,19 @@ test('admin authentication, invalid login, protected redirect, and logout', asyn
   await expect(page).toHaveURL(/\/login\.php$/);
 
   await login(page, adminCredentials);
+  const logoutForm = page.locator('form[data-confirm-logout]').first();
+  await logoutForm.locator('input[name="csrf_token"]').evaluate((input) => {
+    input.value = 'invalid-logout-token';
+  });
+  allowExpectedForbidden(page, '/login.php');
+  await Promise.all([
+    page.waitForNavigation(),
+    logoutForm.evaluate((form) => form.submit()),
+  ]);
+  await expect(page).toHaveURL(/\/login\.php$/);
+  await expect(page.getByRole('alert')).toContainText('Security check failed. Invalid request token.');
+  await page.goto('/index.php');
+  await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
   await captureSanitizedScreenshot(page, 'login-dashboard');
   await logout(page);
   await page.goto('/settings.php');
