@@ -1040,6 +1040,25 @@ function run_integration_tests(): int
         $tests->assertTrue(count(get_stock_movements_page($conn, null, 10, 0)) <= 10, 'Stock movement page is not bounded.');
         $tests->assertTrue(count(get_stock_movements_page($conn, null, 10, 10)) <= 10, 'Stock movement middle page is not bounded.');
         $tests->assertCount(0, get_stock_movements_page($conn, null, 10, 999999), 'Empty stock movement pages must return an empty list.');
+        $scopedMovementCount = (int)test_scalar($conn, 'SELECT COUNT(*) FROM StockMovement WHERE product_id = ?', 'i', [$orderProductId]);
+        $tests->assertSame($scopedMovementCount, count_stock_movements($conn, $orderProductId), 'Product-specific stock movement count is incorrect.');
+        $scopedMovementPage = get_stock_movements_page($conn, $orderProductId, 10, 0);
+        $tests->assertTrue(count($scopedMovementPage) <= 10, 'Product-specific stock movement page is not bounded.');
+        foreach ($scopedMovementPage as $scopedMovement) {
+            $tests->assertSame($orderProductId, (int)($scopedMovement['product_id'] ?? 0), 'Product-specific stock movement filtering returned another product.');
+        }
+        $expectedMovementIds = [];
+        $expectedMovementResult = $conn->query(
+            'SELECT id FROM StockMovement WHERE product_id = ' . $orderProductId . ' ORDER BY created_at DESC, id DESC LIMIT 10'
+        );
+        while ($expectedMovementResult && ($expectedMovement = $expectedMovementResult->fetch_assoc())) {
+            $expectedMovementIds[] = (int)$expectedMovement['id'];
+        }
+        if ($expectedMovementResult) {
+            $expectedMovementResult->free();
+        }
+        $actualMovementIds = array_map(static fn(array $movement): int => (int)$movement['id'], $scopedMovementPage);
+        $tests->assertSame($expectedMovementIds, $actualMovementIds, 'Stock movement page ordering changed.');
 
         $stockPageReason = 'Batch 6D page adjustment';
         $stockPageBefore = (int)test_scalar($conn, 'SELECT stock FROM Product WHERE id = ?', 'i', [$orderProductId]);

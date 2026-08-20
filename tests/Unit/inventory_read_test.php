@@ -32,6 +32,9 @@ function run_inventory_read_unit_tests(): int
     foreach (['inventory_count_stock_movements', 'inventory_get_stock_movements_page'] as $functionName) {
         $tests->assertContains('function ' . $functionName, $module, 'Inventory read function is missing: ' . $functionName);
     }
+    foreach (['WHERE sm.product_id = ?', 'ORDER BY sm.created_at DESC, sm.id DESC', 'LIMIT ? OFFSET ?'] as $queryContract) {
+        $tests->assertContains($queryContract, $module, 'Inventory query contract changed: ' . $queryContract);
+    }
 
     foreach (['inventory_count_stock_movements($conn', 'inventory_get_stock_movements_page($conn'] as $functionCall) {
         $tests->assertContains($functionCall, $stockPage, 'Stock movement page was not migrated to the Inventory read module: ' . $functionCall);
