@@ -17,6 +17,7 @@ function run_architecture_baseline_unit_tests(): int
     $facade = file_get_contents($repository . '/includes/functions.php');
     $catalog = file_get_contents($repository . '/includes/catalog.php');
     $people = file_get_contents($repository . '/includes/people.php');
+    $inventory = file_get_contents($repository . '/includes/inventory.php');
     $auth = file_get_contents($repository . '/includes/auth.php');
     $http = file_get_contents($repository . '/includes/http.php');
     $security = file_get_contents($repository . '/includes/security.php');
@@ -33,6 +34,7 @@ function run_architecture_baseline_unit_tests(): int
         $facade,
         $catalog,
         $people,
+        $inventory,
         $auth,
         $http,
         $security,
@@ -71,7 +73,7 @@ function run_architecture_baseline_unit_tests(): int
         $tests->assertTrue(is_file($repository . '/' . $route), 'Documented public route is missing: ' . $route);
     }
 
-    foreach (['security.php', 'pagination.php', 'audit.php', 'http.php', 'auth.php', 'catalog.php', 'people.php'] as $module) {
+    foreach (['security.php', 'pagination.php', 'audit.php', 'http.php', 'auth.php', 'catalog.php', 'people.php', 'inventory.php'] as $module) {
         $tests->assertContains(
             "require_once __DIR__ . '/{$module}'",
             $facade,
@@ -120,6 +122,10 @@ function run_architecture_baseline_unit_tests(): int
     $tests->assertFalse(
         strpos($auth, "require_once __DIR__ . '/functions.php'") !== false,
         'Authentication module must remain independent from the compatibility facade.'
+    );
+    $tests->assertFalse(
+        strpos($inventory, "require_once __DIR__ . '/functions.php'") !== false,
+        'Inventory module must remain independent from the compatibility facade.'
     );
     $tests->assertContains('$_SESSION', $security, 'Session state ownership must remain in the security module.');
 

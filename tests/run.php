@@ -6,6 +6,7 @@ require_once __DIR__ . '/Unit/validation_test.php';
 require_once __DIR__ . '/Unit/architecture_baseline_test.php';
 require_once __DIR__ . '/Unit/catalog_read_test.php';
 require_once __DIR__ . '/Unit/people_read_test.php';
+require_once __DIR__ . '/Unit/inventory_read_test.php';
 require_once __DIR__ . '/Unit/auth_extraction_test.php';
 require_once __DIR__ . '/Unit/deployment_test.php';
 require_once __DIR__ . '/Unit/http_harness_test.php';
@@ -24,6 +25,7 @@ try {
     $architectureAssertions = run_architecture_baseline_unit_tests();
     $catalogAssertions = run_catalog_read_unit_tests();
     $peopleAssertions = run_people_read_unit_tests();
+    $inventoryAssertions = run_inventory_read_unit_tests();
     $authAssertions = run_auth_extraction_unit_tests();
     $deploymentAssertions = run_deployment_unit_tests();
     $httpHarnessAssertions = run_http_harness_unit_tests();
@@ -34,9 +36,9 @@ try {
     $backupAssertions = run_backup_restore_tests();
     $operationalAssertions = run_operational_tests();
     $exportAssertions = run_export_streaming_tests();
-    $totalAssertions = $unitAssertions + $architectureAssertions + $catalogAssertions + $peopleAssertions + $authAssertions + $deploymentAssertions + $httpHarnessAssertions + $securityScanAssertions + $supplyChainAssertions + $releaseIntegrityAssertions + $integrationAssertions + $backupAssertions + $operationalAssertions + $exportAssertions;
+    $totalAssertions = $unitAssertions + $architectureAssertions + $catalogAssertions + $peopleAssertions + $inventoryAssertions + $authAssertions + $deploymentAssertions + $httpHarnessAssertions + $securityScanAssertions + $supplyChainAssertions + $releaseIntegrityAssertions + $integrationAssertions + $backupAssertions + $operationalAssertions + $exportAssertions;
     $duration = number_format(microtime(true) - $started, 2);
-    echo "PASS: {$totalAssertions} assertions (" . ($unitAssertions + $architectureAssertions + $catalogAssertions + $peopleAssertions + $authAssertions + $deploymentAssertions + $httpHarnessAssertions + $securityScanAssertions + $supplyChainAssertions + $releaseIntegrityAssertions) . " unit, " .
+    echo "PASS: {$totalAssertions} assertions (" . ($unitAssertions + $architectureAssertions + $catalogAssertions + $peopleAssertions + $inventoryAssertions + $authAssertions + $deploymentAssertions + $httpHarnessAssertions + $securityScanAssertions + $supplyChainAssertions + $releaseIntegrityAssertions) . " unit, " .
         ($integrationAssertions + $backupAssertions + $operationalAssertions + $exportAssertions) . " integration) in {$duration}s\n";
     exit(0);
 } catch (Throwable $exception) {
