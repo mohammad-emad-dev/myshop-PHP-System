@@ -21,7 +21,7 @@ if ($is_logout_request) {
     }
 }
 
-if (!$is_logout_request && isset($_SESSION['staff_id']) && verify_login(false)) {
+if (!$is_logout_request && isset($_SESSION['staff_id']) && auth_verify_login($conn, false)) {
     redirect('index.php');
 }
 
