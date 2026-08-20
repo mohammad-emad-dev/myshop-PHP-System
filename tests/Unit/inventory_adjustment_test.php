@@ -43,6 +43,8 @@ function run_inventory_adjustment_unit_tests(): int
         '$conn->rollback()',
         'audit_log($conn, $staff_id, \'stock_adjustment\', \'Product\', $product_id, false',
         'Stock adjustment rollback failed:',
+        'function inventory_rollback_error($conn): string',
+        "error_log('Stock adjustment rollback failed: ' . inventory_rollback_error(\$conn));",
         'Stock adjustment failed:',
         'return true;',
         'return false;',
@@ -53,6 +55,36 @@ function run_inventory_adjustment_unit_tests(): int
         strpos($module, '$_SESSION') !== false,
         'Inventory adjustment service must not read session state.'
     );
+    $tests->assertTrue(
+        function_exists('inventory_rollback_error'),
+        'Rollback diagnostic helper is unavailable.'
+    );
+    if (function_exists('inventory_rollback_error')) {
+        $tests->assertSame(
+            'connection unavailable',
+            inventory_rollback_error(null),
+            'Invalid rollback connection diagnostics must use a safe generic value.'
+        );
+
+        $closedConnection = mysqli_init();
+        $closedDiagnostic = '';
+        $diagnosticEscaped = false;
+        try {
+            $closedConnection->close();
+            $closedDiagnostic = inventory_rollback_error($closedConnection);
+        } catch (Throwable $exception) {
+            $diagnosticEscaped = true;
+        }
+        $tests->assertFalse(
+            $diagnosticEscaped,
+            'Rollback diagnostics must not escape when the mysqli connection is closed.'
+        );
+        $tests->assertSame(
+            'connection unavailable',
+            $closedDiagnostic,
+            'Closed rollback connection diagnostics must use a safe generic value.'
+        );
+    }
 
     $adjustmentStart = strpos($page, '// Handle Manual Stock Adjustment');
     $readPathStart = strpos($page, '// Handle read-only filter');
