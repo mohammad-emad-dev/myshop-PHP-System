@@ -78,8 +78,34 @@ function run_order_write_unit_tests(): int
         }
     }
 
-    $tests->assertContains('create_order($conn,', $page, 'Orders page must retain its compatibility wrapper caller in this batch.');
-    $tests->assertFalse(strpos($page, 'orders_create(') !== false, 'Orders page must not migrate to the focused service in this batch.');
+    $directCall = "orders_create(\$conn, \$_SESSION['staff_id'], \$order_items, \$order_type, \$customer_id, \$supplier_id)";
+    $tests->assertContains(
+        $directCall,
+        $page,
+        'Orders page must call orders_create with the established argument order and actor ID.'
+    );
+    $tests->assertFalse(
+        preg_match('/\\bcreate_order\\s*\\(/', $page) === 1,
+        'Orders page must not call the legacy create_order compatibility wrapper.'
+    );
+
+    $csrfPosition = strpos($page, 'if (!verify_csrf_token($csrf_token))');
+    $authPosition = strpos($page, 'auth_verify_login($conn)');
+    $adminStatePosition = strpos($page, '$is_admin_user = auth_is_admin($conn);');
+    $purchaseAuthorizationPosition = strpos($page, "} elseif (\$order_type === 'purchase' && !auth_is_admin(\$conn))");
+    $servicePosition = strpos($page, $directCall);
+    $tests->assertTrue(
+        $authPosition !== false
+            && $adminStatePosition !== false
+            && $csrfPosition !== false
+            && $purchaseAuthorizationPosition !== false
+            && $servicePosition !== false
+            && $authPosition < $csrfPosition
+            && $adminStatePosition < $csrfPosition
+            && $csrfPosition < $purchaseAuthorizationPosition
+            && $purchaseAuthorizationPosition < $servicePosition,
+        'Orders page must preserve authentication, CSRF, purchase authorization, and service-call order.'
+    );
 
     return $tests->assertions();
 }
