@@ -1,9 +1,9 @@
 # MyShop architecture baseline
 
-Status: Batch 6A authentication and authorization extraction baseline
+Status: Batch 7F product mutation extraction baseline
 
 Captured from the `security-hardening-baseline` branch at starting revision
-`69649236b71cf5bcb5c374303129c29bf6a4171b`.
+`b942f1bb611cc79e5cd23238688e5a4197ca18c0`.
 
 This document describes the current implementation. It is intentionally not a
 target architecture and does not authorize production-code refactoring.
@@ -28,9 +28,10 @@ Browser QA is intentionally separate from the dependency-free PHP test harness.
 3. A page normally requires `includes/functions.php`, starts a secure session,
    loads `config/db.php`, and then performs request-specific work.
 4. `includes/functions.php` loads `security.php`, `pagination.php`, `audit.php`,
-   `http.php`, `auth.php`, `catalog.php`, and `people.php` as a compatibility
-   facade. Catalog and People page callers may use their focused read functions
-   directly; existing authentication callers still use legacy wrappers.
+   `http.php`, `auth.php`, `catalog.php`, `people.php`, `inventory.php`,
+   and `products.php` as a compatibility facade. Catalog and People page
+   callers may use their focused read functions directly; product mutation
+   callers still use legacy wrappers.
 5. `config/db.php` reads `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, and
    `DB_PASSWORD` from the process environment and creates the mysqli
    connection. It does not run schema creation or migrations.
@@ -112,8 +113,8 @@ application service module.
 | `verify_login()`, `redirect()` | Delegation-only Auth and HTTP compatibility wrappers |
 | `build_product_filter_sql()` | Catalog filter compatibility wrapper |
 | `get_all_products()` and Catalog compatibility wrappers | Legacy full product read plus delegation to `includes/catalog.php` |
-| `get_low_stock_products()`, stock movement reads, `log_stock_movement()`, `inventory_adjust_stock()` | Low-stock reads, stock-movement reads/pagination, compatibility-preserving movement writes, and the atomic manual adjustment service |
-| `create_product()`, `update_product()`, `delete_product()` | Product writes, stock history, uploads, and audit coupling |
+| `get_low_stock_products()`, stock movement reads, `log_stock_movement()` | Low-stock reads, stock-movement reads/pagination, and compatibility-preserving movement-write wrappers |
+| `create_product()`, `update_product()`, `delete_product()` | Delegation-only compatibility wrappers to `includes/products.php`; upload validation remains page-owned |
 | `create_order()` | Transactional sale/purchase order creation |
 | Order list/count/summary/detail functions | Order lists, counts, summaries, scoped lookups, and details |
 | Dashboard, upload, chart, and report functions | Dashboard statistics, uploads, charts, and report aggregates |
@@ -137,6 +138,14 @@ Focused shared modules already extracted from the facade:
 - `includes/people.php`: read-only bounded customer and supplier count, page,
   and selector queries. The legacy public function names remain thin wrappers
   in `functions.php`.
+- `includes/inventory.php`: bounded stock-movement reads, movement writing,
+  and the atomic manual stock-adjustment service. The legacy movement writer
+  and bounded read names remain compatibility wrappers where callers have not
+  migrated.
+- `includes/products.php`: explicit product creation, update, and deletion
+  transactions, product stock-history integration, and product audit writes.
+  The legacy `create_product()`, `update_product()`, and `delete_product()`
+  names remain delegation-only wrappers in `functions.php`.
 
 ## Public pages and responsibilities
 
@@ -144,9 +153,9 @@ Focused shared modules already extracted from the facade:
 |---|---|
 | `public/login.php` | Login, logout, rate-limit interaction, session changes, authentication audit, login view |
 | `public/index.php` | Dashboard authorization, dashboard queries, chart data preparation, dashboard view |
-| `public/products.php` | Product CRUD request dispatch, image upload handling, Catalog search/pagination, product table and forms |
+| `public/products.php` | Product CRUD request dispatch, request validation, authorization, CSRF, image upload handling, generic messages, Catalog search/pagination, product table, forms, and rendering; delegates product database mutations through compatibility wrappers |
 | `public/categories.php` | Category CRUD request dispatch, admin checks, Catalog search/pagination, category view |
-| `public/stock_movements.php` | Manual stock adjustment transaction, movement history filtering/pagination, stock ledger view |
+| `public/stock_movements.php` | Manual stock adjustment request validation, CSRF and authorization boundary, delegation to the Inventory service, movement history filtering/pagination, and stock ledger view |
 | `public/orders.php` | POS cart submission, Catalog product/category and People customer/supplier-selector reads, product revalidation, sale/purchase policy, order creation, POS view and JavaScript |
 | `public/order_history.php` | Scoped order history filters, pagination, summaries, order-history view and interactions |
 | `public/get_order_details.php` | Scoped JSON order-detail endpoint |
@@ -171,8 +180,8 @@ Application pages with direct SQL ownership:
 
 - `config/db.php:66-83`: connection and charset initialization.
 - `public/login.php:61-92`: active staff lookup during login.
-- `public/stock_movements.php:43,78-80`: product lock and stock update for
-  manual adjustment.
+- `public/stock_movements.php`: no direct stock-adjustment SQL; delegates the
+  validated manual adjustment to `includes/inventory.php`.
 - `public/settings.php:15,78,131,139`: profile lookup, duplicate username
   check, and profile updates.
 - `public/backup_database.php:113-115`: current admin password lookup for
@@ -186,13 +195,17 @@ Shared modules own most other application SQL:
   wrappers.
 - `includes/people.php`: bounded customer and supplier count/page/selector reads;
   `includes/functions.php` retains compatibility wrappers.
+- `includes/products.php`: product creation, update, and deletion transactions,
+  product stock-history integration, and product audit writes; the legacy names
+  remain compatibility wrappers in `includes/functions.php`.
 - `includes/auth.php`: active Staff session revalidation, admin role checks, and
   admin denial auditing; it accepts the database connection explicitly while
   preserving the current session/global side effects.
 - `includes/http.php`: terminating redirect implementation; `redirect()` remains
   available through the compatibility facade.
-- `includes/functions.php`: legacy full product reads, inventory, order, staff,
-  remaining reference-data, and dashboard queries, plus protected mutations.
+- `includes/functions.php`: legacy full product reads, remaining inventory,
+  order, staff, reference-data, and dashboard queries, plus protected mutations
+  that have not yet been extracted.
 - `includes/audit.php:62-300`: audit writes and reads.
 - `includes/export.php:115-392`: bounded export queries.
 - `includes/backup.php:114-168`: table definition and streamed data queries.

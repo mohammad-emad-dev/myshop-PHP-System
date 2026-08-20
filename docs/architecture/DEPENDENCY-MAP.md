@@ -1,7 +1,7 @@
 # MyShop dependency map
 
 This map records current call-site and dependency relationships after the
-Batch 7A bounded inventory-read extraction. It remains a
+Batch 7F product mutation extraction. It remains a
 characterization artifact; the compatibility wrappers are still required.
 
 ## Public-page to shared-function map
@@ -87,6 +87,36 @@ Unmigrated callers, including `public/stock_movements.php` for product reads,
 continue to use those wrappers. `get_categories()` remains an unbounded
 legacy loader and `get_category_by_id()` remains an uncalled legacy lookup;
 neither was moved without a verified caller.
+
+## Product module boundary
+
+`includes/products.php` has no dependency on `includes/functions.php`. It
+requires `inventory.php` for stock-history integration and safe rollback
+diagnostics, and `audit.php` for explicit-actor audit writes. It accepts the
+database connection and actor ID explicitly and does not read session or
+global state.
+
+| Focused function | Mutation and transaction behavior | Return contract |
+|---|---|---|
+| `products_create` | Creates a product, applies the General-category fallback and barcode normalization, records initial stock history when needed, writes the success audit, and commits atomically; failures roll back and attempt the failure audit | `bool`; `true` only after commit, otherwise `false` |
+| `products_update` | Locks the product row, preserves both image/no-image update paths, applies stock-delta history only when needed, writes the success audit, and commits atomically; failures roll back and attempt the failure audit | `bool`; preserves the existing no-op update behavior and returns `false` on failure |
+| `products_delete` | Locks the product row, rejects OrderDetail or StockMovement history, deletes only one eligible product, writes the success audit, and commits atomically; failures roll back and attempt the failure audit | `bool`; `true` only after commit, otherwise `false` |
+
+The focused functions depend on `inventory_log_stock_movement()` and
+`inventory_rollback_error()` from `includes/inventory.php`, plus
+`audit_log()` from `includes/audit.php`. They preserve the existing
+prepared statements, transaction ordering, rollback cleanup, audit metadata,
+and generic failure behavior.
+
+The legacy names `create_product()`, `update_product()`, and
+`delete_product()` remain in `functions.php` as delegation-only
+compatibility wrappers. `public/products.php` intentionally remains on those
+wrappers: it owns request validation, authorization, CSRF checks, upload
+handling, generic messages, HTTP responses, and page rendering.
+
+`create_order()`, staff administration, category/customer/supplier writes,
+and other not-yet-extracted workflows remain in `includes/functions.php` or
+their existing page controllers.
 
 ## Inventory module boundary
 
@@ -203,9 +233,10 @@ errors and may depend on `$conn` or session scope.
 | `login_rate_limit_cleanup_expired` | Deletes expired rate-limit rows. |
 | `login_rate_limit_record_failure` | Inserts or updates rate-limit state. |
 | `login_rate_limit_reset` | Deletes/reset rate-limit state after successful login. |
-| `create_product` | Inserts a product, records stock history/audit behavior, and may retain an uploaded image. |
-| `update_product` | Updates product data and may record stock history/audit behavior. |
-| `delete_product` | Deletes a product only when history/integrity rules allow it. |
+| `products_create` | Focused atomic product creation service; records initial stock history and success/failure audit events. |
+| `products_update` | Focused atomic product update service; records non-zero stock deltas and success/failure audit events. |
+| `products_delete` | Focused atomic product deletion service; rejects historical order/stock use and records success/failure audit events. |
+| `create_product`, `update_product`, `delete_product` | Delegation-only compatibility wrappers for the focused Product module. |
 | `log_stock_movement` | Inserts stock movement history. |
 | `create_order` | Creates orders/details, updates stock, logs movement/audit, and commits a transaction. |
 | `create_staff_member` | Inserts a staff account with a password hash. |
@@ -257,7 +288,9 @@ of those invariants.
 
 ### Other transaction participants
 
-- `public/stock_movements.php:41-105`: manual stock adjustment transaction.
+- `includes/inventory.php`: atomic manual stock adjustment; `public/stock_movements.php`
+  retains request validation, CSRF, authorization, generic responses, and
+  rendering around the service call.
 - `public/settings.php:113-195`: profile update transaction.
 - `includes/backup.php:88-180`: read-only consistent snapshot transaction.
 - Login rate-limit helpers: transaction helpers around rate-limit state changes.
@@ -276,8 +309,6 @@ request handling, staff writes, or any business mutation.
 
 - `create_order()` because it owns price authority, stock locks, order
   invariants, audit behavior, and rollback.
-- `create_product()` and `update_product()` because they combine product data,
-  stock history, uploads, and audit behavior.
 - Staff deletion/status functions because they protect the last active admin
   and self-deactivation invariants.
 - `handle_image_upload()` because its path, MIME, dimension, and filesystem

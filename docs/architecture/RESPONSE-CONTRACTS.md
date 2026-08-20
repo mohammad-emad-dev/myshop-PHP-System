@@ -13,6 +13,33 @@ stock-movement history writer there while retaining the legacy wrapper. Batch
 the page's request, CSRF, authorization, and response responsibilities. Legacy
 names for moved functions remain available from `includes/functions.php` as compatibility
 wrappers, while unmoved legacy functions retain their original contracts.
+Batch 7D, 7E, and 7F place product creation, update, and deletion
+transactions in includes/products.php; the legacy product names remain
+delegation-only wrappers.
+
+## Focused Product mutation contracts
+
+The focused product services accept explicit database and actor dependencies
+and return bool:
+
+- products_create() returns true only after Product insertion, optional
+  initial stock-history logging, success-audit logging, and commit succeed.
+- products_update() preserves the image/no-image paths, no-op update
+  behavior, and non-zero stock-delta movement contract; it returns true
+  only after the transaction commits.
+- products_delete() preserves ID normalization, row locking, historical
+  OrderDetail/StockMovement protection, deletion affected-row validation,
+  nullable actor IDs, success-audit logging, and commit ordering; it returns
+  true only after commit.
+
+All three services roll back and clean up statements on database-operation
+failure, emit the existing failure audit attempt after rollback, use safe
+rollback diagnostics, and return false without exposing database details.
+They do not read session or global state. includes/functions.php keeps
+create_product(), update_product(), and delete_product() as
+delegation-only wrappers with their original signatures and return contracts.
+public/products.php remains responsible for request validation, authorization,
+CSRF, uploads, generic messages, HTTP responses, and rendering.
 
 ## Array-returning functions
 
@@ -84,8 +111,10 @@ failures, and some infrastructure failures.
 - `auth_verify_login(..., false)`, exposed through `verify_login(false)`, when
   the current session is not authenticated or no longer represents an active
   allowed staff record.
-- `create_product()`, `update_product()`, and `delete_product()` on rejected or
-  failed mutations.
+- `products_create()`, `products_update()`, and `products_delete()` return
+  `false` on rejected or failed mutations; the legacy
+  `create_product()`, `update_product()`, and `delete_product()` wrappers
+  preserve the same boolean contract.
 - `inventory_log_stock_movement()` / `log_stock_movement()` on rejected or failed history writes.
 - `inventory_adjust_stock()` on invalid service arguments or any failed lock,
   stock validation, guarded update, movement, audit, commit, or database
