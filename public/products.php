@@ -40,7 +40,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             }
 
             if (empty($error)) {
-                if (create_product($conn, $_SESSION['staff_id'], $name, $description, $price, $stock, $image_path, $alert_threshold, $category_id, $barcode)) {
+                if (products_create($conn, $_SESSION['staff_id'], $name, $description, $price, $stock, $image_path, $alert_threshold, $category_id, $barcode)) {
                     $success = 'Product created successfully';
                 } else {
                     if (is_string($image_path)) {
@@ -70,7 +70,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             }
 
             if ($upload_ok) {
-                if (update_product($conn, $_SESSION['staff_id'], $id, $name, $description, $price, $stock, $image_path, $alert_threshold, $category_id, $barcode)) {
+                if (products_update($conn, $_SESSION['staff_id'], $id, $name, $description, $price, $stock, $image_path, $alert_threshold, $category_id, $barcode)) {
                     $success = 'Product updated successfully';
                 } else {
                     if (is_string($image_path)) {
@@ -83,7 +83,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $id = intval($_POST['id'] ?? 0);
             if ($id <= 0) {
                 $error = 'Invalid product selected.';
-            } elseif (delete_product($conn, $id, $_SESSION['staff_id'])) {
+            } elseif (products_delete($conn, $id, $_SESSION['staff_id'])) {
                 $success = 'Product deleted successfully';
             } else {
                 $error = 'Failed to delete product. Products with historical orders or stock movements cannot be deleted.';
