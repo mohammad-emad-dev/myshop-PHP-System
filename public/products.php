@@ -105,14 +105,14 @@ $raw_highlight_id = $_GET['highlight'] ?? 0;
 $highlight_id = is_scalar($raw_highlight_id) ? filter_var($raw_highlight_id, FILTER_VALIDATE_INT) : false;
 $highlight_id = $highlight_id !== false && $highlight_id > 0 ? $highlight_id : 0;
 
-$total_products = count_products($conn, $search, $filter);
+$total_products = catalog_count_products($conn, $search, $filter);
 $total_pages = max(1, (int)ceil($total_products / $page_size));
 if ($page > $total_pages) {
     $page = $total_pages;
 }
 
 $offset = ($page - 1) * $page_size;
-$products = get_products_page($conn, $search, $filter, $page_size, $offset);
+$products = catalog_get_products_page($conn, $search, $filter, $page_size, $offset);
 $range_start = $total_products > 0 ? $offset + 1 : 0;
 $range_end = $total_products > 0 ? min($offset + count($products), $total_products) : 0;
 
@@ -153,7 +153,7 @@ if ($total_pages <= 7) {
     $pagination_pages[] = $total_pages;
 }
 
-$categories = get_categories_for_selector($conn);
+$categories = catalog_get_categories_for_selector($conn);
 $page_title = 'Products';
 $active_page = 'products';
 $extra_css = ['https://cdn.jsdelivr.net/npm/sweetalert2@11.10.0/dist/sweetalert2.min.css'];

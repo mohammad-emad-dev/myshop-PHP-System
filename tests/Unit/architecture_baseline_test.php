@@ -15,6 +15,7 @@ function run_architecture_baseline_unit_tests(): int
     $repository = dirname(__DIR__, 2);
 
     $facade = file_get_contents($repository . '/includes/functions.php');
+    $catalog = file_get_contents($repository . '/includes/catalog.php');
     $security = file_get_contents($repository . '/includes/security.php');
     $orders = file_get_contents($repository . '/public/orders.php');
     $products = file_get_contents($repository . '/public/products.php');
@@ -25,6 +26,7 @@ function run_architecture_baseline_unit_tests(): int
 
     foreach ([
         $facade,
+        $catalog,
         $security,
         $orders,
         $products,
@@ -59,7 +61,7 @@ function run_architecture_baseline_unit_tests(): int
         $tests->assertTrue(is_file($repository . '/' . $route), 'Documented public route is missing: ' . $route);
     }
 
-    foreach (['security.php', 'pagination.php', 'audit.php'] as $module) {
+    foreach (['security.php', 'pagination.php', 'audit.php', 'catalog.php'] as $module) {
         $tests->assertContains(
             "require_once __DIR__ . '/{$module}'",
             $facade,
@@ -81,12 +83,13 @@ function run_architecture_baseline_unit_tests(): int
         $tests->assertContains($functionContract, $facade, 'Legacy compatibility function disappeared: ' . $functionContract);
     }
 
-    foreach (['get_products_page', 'count_products', 'handle_image_upload', 'delete_product'] as $productFunction) {
+    foreach (['catalog_get_products_page', 'catalog_count_products', 'catalog_get_categories_for_selector', 'handle_image_upload', 'delete_product'] as $productFunction) {
         $tests->assertContains($productFunction . '(', $products, 'Products page dependency contract changed: ' . $productFunction);
     }
-    foreach (['get_pos_products', 'get_product_by_id', 'create_order'] as $orderFunction) {
+    foreach (['catalog_get_pos_products', 'catalog_get_categories_for_selector', 'catalog_get_product_by_id', 'create_order'] as $orderFunction) {
         $tests->assertContains($orderFunction . '(', $orders, 'Orders page dependency contract changed: ' . $orderFunction);
     }
+    $tests->assertContains('catalog_get_pos_product_by_barcode(', file_get_contents($repository . '/public/pos_product_lookup.php'), 'Barcode endpoint dependency contract changed.');
     $tests->assertContains('stream_database_backup(', $backup, 'Backup endpoint must retain the streaming service boundary.');
     $tests->assertContains('export_stream_entity(', $export, 'Export endpoint must retain the streaming service boundary.');
 

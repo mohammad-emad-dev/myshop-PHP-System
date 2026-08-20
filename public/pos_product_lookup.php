@@ -15,7 +15,7 @@ if ($barcode === '') {
     exit;
 }
 
-$product = get_pos_product_by_barcode($conn, $barcode);
+$product = catalog_get_pos_product_by_barcode($conn, $barcode);
 if ($product === null) {
     http_response_code(404);
     echo json_encode(['error' => 'Product not found.']);

@@ -3,6 +3,11 @@
 This inventory records current return and control-flow behavior. Future
 modules must preserve these contracts until callers are migrated deliberately.
 
+Batch 2 places the focused Catalog read implementations in
+`includes/catalog.php`. The legacy names listed below remain available from
+`includes/functions.php` as compatibility wrappers, so existing scripts and
+unmigrated pages retain the same return and failure contracts.
+
 ## Array-returning functions
 
 An empty array may mean “no rows” or “database failure” for legacy functions;

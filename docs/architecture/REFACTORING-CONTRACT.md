@@ -1,7 +1,7 @@
 # MyShop refactoring contract
 
-This contract is the safety boundary for future modularization. Batch 1 does
-not change application behavior.
+This contract is the safety boundary for future modularization. Batch 2
+extracts only Catalog read queries and preserves application behavior.
 
 ## Behavior that must remain unchanged
 
@@ -23,6 +23,9 @@ not change application behavior.
 - CSV headers, filenames, ordering, UTF-8 BOM behavior, formula-injection
   protection, and bounded streaming remain unchanged.
 - Health and readiness response contracts remain unchanged.
+- Catalog search, pagination, ordering, bounded POS loading, exact barcode
+  lookup, category selector ordering, and their legacy failure values remain
+  unchanged.
 
 ## URLs and routes that must remain unchanged
 
@@ -139,36 +142,27 @@ with the exact command and environment.
 
 ## Recommended next batch
 
-Extract only the Catalog read side behind compatibility wrappers:
-
-- `get_products_page`
-- `count_products`
-- `get_pos_products`
-- `get_pos_product_by_barcode`
-- `get_product_by_id`
-- category selector/list reads used by those pages
-
-Migrate only `public/products.php`, `public/orders.php`, and
-`public/pos_product_lookup.php` in that batch. Do not move product writes,
-stock mutations, uploads, orders, authorization policy, or UI markup.
+After Batch 2, the next candidate is a similarly bounded read-side extraction
+for customer and supplier pagination. It must be planned separately and must
+not include customer/supplier writes.
 
 Acceptance criteria:
 
-- Product search, pagination, ordering, POS lookup, and barcode behavior are
-  unchanged.
+- Customer/supplier search, pagination, ordering, selector behavior, and
+  failure values are unchanged.
 - Existing assertion count is unchanged or higher.
-- Browser QA product search/pagination remains passing.
-- No catalog SQL remains in the migrated page controllers.
+- Browser QA customer/supplier journeys remain passing.
+- No customer/supplier read SQL remains in migrated page controllers.
 - The old function names still work through wrappers.
 
 ## Rollback instructions
 
-Because Batch 1 changes only documentation, test registration, and a static
-baseline test, rollback is simple:
+Batch 2 can be rolled back without a schema or data rollback:
 
-1. Revert the Batch 1 commit locally, or restore the prior commit if the commit
+1. Revert the local Batch 2 commit, or restore the previous local commit if it
    is not shared.
-2. Confirm `tests/run.php` no longer loads the baseline test.
+2. Confirm the three page callers use the legacy function names again and that
+   `includes/functions.php` no longer requires `catalog.php`.
 3. Re-run `git diff --check` and the previously passing test suite.
 
 No database rollback, migration rollback, container rollback, or production

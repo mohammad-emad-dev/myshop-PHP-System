@@ -66,7 +66,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['complete_order'])) {
 
                 // Security: Fetch product from DB to ensure it exists and to get the true price.
                 // NEVER trust client-side prices!
-                $prod = get_product_by_id($conn, $product_id);
+                $prod = catalog_get_product_by_id($conn, $product_id);
                 if (!$prod) {
                     $error = "Product ID #{$product_id} does not exist.";
                     $valid_order = false;
@@ -120,8 +120,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['complete_order'])) {
 }
 
 $pos_search = truncate_list_search($_GET['product_search'] ?? '');
-$products = get_pos_products($conn, $pos_search, 100);
-$categories = get_categories_for_selector($conn, 100);
+$products = catalog_get_pos_products($conn, $pos_search, 100);
+$categories = catalog_get_categories_for_selector($conn, 100);
 $customers = get_customers_for_selector($conn, 100);
 $suppliers = get_suppliers_for_selector($conn, 100);
 
@@ -805,7 +805,7 @@ $extra_js = [
 <?php if ($is_admin_user && isset($_GET['purchase_product_id'])): ?>
     <?php
     $restock_prod_id = intval($_GET['purchase_product_id']);
-    $restock_prod = get_product_by_id($conn, $restock_prod_id);
+    $restock_prod = catalog_get_product_by_id($conn, $restock_prod_id);
     if ($restock_prod):
     ?>
     <script type="application/json" id="restock-product-data" nonce="<?php echo htmlspecialchars($csp_nonce, ENT_QUOTES, 'UTF-8'); ?>"><?php echo json_encode([

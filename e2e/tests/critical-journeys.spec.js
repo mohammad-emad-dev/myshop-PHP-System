@@ -288,6 +288,24 @@ test('admin can load critical pages, search and paginate products, and access ex
   expect(exportResult.disposition).toContain('products.csv');
 });
 
+test('authenticated POS barcode lookup returns the disposable catalog product', async ({ page }) => {
+  await login(page, adminCredentials);
+
+  const barcode = `${dataPrefix}_BARCODE_07`;
+  const result = await page.evaluate(async (value) => {
+    const response = await fetch(`/pos_product_lookup.php?barcode=${encodeURIComponent(value)}`, {
+      credentials: 'include',
+    });
+    return {
+      status: response.status,
+      payload: await response.json(),
+    };
+  }, barcode);
+
+  expect(result.status).toBe(200);
+  expect(result.payload.product.name).toBe(`${dataPrefix}_PRODUCT_07`);
+});
+
 test('cashier can use sales and history but cannot access administrative or purchase controls', async ({ page }) => {
   await login(page, cashierCredentials);
 

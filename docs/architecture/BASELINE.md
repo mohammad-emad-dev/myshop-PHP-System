@@ -1,6 +1,6 @@
 # MyShop architecture baseline
 
-Status: Batch 1 characterization baseline
+Status: Batch 2 catalog read extraction baseline
 
 Captured from the `security-hardening-baseline` branch at starting revision
 `61e8128a66e0bd98c3bfa5470299c7cad40bcf68`.
@@ -27,8 +27,9 @@ Browser QA is intentionally separate from the dependency-free PHP test harness.
    headers, and keeps uploaded files from executing server-side scripts.
 3. A page normally requires `includes/functions.php`, starts a secure session,
    loads `config/db.php`, and then performs request-specific work.
-4. `includes/functions.php` loads `security.php`, `pagination.php`, and
-   `audit.php` as a compatibility facade.
+4. `includes/functions.php` loads `security.php`, `pagination.php`, `audit.php`,
+   and `catalog.php` as a compatibility facade. Catalog page callers may use
+   the focused `catalog_*` functions directly.
 5. `config/db.php` reads `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, and
    `DB_PASSWORD` from the process environment and creates the mysqli
    connection. It does not run schema creation or migrations.
@@ -105,18 +106,18 @@ application service module.
 | `:12-70` | Sanitization, identifiers, password policy, login normalization |
 | `:72-480` | Login rate-limit state, transaction helpers, and cleanup |
 | `:484-567` | Database-backed login verification and session population |
-| `:569-590` | Redirect helper and product filter construction |
-| `:593-872` | Product reads, POS reads, barcode lookup, counts, and pagination |
-| `:874-1114` | Low-stock reads and stock-movement reads/pagination |
-| `:1116-1485` | Product create/update/delete, stock history, and audit coupling |
-| `:1488-1853` | Transactional sale/purchase order creation |
-| `:1855-2244` | Order lists, counts, summaries, scoped lookups, and details |
-| `:2247-2552` | Dashboard statistics, uploads, charts, and report aggregates |
-| `:2557-3054` | Role checks and staff administration |
-| `:3057-3505` | Category reads, selectors, and mutations |
-| `:3538-3843` | Customer reads, selectors, and mutations |
-| `:3846-4140` | Supplier reads, selectors, and mutations |
-| `:4154-4298` | Inventory valuation and dashboard sales aggregates |
+| `redirect()`, `build_product_filter_sql()` | Redirect helper and Catalog filter compatibility wrapper |
+| `get_all_products()` and Catalog compatibility wrappers | Legacy full product read plus delegation to `includes/catalog.php` |
+| `get_low_stock_products()`, stock movement reads | Low-stock reads and stock-movement reads/pagination |
+| `create_product()`, `update_product()`, `delete_product()` | Product writes, stock history, uploads, and audit coupling |
+| `create_order()` | Transactional sale/purchase order creation |
+| Order list/count/summary/detail functions | Order lists, counts, summaries, scoped lookups, and details |
+| Dashboard, upload, chart, and report functions | Dashboard statistics, uploads, charts, and report aggregates |
+| Role checks and staff administration functions | Authorization and staff administration |
+| Category read/mutation functions | Remaining category reads and category mutations |
+| Customer read/mutation functions | Customer reads, selectors, and mutations |
+| Supplier read/mutation functions | Supplier reads, selectors, and mutations |
+| Inventory valuation and sales aggregate functions | Inventory valuation and dashboard sales aggregates |
 
 Focused shared modules already extracted from the facade:
 
@@ -126,6 +127,9 @@ Focused shared modules already extracted from the facade:
 - `includes/audit.php`: audit metadata, writes, filters, and pagination.
 - `includes/export.php`: allow-listed, bounded CSV streaming.
 - `includes/backup.php`: allow-listed, snapshot-based SQL backup streaming.
+- `includes/catalog.php`: read-only product, POS, barcode, product-page, and
+  category-selector queries. The legacy public function names remain thin
+  wrappers in `functions.php`.
 
 ## Public pages and responsibilities
 
@@ -133,13 +137,13 @@ Focused shared modules already extracted from the facade:
 |---|---|
 | `public/login.php` | Login, logout, rate-limit interaction, session changes, authentication audit, login view |
 | `public/index.php` | Dashboard authorization, dashboard queries, chart data preparation, dashboard view |
-| `public/products.php` | Product CRUD request dispatch, image upload handling, search/pagination, product table and forms |
+| `public/products.php` | Product CRUD request dispatch, image upload handling, Catalog search/pagination, product table and forms |
 | `public/categories.php` | Category CRUD request dispatch, admin checks, search/pagination, category view |
 | `public/stock_movements.php` | Manual stock adjustment transaction, movement history filtering/pagination, stock ledger view |
-| `public/orders.php` | POS cart submission, product revalidation, sale/purchase policy, order creation, POS view and JavaScript |
+| `public/orders.php` | POS cart submission, Catalog product/category reads, product revalidation, sale/purchase policy, order creation, POS view and JavaScript |
 | `public/order_history.php` | Scoped order history filters, pagination, summaries, order-history view and interactions |
 | `public/get_order_details.php` | Scoped JSON order-detail endpoint |
-| `public/pos_product_lookup.php` | Authenticated barcode lookup endpoint |
+| `public/pos_product_lookup.php` | Authenticated barcode lookup endpoint backed by the Catalog module |
 | `public/customers.php` | Customer CRUD, search/pagination, forms and table |
 | `public/suppliers.php` | Supplier CRUD, search/pagination, forms and table |
 | `public/audit_log.php` | Admin audit filtering, pagination, and audit table |
@@ -170,8 +174,10 @@ Application pages with direct SQL ownership:
 
 Shared modules own most other application SQL:
 
-- `includes/functions.php`: catalog, inventory, order, staff, reference data,
-  and dashboard queries.
+- `includes/catalog.php`: product/POS/barcode/product-page and category
+  selector reads; `includes/functions.php` retains compatibility wrappers.
+- `includes/functions.php`: legacy full product reads, inventory, order, staff,
+  remaining reference-data, and dashboard queries, plus protected mutations.
 - `includes/audit.php:62-300`: audit writes and reads.
 - `includes/export.php:115-392`: bounded export queries.
 - `includes/backup.php:114-168`: table definition and streamed data queries.

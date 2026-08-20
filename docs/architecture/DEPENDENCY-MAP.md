@@ -1,7 +1,8 @@
 # MyShop dependency map
 
-This map records current call-site and dependency relationships. It is a
-characterization artifact, not permission to move code yet.
+This map records current call-site and dependency relationships after the
+Batch 2 Catalog read extraction. It remains a characterization artifact; the
+compatibility wrappers are still required.
 
 ## Public-page to shared-function map
 
@@ -20,10 +21,10 @@ names are grouped only for readability; the source remains the authority.
 | `index.php` | `start_secure_session`, `verify_login`, `is_admin`, `get_dashboard_stats`, `get_chart_data`, `get_inventory_valuation`, `get_top_selling_products`, `get_category_sales_distribution`, `get_low_stock_products` |
 | `login.php` | `start_secure_session`, `send_security_headers`, `verify_csrf_token`, `get_login_source_ip`, `build_login_rate_limit_key`, `login_rate_limit_check`, `login_rate_limit_record_failure`, `login_rate_limit_reset`, `audit_log`, `audit_log_current_actor`, `destroy_current_session`, `generate_csrf_token`, `redirect`, `verify_login`, `get_asset_integrity` |
 | `order_history.php` | `start_secure_session`, `verify_login`, `is_admin`, `sanitize_input`, `normalize_page_number`, `normalize_page_size`, `count_orders`, `get_order_summary`, `get_orders_page` |
-| `orders.php` | `start_secure_session`, `verify_login`, `is_admin`, `verify_csrf_token`, `generate_csrf_token`, `truncate_list_search`, `get_pos_products`, `get_categories_for_selector`, `get_customers_for_selector`, `get_suppliers_for_selector`, `get_product_by_id`, `create_order`, `audit_log_current_actor`, `audit_log_denied` |
-| `pos_product_lookup.php` | `start_secure_session`, `verify_login`, `truncate_list_search`, `get_pos_product_by_barcode` |
+| `orders.php` | `start_secure_session`, `verify_login`, `is_admin`, `verify_csrf_token`, `generate_csrf_token`, `truncate_list_search`, `catalog_get_pos_products`, `catalog_get_categories_for_selector`, `get_customers_for_selector`, `get_suppliers_for_selector`, `catalog_get_product_by_id`, `create_order`, `audit_log_current_actor`, `audit_log_denied` |
+| `pos_product_lookup.php` | `start_secure_session`, `verify_login`, `truncate_list_search`, `catalog_get_pos_product_by_barcode` |
 | `print_invoice.php` | `start_secure_session`, `send_security_headers`, `verify_login`, `is_admin`, `sanitize_id`, `get_order_by_id`, `get_order_details`, `audit_log_current_actor` |
-| `products.php` | `start_secure_session`, `verify_login`, `is_admin`, `verify_csrf_token`, `generate_csrf_token`, `sanitize_input`, `normalize_page_number`, `normalize_page_size`, `truncate_list_search`, `get_categories_for_selector`, `get_products_page`, `count_products`, `create_product`, `update_product`, `delete_product`, `handle_image_upload`, `delete_newly_uploaded_image`, `audit_log_current_actor`, `audit_log_denied` |
+| `products.php` | `start_secure_session`, `verify_login`, `is_admin`, `verify_csrf_token`, `generate_csrf_token`, `sanitize_input`, `normalize_page_number`, `normalize_page_size`, `truncate_list_search`, `catalog_get_categories_for_selector`, `catalog_get_products_page`, `catalog_count_products`, `create_product`, `update_product`, `delete_product`, `handle_image_upload`, `delete_newly_uploaded_image`, `audit_log_current_actor`, `audit_log_denied` |
 | `ready.php` | `initialize_request_context`, `log_application_error`; `config/db.php` performs the connection and readiness failure contract |
 | `settings.php` | `start_secure_session`, `verify_login`, `is_admin`, `require_admin`, `verify_csrf_token`, `generate_csrf_token`, `sanitize_input`, `password_meets_policy`, `create_staff_member`, `update_staff_member`, `delete_staff_member`, `set_staff_active`, `get_staff_members`, `audit_log_current_actor` |
 | `stock_movements.php` | `start_secure_session`, `verify_login`, `is_admin`, `verify_csrf_token`, `sanitize_input`, `normalize_page_number`, `normalize_page_size`, `get_pos_products`, `get_product_by_id`, `log_stock_movement`, `get_stock_movements_page`, `count_stock_movements`, `audit_log_current_actor`, `audit_log_denied` |
@@ -43,6 +44,27 @@ names are grouped only for readability; the source remains the authority.
 | Process environment | `config/db.php`, HSTS/proxy handling, production scripts, tests, and Compose provide configuration through environment variables. |
 | Headers/termination | `redirect()`, `require_admin()`, database failure handlers, CSV failure handling, and backup failure handling can send headers or terminate execution. |
 
+## Catalog module boundary
+
+`includes/catalog.php` has no dependency on `includes/functions.php`. It
+requires only `pagination.php` for the existing search and page-size
+normalization helpers and accepts `$conn` explicitly for every query.
+
+| Focused function | Read behavior | Side effects and security notes |
+|---|---|---|
+| `catalog_get_products_page` | Bounded, ordered product page with optional search and low-stock filter | Prepared values; returns `[]` on failure |
+| `catalog_count_products` | Product count using the same allow-listed filter fragment | Prepared values; returns `0` on failure |
+| `catalog_get_pos_products` | Bounded POS product list or name/barcode search | Prepared values; returns `[]` on failure |
+| `catalog_get_pos_product_by_barcode` | Exact barcode lookup | Prepared value; returns `null` on empty, missing, or failed lookup |
+| `catalog_get_product_by_id` | Single product lookup for server-side revalidation/selectors | Prepared value; returns `null` for invalid or failed lookup |
+| `catalog_get_categories_for_selector` | Bounded category selector list ordered by name and ID | Prepared limit; returns `[]` on failure |
+
+The legacy names `get_products_page`, `count_products`, `get_pos_products`,
+`get_pos_product_by_barcode`, `get_product_by_id`, and
+`get_categories_for_selector` remain in `functions.php` as delegation-only
+compatibility wrappers. Unmigrated callers, including
+`public/stock_movements.php`, continue to use those wrappers.
+
 ## Read-only functions
 
 These functions are intended to read or normalize data. They still may log
@@ -58,12 +80,12 @@ errors and may depend on `$conn` or session scope.
 
 ### Catalog and inventory reads
 
-- `get_all_products` (legacy unbounded loader)
-- `get_pos_products`
-- `get_pos_product_by_barcode`
-- `count_products`
-- `get_products_page`
-- `get_product_by_id`
+- `get_all_products` (legacy unbounded loader, still in `functions.php`)
+- `catalog_get_pos_products` (`get_pos_products` compatibility wrapper)
+- `catalog_get_pos_product_by_barcode` (`get_pos_product_by_barcode` compatibility wrapper)
+- `catalog_count_products` (`count_products` compatibility wrapper)
+- `catalog_get_products_page` (`get_products_page` compatibility wrapper)
+- `catalog_get_product_by_id` (`get_product_by_id` compatibility wrapper)
 - `get_low_stock_products`
 - `get_stock_movements` (legacy unbounded loader)
 - `count_stock_movements`
@@ -88,7 +110,8 @@ errors and may depend on `$conn` or session scope.
 
 - `get_staff_members`
 - `get_categories`, `count_categories`, `get_categories_page`,
-  `get_categories_for_selector`, `get_category_by_id`
+  `catalog_get_categories_for_selector` (`get_categories_for_selector` compatibility wrapper),
+  `get_category_by_id`
 - `get_customers`, `count_customers`, `get_customers_page`,
   `get_customers_for_selector`, `get_customer_by_id`
 - `get_suppliers`, `count_suppliers`, `get_suppliers_page`,
@@ -159,18 +182,16 @@ of those invariants.
 - `includes/backup.php:88-180`: read-only consistent snapshot transaction.
 - Login rate-limit helpers: transaction helpers around rate-limit state changes.
 
-## Safe first-extraction candidates
+## Safe remaining extraction candidates
 
-The safest candidates are read-side boundaries with existing bounded tests:
+The safest remaining candidates are read-side boundaries with existing bounded tests:
 
-1. Catalog reads: `get_products_page`, `count_products`,
-   `get_pos_products`, `get_pos_product_by_barcode`, `get_product_by_id`.
-2. Category selector/list reads.
-3. Customer and supplier paginated reads.
-4. Dashboard read model after current query behavior is characterized.
+1. Customer and supplier paginated reads.
+2. Remaining category list/page reads.
+3. Dashboard read model after current query behavior is characterized.
 
-The first recommended batch is Catalog read extraction behind compatibility
-wrappers. It should not include product writes, stock updates, or orders.
+Batch 2 completed the Catalog read extraction behind compatibility wrappers. It
+did not include product writes, stock updates, uploads, or orders.
 
 ## Functions that must not move early
 
