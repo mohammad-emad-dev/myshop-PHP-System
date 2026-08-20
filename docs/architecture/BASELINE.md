@@ -96,8 +96,8 @@ convenience and is not the security boundary.
 | Staff management | `public/settings.php` protects staff mutations with `require_admin()` |
 | Database backup | `public/backup_database.php` requires active admin, CSRF, and current-password reauthentication |
 | Purchase orders | `public/orders.php:27-35` rejects purchase creation by cashiers |
-| Order history | `get_orders_page()` and related lookups apply staff scope for non-admin users |
-| Order details/invoices | `get_order_by_id()` and `get_order_details()` apply optional staff scope |
+| Order history | `orders_count()`, `orders_get_page()`, and `orders_get_summary()` apply staff scope for non-admin users |
+| Order details/invoices | `orders_get_by_id()` and `orders_get_details()` apply optional staff scope |
 | Product and stock mutations | Page-level role checks plus shared audit and transaction logic |
 
 The exact status code and redirect behavior of each route is part of the
