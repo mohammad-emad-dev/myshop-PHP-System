@@ -52,7 +52,7 @@ integration suite.
 | Guarantee | Command | Result |
 |---|---|---|
 | Direct product service callers and source ordering | focused product unit command above | PASS: 108 assertions |
-| Full application and disposable integration behavior | `docker compose --env-file .env exec -T ... app php tests/run.php` with disposable test databases | PASS: 1413 assertions (830 unit, 583 integration) |
+| Full application and disposable integration behavior | `$testRootPassword = ((Get-Content .env | Where-Object { $_ -match '^MYSQL_ROOT_PASSWORD=' }) -replace '^MYSQL_ROOT_PASSWORD=', ''); docker compose --env-file .env exec -T -e TEST_DB_HOST=db -e TEST_DB_PORT=3306 -e TEST_DB_ROOT_USER=root -e TEST_DB_ROOT_PASSWORD=$testRootPassword app php tests/run.php` | PASS: 1413 assertions (830 unit, 583 integration) |
 | Browser behavior and responsive/accessibility regression | `powershell -NoProfile -File scripts/run-browser-qa.ps1` | PASS: 18 tests across 375px, 768px, and 1440px |
 
 The browser runner used its disposable environment and cleaned its containers,
