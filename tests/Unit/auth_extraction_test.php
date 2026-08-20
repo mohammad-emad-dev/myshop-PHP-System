@@ -377,6 +377,61 @@ function run_auth_extraction_unit_tests(): int
         }
     }
 
+    $loginAuthCalls = [];
+    if (is_string($login)) {
+        preg_match_all(
+            '/\b(?:auth_verify_login|auth_is_admin|auth_require_admin)\s*\([^)]*\)/',
+            $login,
+            $loginAuthCalls
+        );
+        $tests->assertSame(
+            ['auth_verify_login($conn, false)'],
+            $loginAuthCalls[0],
+            'Login authentication call count or execution position changed.'
+        );
+        $tests->assertFalse(
+            preg_match('/(?<!auth_)\bverify_login\s*\(/', $login) === 1,
+            'Login page still uses the legacy authentication wrapper.'
+        );
+
+        $logoutBranchOffset = strpos($login, 'if ($is_logout_request)');
+        $authenticationOffset = strpos($login, 'auth_verify_login($conn, false)');
+        $loginPostOffset = strpos($login, "if (!\$is_logout_request && \$_SERVER['REQUEST_METHOD'] === 'POST')");
+        $tests->assertTrue(
+            $logoutBranchOffset !== false
+                && $authenticationOffset !== false
+                && $loginPostOffset !== false
+                && $logoutBranchOffset < $authenticationOffset
+                && $authenticationOffset < $loginPostOffset,
+            'Login logout, authenticated redirect, and POST handling order changed.'
+        );
+        $tests->assertContains(
+            "if (!\$is_logout_request && isset(\$_SESSION['staff_id']) && auth_verify_login(\$conn, false))",
+            $login,
+            'Authenticated-user redirect guard changed during caller migration.'
+        );
+        foreach ([
+            'if (!$is_logout_request && $_SERVER[\'REQUEST_METHOD\'] === \'POST\')',
+            'if (!verify_csrf_token($token))',
+            'if (!verify_csrf_token($csrf_token))',
+            'destroy_current_session();',
+            "redirect('login.php');",
+            'login_rate_limit_check($conn, $rate_limit_key)',
+            'login_rate_limit_record_failure($conn, $rate_limit_key)',
+            'login_rate_limit_reset($conn, $rate_limit_key)',
+            'session_regenerate_id(true)',
+            "unset(\$_SESSION['csrf_token']);",
+            'generate_csrf_token();',
+            "audit_log(\$conn, (int)\$user['id'], 'login_success'",
+        ] as $loginInvariant) {
+            $tests->assertContains(
+                $loginInvariant,
+                $login,
+                'Login/session/rate-limit invariant disappeared during auth caller migration: ' . $loginInvariant
+            );
+        }
+    }
+
     $stockMovements = file_get_contents($repository . '/public/stock_movements.php');
     $tests->assertTrue(is_string($stockMovements), 'Stock movement authentication caller source could not be read.');
     if (is_string($stockMovements)) {
@@ -442,7 +497,6 @@ function run_auth_extraction_unit_tests(): int
     }
 
     foreach ([
-        'public/login.php' => 'verify_login(false)',
         'includes/layouts/sidebar.php' => 'is_admin()',
     ] as $relativePath => $legacyCall) {
         $source = file_get_contents($repository . '/' . $relativePath);
