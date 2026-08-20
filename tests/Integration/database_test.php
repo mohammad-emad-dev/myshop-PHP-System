@@ -252,9 +252,20 @@ function run_integration_tests(): int
         $tests->assertCount(1, get_customers_page($conn, $pagedCustomerOne, 10, 0), 'Customer search page is incorrect.');
         $customerPageRows = get_customers_page($conn, $prefix . '_CUSTOMER_PAGE_', 10, 0);
         $tests->assertTrue(count($customerPageRows) <= 10, 'Customer first page is not bounded.');
+        $tests->assertSame([$pagedCustomerOne, $pagedCustomerTwo], array_column($customerPageRows, 'name'), 'Customers must be ordered by name.');
+        $tests->assertCount(1, get_customers_page($conn, '555-501', 10, 0), 'Customer phone search is incorrect.');
+        $tests->assertCount(1, get_customers_page($conn, 'page2@example.com', 10, 0), 'Customer email search is incorrect.');
         $tests->assertCount(1, get_customers_page($conn, $prefix . '_CUSTOMER_PAGE_', 10, 1), 'Customer middle/last page size is incorrect.');
         $tests->assertCount(0, get_customers_page($conn, $prefix . '_CUSTOMER_PAGE_', 10, 99), 'Empty customer page should return an empty list.');
-        $tests->assertTrue(count(get_customers_for_selector($conn, 100)) <= 100, 'Customer selector must be bounded.');
+        $tests->assertSame(0, count_customers($conn, $prefix . '_MISSING_CUSTOMER'), 'Empty customer search should return zero results.');
+        $customerSelectorRows = get_customers_for_selector($conn, 100);
+        $tests->assertTrue(count($customerSelectorRows) <= 100, 'Customer selector must be bounded.');
+        $selectorCustomerRows = array_values(array_filter(
+            $customerSelectorRows,
+            static fn(array $row): bool => (string)$row['name'] === $pagedCustomerOne
+        ));
+        $tests->assertCount(1, $selectorCustomerRows, 'Customer selector did not return the expected customer.');
+        $tests->assertSame('555-501', (string)$selectorCustomerRows[0]['phone'], 'Customer selector must retain the phone field.');
 
         $pagedSupplierOne = $prefix . '_SUPPLIER_PAGE_1';
         $pagedSupplierTwo = $prefix . '_SUPPLIER_PAGE_2';
