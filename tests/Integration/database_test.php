@@ -273,10 +273,22 @@ function run_integration_tests(): int
         $tests->assertTrue(create_supplier($conn, $pagedSupplierTwo, '555-602', 'supplier2@example.com', 'Page 2'), 'Paged supplier fixture two failed.');
         $tests->assertTrue(count_suppliers($conn, $prefix . '_SUPPLIER_PAGE_') >= 2, 'Supplier search count is incorrect.');
         $tests->assertCount(1, get_suppliers_page($conn, $pagedSupplierOne, 10, 0), 'Supplier search page is incorrect.');
-        $tests->assertTrue(count(get_suppliers_page($conn, $prefix . '_SUPPLIER_PAGE_', 10, 0)) <= 10, 'Supplier first page is not bounded.');
+        $supplierPageRows = get_suppliers_page($conn, $prefix . '_SUPPLIER_PAGE_', 10, 0);
+        $tests->assertTrue(count($supplierPageRows) <= 10, 'Supplier first page is not bounded.');
+        $tests->assertSame([$pagedSupplierOne, $pagedSupplierTwo], array_column($supplierPageRows, 'name'), 'Suppliers must be ordered by name.');
+        $tests->assertCount(1, get_suppliers_page($conn, '555-601', 10, 0), 'Supplier phone search is incorrect.');
+        $tests->assertCount(1, get_suppliers_page($conn, 'supplier2@example.com', 10, 0), 'Supplier email search is incorrect.');
         $tests->assertCount(1, get_suppliers_page($conn, $prefix . '_SUPPLIER_PAGE_', 10, 1), 'Supplier middle/last page size is incorrect.');
         $tests->assertCount(0, get_suppliers_page($conn, $prefix . '_SUPPLIER_PAGE_', 10, 99), 'Empty supplier page should return an empty list.');
-        $tests->assertTrue(count(get_suppliers_for_selector($conn, 100)) <= 100, 'Supplier selector must be bounded.');
+        $tests->assertSame(0, count_suppliers($conn, $prefix . '_MISSING_SUPPLIER'), 'Empty supplier search should return zero results.');
+        $supplierSelectorRows = get_suppliers_for_selector($conn, 100);
+        $tests->assertTrue(count($supplierSelectorRows) <= 100, 'Supplier selector must be bounded.');
+        $selectorSupplierRows = array_values(array_filter(
+            $supplierSelectorRows,
+            static fn(array $row): bool => (string)$row['name'] === $pagedSupplierOne
+        ));
+        $tests->assertCount(1, $selectorSupplierRows, 'Supplier selector did not return the expected supplier.');
+        $tests->assertSame('555-601', (string)$selectorSupplierRows[0]['phone'], 'Supplier selector must retain the phone field.');
         $tests->assertSame(1, normalize_page_number('not-a-page'), 'Invalid page values must normalize to page one.');
         $tests->assertSame(25, normalize_page_size(999), 'Oversized page values must normalize to the default page size.');
 

@@ -20,6 +20,7 @@ function run_architecture_baseline_unit_tests(): int
     $security = file_get_contents($repository . '/includes/security.php');
     $orders = file_get_contents($repository . '/public/orders.php');
     $categories = file_get_contents($repository . '/public/categories.php');
+    $suppliers = file_get_contents($repository . '/public/suppliers.php');
     $products = file_get_contents($repository . '/public/products.php');
     $backup = file_get_contents($repository . '/public/backup_database.php');
     $export = file_get_contents($repository . '/public/export_report.php');
@@ -33,6 +34,7 @@ function run_architecture_baseline_unit_tests(): int
         $security,
         $orders,
         $categories,
+        $suppliers,
         $products,
         $backup,
         $export,
@@ -100,6 +102,11 @@ function run_architecture_baseline_unit_tests(): int
         $tests->assertContains($customerFunction . '(', file_get_contents($repository . '/public/customers.php'), 'Customers page dependency contract changed: ' . $customerFunction);
     }
     $tests->assertContains('people_get_customers_for_selector(', $orders, 'Orders page must retain the People customer selector boundary.');
+    foreach (['people_count_suppliers', 'people_get_suppliers_page', 'create_supplier', 'update_supplier', 'delete_supplier'] as $supplierFunction) {
+        $tests->assertContains($supplierFunction . '(', $suppliers, 'Suppliers page dependency contract changed: ' . $supplierFunction);
+    }
+    $tests->assertContains('people_get_suppliers_for_selector(', $orders, 'Orders page must retain the People supplier selector boundary.');
+    $tests->assertContains("elseif (\$order_type === 'purchase' && !is_admin())", $orders, 'Orders page must retain server-side cashier purchase rejection.');
     $tests->assertContains('catalog_get_pos_product_by_barcode(', file_get_contents($repository . '/public/pos_product_lookup.php'), 'Barcode endpoint dependency contract changed.');
     $tests->assertContains('stream_database_backup(', $backup, 'Backup endpoint must retain the streaming service boundary.');
     $tests->assertContains('export_stream_entity(', $export, 'Export endpoint must retain the streaming service boundary.');
