@@ -1541,12 +1541,29 @@ function run_integration_tests(): int
         );
         $tests->assertFalse(delete_category($failureConnection, 2), 'Delete DB failures must return false.');
 
-        $missingUpdateAuditBefore = (int)test_scalar($conn, "SELECT COUNT(*) FROM AuditLog WHERE action = 'product_update' AND outcome = 'failure'");
+        $missingUpdateAuditBefore = (int)test_scalar(
+            $conn,
+            "SELECT COUNT(*) FROM AuditLog WHERE actor_staff_id = ? AND action = 'product_update' AND entity_id = ? AND outcome = 'failure'",
+            'ii',
+            [$adminId, 999999999]
+        );
+        $missingUpdateMovementBefore = (int)test_scalar($conn, 'SELECT COUNT(*) FROM StockMovement');
         $tests->assertFalse(
             products_update($conn, $adminId, 999999999, $prefix . '_MISSING_UPDATE', 'Missing', 1.00, 1),
             'Missing product updates must fail.'
         );
-        $tests->assertSame($missingUpdateAuditBefore, (int)test_scalar($conn, "SELECT COUNT(*) FROM AuditLog WHERE action = 'product_update' AND outcome = 'failure'"), 'Missing product update unexpectedly persisted a failure audit.');
+        $tests->assertSame(null, test_scalar($conn, 'SELECT id FROM Product WHERE id = ?', 'i', [999999999]), 'Missing product update unexpectedly created a product.');
+        $tests->assertSame($missingUpdateMovementBefore, (int)test_scalar($conn, 'SELECT COUNT(*) FROM StockMovement'), 'Missing product update created a stock movement.');
+        $tests->assertSame(
+            $missingUpdateAuditBefore + 1,
+            (int)test_scalar(
+                $conn,
+                "SELECT COUNT(*) FROM AuditLog WHERE actor_staff_id = ? AND action = 'product_update' AND entity_id = ? AND outcome = 'failure'",
+                'ii',
+                [$adminId, 999999999]
+            ),
+            'Missing product update failure audit behavior changed.'
+        );
         $invalidUpdateStockBefore = (int)test_scalar($conn, 'SELECT stock FROM Product WHERE id = ?', 'i', [$serviceProductId]);
         $invalidUpdateMovementBefore = (int)test_scalar($conn, 'SELECT COUNT(*) FROM StockMovement WHERE product_id = ?', 'i', [$serviceProductId]);
         $tests->assertFalse(
