@@ -260,3 +260,144 @@ function products_update($conn, $staff_id, $id, $name, $description, $price, $st
         return false;
     }
 }
+
+/**
+ * Delete a product that has no historical order or stock records atomically.
+ *
+ * The caller owns authorization and request validation. This service receives
+ * the optional actor explicitly and owns only the deletion transaction and
+ * its associated audit write.
+ */
+function products_delete($conn, $id, $actor_staff_id = null): bool
+{
+    $id = (int)$id;
+    if ($id <= 0) {
+        return false;
+    }
+
+    try {
+        if (!$conn->begin_transaction()) {
+            error_log('delete_product failed: unable to start transaction.');
+            return false;
+        }
+    } catch (Throwable $exception) {
+        error_log('delete_product transaction start failed: ' . $exception->getMessage());
+        return false;
+    }
+
+    $transaction_started = true;
+    $product_stmt = null;
+    $order_detail_stmt = null;
+    $movement_stmt = null;
+    $delete_stmt = null;
+    try {
+        $product_stmt = $conn->prepare("SELECT id FROM Product WHERE id = ? FOR UPDATE");
+        if (!$product_stmt) {
+            throw new Exception("Failed to prepare product lock statement");
+        }
+        if (!$product_stmt->bind_param("i", $id)) {
+            throw new Exception("Failed to bind product lock statement");
+        }
+        if (!$product_stmt->execute()) {
+            throw new Exception("Failed to lock product");
+        }
+
+        $product_result = $product_stmt->get_result();
+        if (!$product_result) {
+            throw new Exception("Failed to read product");
+        }
+        if ($product_result->num_rows !== 1) {
+            throw new Exception("Product not found");
+        }
+        $product_stmt->close();
+        $product_stmt = null;
+
+        $order_detail_stmt = $conn->prepare("SELECT id FROM OrderDetail WHERE product_id = ? LIMIT 1");
+        if (!$order_detail_stmt) {
+            throw new Exception("Failed to prepare order history check");
+        }
+        if (!$order_detail_stmt->bind_param("i", $id)) {
+            throw new Exception("Failed to bind order history check");
+        }
+        if (!$order_detail_stmt->execute()) {
+            throw new Exception("Failed to check order history");
+        }
+        $order_detail_result = $order_detail_stmt->get_result();
+        if (!$order_detail_result) {
+            throw new Exception("Failed to read order history");
+        }
+        $has_order_history = $order_detail_result->num_rows > 0;
+        $order_detail_stmt->close();
+        $order_detail_stmt = null;
+        if ($has_order_history) {
+            throw new Exception("Product has historical order details");
+        }
+
+        $movement_stmt = $conn->prepare("SELECT id FROM StockMovement WHERE product_id = ? LIMIT 1");
+        if (!$movement_stmt) {
+            throw new Exception("Failed to prepare stock history check");
+        }
+        if (!$movement_stmt->bind_param("i", $id)) {
+            throw new Exception("Failed to bind stock history check");
+        }
+        if (!$movement_stmt->execute()) {
+            throw new Exception("Failed to check stock history");
+        }
+        $movement_result = $movement_stmt->get_result();
+        if (!$movement_result) {
+            throw new Exception("Failed to read stock history");
+        }
+        $has_stock_history = $movement_result->num_rows > 0;
+        $movement_stmt->close();
+        $movement_stmt = null;
+        if ($has_stock_history) {
+            throw new Exception("Product has historical stock movements");
+        }
+
+        $delete_stmt = $conn->prepare("DELETE FROM Product WHERE id = ?");
+        if (!$delete_stmt) {
+            throw new Exception("Failed to prepare product deletion");
+        }
+        if (!$delete_stmt->bind_param("i", $id)) {
+            throw new Exception("Failed to bind product deletion");
+        }
+        if (!$delete_stmt->execute()) {
+            throw new Exception("Failed to delete product");
+        }
+        if ($delete_stmt->affected_rows !== 1) {
+            throw new Exception("Product deletion affected an unexpected number of rows");
+        }
+        $delete_stmt->close();
+        $delete_stmt = null;
+
+        if (!audit_log($conn, $actor_staff_id, 'product_delete', 'Product', $id, true, null)) {
+            throw new Exception("Product audit logging failed");
+        }
+
+        if (!$conn->commit()) {
+            throw new Exception("Failed to commit product deletion");
+        }
+        $transaction_started = false;
+        return true;
+    } catch (Throwable $e) {
+        foreach ([$product_stmt, $order_detail_stmt, $movement_stmt, $delete_stmt] as $open_stmt) {
+            if ($open_stmt instanceof mysqli_stmt) {
+                $open_stmt->close();
+            }
+        }
+        if ($transaction_started) {
+            try {
+                if (!$conn->rollback()) {
+                    error_log('delete_product rollback failed: ' . inventory_rollback_error($conn));
+                }
+            } catch (Throwable $rollback_exception) {
+                error_log('delete_product rollback failed: ' . $rollback_exception->getMessage());
+            }
+        }
+        error_log("delete_product failed: " . $e->getMessage());
+        audit_log($conn, $actor_staff_id, 'product_delete', 'Product', $id, false, [
+            'reason' => 'database_operation_failed',
+        ]);
+        return false;
+    }
+}

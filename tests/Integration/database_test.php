@@ -869,6 +869,8 @@ function run_integration_tests(): int
             (int)test_scalar($conn, 'SELECT id FROM Product WHERE id = ?', 'i', [$orderHistoryDeleteProductId]),
             'Order-history product was unexpectedly deleted.'
         );
+        test_execute($conn, 'DELETE FROM OrderDetail WHERE order_id = ?', 'i', [$orderHistoryDeleteOrderId]);
+        test_execute($conn, 'DELETE FROM `Order` WHERE id = ?', 'i', [$orderHistoryDeleteOrderId]);
 
         $tests->assertFalse(delete_product($conn, $historyProductId), 'Products with stock history must not be deleted.');
         $tests->assertSame($historyProductId, (int)test_scalar($conn, 'SELECT id FROM Product WHERE id = ?', 'i', [$historyProductId]), 'Historical product was unexpectedly deleted.');
