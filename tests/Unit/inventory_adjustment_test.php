@@ -37,11 +37,11 @@ function run_inventory_adjustment_unit_tests(): int
         'filter_var($product[\'stock\'], FILTER_VALIDATE_INT',
         'Stock adjustment would exceed the supported range.',
         'UPDATE Product SET stock = ? WHERE id = ? AND stock = ?',
-        "inventory_log_stock_movement($conn, $product_id, $staff_id, $quantity, 'manual_adjustment', $reason)",
-        "audit_log($conn, $staff_id, 'stock_adjustment', 'Product', $product_id, true",
+        'inventory_log_stock_movement($conn, $product_id, $staff_id, $quantity, \'manual_adjustment\', $reason)',
+        'audit_log($conn, $staff_id, \'stock_adjustment\', \'Product\', $product_id, true',
         '$conn->commit()',
         '$conn->rollback()',
-        "audit_log($conn, $staff_id, 'stock_adjustment', $product_id, false",
+        'audit_log($conn, $staff_id, \'stock_adjustment\', \'Product\', $product_id, false',
         'Stock adjustment rollback failed:',
         'Stock adjustment failed:',
         'return true;',
@@ -71,7 +71,7 @@ function run_inventory_adjustment_unit_tests(): int
         'log_stock_movement($conn',
         '$conn->commit()',
         '$conn->rollback()',
-        "audit_log_current_actor($conn, 'stock_adjustment', 'Product', $adj_product_id",
+        'audit_log_current_actor($conn, \'stock_adjustment\', \'Product\', $adj_product_id',
     ] as $removedOperation) {
         $tests->assertFalse(
             strpos($adjustmentBlock, $removedOperation) !== false,

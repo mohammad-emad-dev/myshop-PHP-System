@@ -8,7 +8,9 @@ redirect implementations in `includes/auth.php` and `includes/http.php`. Batch
 5 placed bounded Supplier reads in `includes/people.php`; earlier batches placed
 Customer and Catalog reads in their focused modules. Batch 7A places bounded
 stock-movement count/page reads in `includes/inventory.php`; Batch 7B places the
-stock-movement history writer there while retaining the legacy wrapper. Legacy
+stock-movement history writer there while retaining the legacy wrapper. Batch
+7C places the atomic manual stock-adjustment transaction there while retaining
+the page's request, CSRF, authorization, and response responsibilities. Legacy
 names for moved functions remain available from `includes/functions.php` as compatibility
 wrappers, while unmoved legacy functions retain their original contracts.
 
@@ -85,6 +87,9 @@ failures, and some infrastructure failures.
 - `create_product()`, `update_product()`, and `delete_product()` on rejected or
   failed mutations.
 - `inventory_log_stock_movement()` / `log_stock_movement()` on rejected or failed history writes.
+- `inventory_adjust_stock()` on invalid service arguments or any failed lock,
+  stock validation, guarded update, movement, audit, commit, or database
+  operation; database-operation failures roll back before the failure audit is attempted.
 - `create_order()` on any validation, authorization, transaction, stock,
   audit, or database failure.
 - Staff, category, customer, and supplier mutation functions on rejected or
