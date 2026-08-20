@@ -38,8 +38,8 @@ does not require `functions.php`.
 | Stage | Command | Result |
 |---|---|---|
 | RED | `docker compose run --rm --no-deps app php -r "require 'tests/Unit/inventory_read_test.php'; echo run_inventory_read_unit_tests(), PHP_EOL;"` before implementation | Failed because the Inventory extraction source fixture was missing. |
-| GREEN | Same command after implementation | Passed with `37` assertions. |
-| Full regression | `docker compose --env-file .env exec -T -e TEST_DB_HOST=db -e TEST_DB_PORT=3306 -e TEST_DB_ROOT_USER=root -e TEST_DB_ROOT_PASSWORD=<local disposable value> app php tests/run.php` | Passed with `1139 assertions (661 unit, 478 integration)`. |
+| GREEN | Same command after implementation | Passed with `40` assertions. |
+| Full regression | `docker compose --env-file .env exec -T -e TEST_DB_HOST=db -e TEST_DB_PORT=3306 -e TEST_DB_ROOT_USER=root -e TEST_DB_ROOT_PASSWORD=<local disposable value> app php tests/run.php` | Passed with `1151 assertions (664 unit, 487 integration)`. |
 | Browser QA | `powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/run-browser-qa.ps1` | Passed `18/18` at 375px, 768px, and 1440px. |
 
 The existing disposable integration suite also continued to verify movement
