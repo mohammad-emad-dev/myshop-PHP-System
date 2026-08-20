@@ -149,13 +149,13 @@ if ($selected_product_id !== null) {
 $page_size_options = [10, 25, 50, 100];
 $page_size = normalize_page_size($_GET['page_size'] ?? 25, 25, $page_size_options);
 $page = normalize_page_number($_GET['page'] ?? 1);
-$total_movements = count_stock_movements($conn, $selected_product_id);
+$total_movements = inventory_count_stock_movements($conn, $selected_product_id);
 $total_pages = max(1, (int)ceil($total_movements / $page_size));
 if ($page > $total_pages) {
     $page = $total_pages;
 }
 $offset = ($page - 1) * $page_size;
-$movements = get_stock_movements_page($conn, $selected_product_id, $page_size, $offset);
+$movements = inventory_get_stock_movements_page($conn, $selected_product_id, $page_size, $offset);
 $products_list = get_pos_products($conn, '', 100); // bounded selector data
 $range_start = $total_movements > 0 ? $offset + 1 : 0;
 $range_end = $total_movements > 0 ? min($offset + count($movements), $total_movements) : 0;
