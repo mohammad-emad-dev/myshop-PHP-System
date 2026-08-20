@@ -363,11 +363,11 @@ function run_auth_extraction_unit_tests(): int
             'Backup authentication, authorization, CSRF, and streaming order changed.'
         );
         foreach ([
-            "header('Content-Type', 'application/sql; charset=utf-8')",
-            "header('Content-Disposition: attachment; filename=\"' . $filename . '\"')",
-            "-- MYSHOP_BACKUP_COMPLETE",
-            "-- BACKUP FAILED: The generated file is incomplete and must not be restored.",
-            "audit_log($conn, $staff_id, 'database_backup'",
+            'header(\'Content-Type: application/sql; charset=utf-8\')',
+            'Content-Disposition: attachment; filename="',
+            'finish_failed_backup_response($output)',
+            'stream_database_backup($conn',
+            "audit_log(\$conn, \$staff_id, 'database_backup'",
         ] as $backupInvariant) {
             $tests->assertContains(
                 $backupInvariant,

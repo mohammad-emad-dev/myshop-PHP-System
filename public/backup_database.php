@@ -75,7 +75,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
 
 // Use the current database-backed account and active role, not stale session role data.
 try {
-    $authenticated = verify_login(false);
+    $authenticated = auth_verify_login($conn, false);
 } catch (Throwable $exception) {
     error_log('Backup authentication failed: ' . $exception->getMessage());
     abort_backup_request($session_staff_id, 'authentication_error', 500);
@@ -87,7 +87,7 @@ if (!$authenticated) {
 
 $staff_id = isset($_SESSION['staff_id']) ? (int)$_SESSION['staff_id'] : null;
 try {
-    $authorized = is_admin();
+    $authorized = auth_is_admin($conn);
 } catch (Throwable $exception) {
     error_log('Backup authorization failed: ' . $exception->getMessage());
     abort_backup_request($staff_id, 'authorization_error', 500);
