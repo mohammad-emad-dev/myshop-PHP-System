@@ -125,7 +125,7 @@ function run_people_read_unit_tests(): int
     }
 
     $tests->assertContains(
-        "elseif (\$order_type === 'purchase' && !is_admin())",
+        "elseif (\$order_type === 'purchase' && !auth_is_admin(\$conn))",
         $orders,
         'Orders page must retain server-side cashier purchase rejection.'
     );

@@ -3,8 +3,8 @@ require_once '../includes/functions.php';
 start_secure_session();
 require_once '../config/db.php';
 
-verify_login();
-$is_admin_user = is_admin();
+auth_verify_login($conn);
+$is_admin_user = auth_is_admin($conn);
 
 $success = '';
 $error = '';
@@ -29,7 +29,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['complete_order'])) {
                 http_response_code(400);
                 audit_log_current_actor($conn, 'order_create', 'Order', null, false, ['reason' => 'invalid_order_type']);
                 $error = "Invalid order type.";
-            } elseif ($order_type === 'purchase' && !is_admin()) {
+            } elseif ($order_type === 'purchase' && !auth_is_admin($conn)) {
                 http_response_code(403);
                 audit_log_denied($conn, 'purchase_order_create', 'Order', null);
                 $error = "Access denied. Cashier accounts cannot create purchase orders.";

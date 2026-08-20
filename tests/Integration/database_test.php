@@ -97,6 +97,86 @@ function test_run_stock_movement_page_request(
     ];
 }
 
+function test_run_orders_page_request(
+    string $repository,
+    int $staffId,
+    string $orderType,
+    array $cartItems,
+    ?int $customerId,
+    ?int $supplierId,
+    bool $validCsrf
+): array {
+    $functionsPath = $repository . '/includes/functions.php';
+    $pagePath = $repository . '/public/orders.php';
+    $cartJson = json_encode($cartItems, JSON_THROW_ON_ERROR);
+    $csrfExpression = $validCsrf
+        ? 'generate_csrf_token()'
+        : var_export('invalid-order-csrf-token', true);
+    $script = '$_SERVER[\'REQUEST_METHOD\'] = \'POST\';'
+        . '$_SERVER[\'REQUEST_URI\'] = \'/orders.php\';'
+        . '$_SERVER[\'REMOTE_ADDR\'] = \'127.0.0.1\';'
+        . 'require ' . var_export($functionsPath, true) . ';'
+        . 'start_secure_session();'
+        . '$_SESSION = [\'staff_id\' => ' . $staffId . '];'
+        . '$orderPageCsrfToken = ' . $csrfExpression . ';'
+        . '$_POST = [\'complete_order\' => \'1\', \'csrf_token\' => $orderPageCsrfToken, '
+        . '\'cart_data\' => ' . var_export($cartJson, true) . ', '
+        . '\'order_type\' => ' . var_export($orderType, true) . ', '
+        . '\'customer_id\' => ' . var_export($customerId, true) . ', '
+        . '\'supplier_id\' => ' . var_export($supplierId, true) . '];'
+        . 'ob_start();'
+        . 'require ' . var_export($pagePath, true) . ';'
+        . 'ob_end_clean();'
+        . '$orderPageStatus = http_response_code();'
+        . 'echo \'RESULT_STATUS=\' . ($orderPageStatus === false ? \'default\' : (string)$orderPageStatus);';
+
+    $descriptors = [
+        0 => ['pipe', 'r'],
+        1 => ['pipe', 'w'],
+        2 => ['pipe', 'w'],
+    ];
+    $process = proc_open(
+        [PHP_BINARY, '-d', 'display_errors=1', '-d', 'log_errors=0', '-r', $script],
+        $descriptors,
+        $pipes,
+        $repository . '/public'
+    );
+    if (!is_resource($process)) {
+        throw new TestFailure('Orders page subprocess could not start.');
+    }
+
+    fclose($pipes[0]);
+    $stdout = stream_get_contents($pipes[1]);
+    fclose($pipes[1]);
+    $stderr = stream_get_contents($pipes[2]);
+    fclose($pipes[2]);
+    $exitCode = proc_close($process);
+    $output = (string)$stdout . (string)$stderr;
+
+    if ($exitCode !== 0) {
+        $diagnostics = [];
+        foreach (preg_split('/\R/', $output) ?: [] as $line) {
+            if (preg_match('/(?:Warning|Notice|Fatal error|Parse error|Uncaught)/i', $line) !== 1) {
+                continue;
+            }
+            $line = preg_replace('/(?i)(password|secret|token|cookie|authorization)[^\r\n]*/', '$1=[redacted]', $line);
+            $diagnostics[] = substr((string)$line, 0, 400);
+        }
+        throw new TestFailure(
+            'Orders page subprocess failed: ' . substr(implode(' | ', $diagnostics), 0, 800)
+        );
+    }
+
+    if (preg_match('/RESULT_STATUS=(default|[0-9]+)/', $output, $matches) !== 1) {
+        throw new TestFailure('Orders page subprocess did not return a safe status marker.');
+    }
+
+    return [
+        'status' => $matches[1],
+        'output' => $output,
+    ];
+}
+
 function run_integration_tests(): int
 {
     $tests = new TestContext();
@@ -473,6 +553,160 @@ function run_integration_tests(): int
         $orderSummary = get_order_summary($conn, $cashierId, 'all');
         $tests->assertSame(1, $orderSummary['total_orders'], 'Cashier order summary scope is incorrect.');
         $tests->assertSame(24.68, round($orderSummary['total_sales_amount'], 2), 'Cashier order summary total is incorrect.');
+        $cashierOrderCountBeforePageTests = count(get_orders_for_staff($conn, $cashierId));
+        $orderPageSaleBeforeCount = (int)test_scalar($conn, 'SELECT COUNT(*) FROM `Order`');
+        $orderPageSaleBeforeStock = (int)test_scalar($conn, 'SELECT stock FROM Product WHERE id = ?', 'i', [$orderProductId]);
+        $orderPageAdminSale = test_run_orders_page_request(
+            dirname(__DIR__, 2),
+            $adminId,
+            'sale',
+            [[
+                'id' => $orderProductId,
+                'qty' => 1,
+                'price' => 0.01,
+                'subtotal' => 0.01,
+            ]],
+            $customerId,
+            null,
+            true
+        );
+        $tests->assertSame('default', $orderPageAdminSale['status'], 'Admin sale should retain the normal success response status.');
+        $tests->assertFalse(
+            preg_match('/(?:Warning|Notice|Fatal error)/i', $orderPageAdminSale['output']) === 1,
+            'Admin sale emitted a PHP warning or fatal diagnostic.'
+        );
+        $tests->assertSame($orderPageSaleBeforeCount + 1, (int)test_scalar($conn, 'SELECT COUNT(*) FROM `Order`'), 'Admin page sale did not create exactly one order.');
+        $adminPageSaleId = (int)test_scalar($conn, 'SELECT MAX(id) FROM `Order`');
+        $adminPageSale = test_fetch_one($conn, 'SELECT total_amount, staff_id, order_type, customer_id FROM `Order` WHERE id = ?', 'i', [$adminPageSaleId]);
+        $adminPageSaleDetail = test_fetch_one($conn, 'SELECT quantity, unit_price, subtotal FROM OrderDetail WHERE order_id = ?', 'i', [$adminPageSaleId]);
+        $tests->assertSame($adminId, (int)$adminPageSale['staff_id'], 'Admin page sale actor changed.');
+        $tests->assertSame('sale', $adminPageSale['order_type'], 'Admin page sale order type changed.');
+        $tests->assertSame($customerId, (int)$adminPageSale['customer_id'], 'Admin page sale customer association changed.');
+        $tests->assertSame(1, (int)$adminPageSaleDetail['quantity'], 'Admin page sale quantity changed.');
+        $tests->assertSame(12.34, round((float)$adminPageSaleDetail['unit_price'], 2), 'Client-submitted sale price became authoritative.');
+        $tests->assertSame(12.34, round((float)$adminPageSaleDetail['subtotal'], 2), 'Server-side sale subtotal authority changed.');
+        $tests->assertSame(12.34, round((float)$adminPageSale['total_amount'], 2), 'Server-side sale total authority changed.');
+        $tests->assertSame($orderPageSaleBeforeStock - 1, (int)test_scalar($conn, 'SELECT stock FROM Product WHERE id = ?', 'i', [$orderProductId]), 'Admin page sale stock mutation changed.');
+        $tests->assertSame(1, (int)test_scalar(
+            $conn,
+            'SELECT COUNT(*) FROM StockMovement WHERE product_id = ? AND staff_id = ? AND movement_type = ? AND quantity = ? AND reason = ?',
+            'iisis',
+            [$orderProductId, $adminId, 'sale', -1, 'Order #' . $adminPageSaleId . ' Sale']
+        ), 'Admin page sale stock movement invariant changed.');
+
+        $orderPageCashierSaleBeforeCount = (int)test_scalar($conn, 'SELECT COUNT(*) FROM `Order`');
+        $orderPageCashierSaleBeforeStock = (int)test_scalar($conn, 'SELECT stock FROM Product WHERE id = ?', 'i', [$orderProductId]);
+        $orderPageCashierSale = test_run_orders_page_request(
+            dirname(__DIR__, 2),
+            $cashierId,
+            'sale',
+            [['id' => $orderProductId, 'qty' => 1]],
+            $customerId,
+            null,
+            true
+        );
+        $tests->assertSame('default', $orderPageCashierSale['status'], 'Cashier sale should remain allowed with the normal response status.');
+        $tests->assertFalse(
+            preg_match('/(?:Warning|Notice|Fatal error)/i', $orderPageCashierSale['output']) === 1,
+            'Cashier sale emitted a PHP warning or fatal diagnostic.'
+        );
+        $tests->assertSame($orderPageCashierSaleBeforeCount + 1, (int)test_scalar($conn, 'SELECT COUNT(*) FROM `Order`'), 'Cashier page sale did not create exactly one order.');
+        $cashierPageSaleId = (int)test_scalar($conn, 'SELECT MAX(id) FROM `Order`');
+        $tests->assertSame($cashierId, (int)test_scalar($conn, 'SELECT staff_id FROM `Order` WHERE id = ?', 'i', [$cashierPageSaleId]), 'Cashier page sale actor changed.');
+        $tests->assertSame($orderPageCashierSaleBeforeStock - 1, (int)test_scalar($conn, 'SELECT stock FROM Product WHERE id = ?', 'i', [$orderProductId]), 'Cashier page sale stock mutation changed.');
+
+        $orderPagePurchaseBeforeCount = (int)test_scalar($conn, 'SELECT COUNT(*) FROM `Order`');
+        $orderPagePurchaseBeforeStock = (int)test_scalar($conn, 'SELECT stock FROM Product WHERE id = ?', 'i', [$orderProductId]);
+        $orderPageAdminPurchase = test_run_orders_page_request(
+            dirname(__DIR__, 2),
+            $adminId,
+            'purchase',
+            [['id' => $orderProductId, 'qty' => 2]],
+            null,
+            $supplierId,
+            true
+        );
+        $tests->assertSame('default', $orderPageAdminPurchase['status'], 'Admin purchase should retain the normal success response status.');
+        $tests->assertFalse(
+            preg_match('/(?:Warning|Notice|Fatal error)/i', $orderPageAdminPurchase['output']) === 1,
+            'Admin purchase emitted a PHP warning or fatal diagnostic.'
+        );
+        $tests->assertSame($orderPagePurchaseBeforeCount + 1, (int)test_scalar($conn, 'SELECT COUNT(*) FROM `Order`'), 'Admin page purchase did not create exactly one order.');
+        $adminPagePurchaseId = (int)test_scalar($conn, 'SELECT MAX(id) FROM `Order`');
+        $adminPagePurchase = test_fetch_one($conn, 'SELECT staff_id, order_type, supplier_id FROM `Order` WHERE id = ?', 'i', [$adminPagePurchaseId]);
+        $tests->assertSame($adminId, (int)$adminPagePurchase['staff_id'], 'Admin page purchase actor changed.');
+        $tests->assertSame('purchase', $adminPagePurchase['order_type'], 'Admin page purchase order type changed.');
+        $tests->assertSame($supplierId, (int)$adminPagePurchase['supplier_id'], 'Admin page purchase supplier association changed.');
+        $tests->assertSame($orderPagePurchaseBeforeStock + 2, (int)test_scalar($conn, 'SELECT stock FROM Product WHERE id = ?', 'i', [$orderProductId]), 'Admin page purchase stock mutation changed.');
+
+        $purchaseDeniedBeforeCount = (int)test_scalar($conn, 'SELECT COUNT(*) FROM `Order`');
+        $purchaseDeniedBeforeStock = (int)test_scalar($conn, 'SELECT stock FROM Product WHERE id = ?', 'i', [$orderProductId]);
+        $purchaseDeniedAuditBefore = (int)test_scalar($conn, "SELECT COUNT(*) FROM AuditLog WHERE action = 'purchase_order_create' AND outcome = 'failure'");
+        $orderPageCashierPurchase = test_run_orders_page_request(
+            dirname(__DIR__, 2),
+            $cashierId,
+            'purchase',
+            [['id' => $orderProductId, 'qty' => 1]],
+            null,
+            $supplierId,
+            true
+        );
+        $tests->assertSame('403', $orderPageCashierPurchase['status'], 'Cashier purchase must remain denied with HTTP 403.');
+        $tests->assertFalse(
+            preg_match('/(?:Warning|Notice|Fatal error)/i', $orderPageCashierPurchase['output']) === 1,
+            'Cashier purchase denial emitted a PHP warning or fatal diagnostic.'
+        );
+        $tests->assertSame($purchaseDeniedBeforeCount, (int)test_scalar($conn, 'SELECT COUNT(*) FROM `Order`'), 'Cashier purchase denial mutated orders.');
+        $tests->assertSame($purchaseDeniedBeforeStock, (int)test_scalar($conn, 'SELECT stock FROM Product WHERE id = ?', 'i', [$orderProductId]), 'Cashier purchase denial mutated stock.');
+        $tests->assertSame($purchaseDeniedAuditBefore + 1, (int)test_scalar($conn, "SELECT COUNT(*) FROM AuditLog WHERE action = 'purchase_order_create' AND outcome = 'failure'"), 'Cashier purchase denial audit behavior changed.');
+
+        $invalidOrderCsrfBeforeCount = (int)test_scalar($conn, 'SELECT COUNT(*) FROM `Order`');
+        $invalidOrderCsrfBeforeStock = (int)test_scalar($conn, 'SELECT stock FROM Product WHERE id = ?', 'i', [$orderProductId]);
+        $invalidOrderCsrfAuditBefore = (int)test_scalar($conn, "SELECT COUNT(*) FROM AuditLog WHERE action = 'order_create' AND outcome = 'failure'");
+        $invalidOrderCsrfRequest = test_run_orders_page_request(
+            dirname(__DIR__, 2),
+            $adminId,
+            'sale',
+            [['id' => $orderProductId, 'qty' => 1]],
+            $customerId,
+            null,
+            false
+        );
+        $tests->assertSame('403', $invalidOrderCsrfRequest['status'], 'Invalid order CSRF must remain denied with HTTP 403.');
+        $tests->assertFalse(
+            preg_match('/(?:Warning|Notice|Fatal error)/i', $invalidOrderCsrfRequest['output']) === 1,
+            'Invalid order CSRF emitted a PHP warning or fatal diagnostic.'
+        );
+        $tests->assertSame($invalidOrderCsrfBeforeCount, (int)test_scalar($conn, 'SELECT COUNT(*) FROM `Order`'), 'Invalid order CSRF mutated orders.');
+        $tests->assertSame($invalidOrderCsrfBeforeStock, (int)test_scalar($conn, 'SELECT stock FROM Product WHERE id = ?', 'i', [$orderProductId]), 'Invalid order CSRF mutated stock.');
+        $tests->assertSame($invalidOrderCsrfAuditBefore + 1, (int)test_scalar($conn, "SELECT COUNT(*) FROM AuditLog WHERE action = 'order_create' AND outcome = 'failure'"), 'Invalid order CSRF audit behavior changed.');
+
+        $insufficientStockBeforeCount = (int)test_scalar($conn, 'SELECT COUNT(*) FROM `Order`');
+        $insufficientStockBeforeStock = (int)test_scalar($conn, 'SELECT stock FROM Product WHERE id = ?', 'i', [$orderProductId]);
+        $insufficientPageRequest = test_run_orders_page_request(
+            dirname(__DIR__, 2),
+            $adminId,
+            'sale',
+            [['id' => $orderProductId, 'qty' => $insufficientStockBeforeStock + 1]],
+            $customerId,
+            null,
+            true
+        );
+        $tests->assertSame('default', $insufficientPageRequest['status'], 'Insufficient page stock should retain the generic response status.');
+        $tests->assertSame($insufficientStockBeforeCount, (int)test_scalar($conn, 'SELECT COUNT(*) FROM `Order`'), 'Insufficient page stock created an order.');
+        $tests->assertSame($insufficientStockBeforeStock, (int)test_scalar($conn, 'SELECT stock FROM Product WHERE id = ?', 'i', [$orderProductId]), 'Insufficient page stock mutated inventory.');
+
+        $rollbackOrderBeforeCount = (int)test_scalar($conn, 'SELECT COUNT(*) FROM `Order`');
+        $rollbackStockBefore = (int)test_scalar($conn, 'SELECT stock FROM Product WHERE id = ?', 'i', [$orderProductId]);
+        $rollbackMovementBefore = (int)test_scalar($conn, 'SELECT COUNT(*) FROM StockMovement WHERE product_id = ?', 'i', [$orderProductId]);
+        $tests->assertFalse(
+            create_order($conn, $adminId, [['product_id' => $orderProductId, 'quantity' => $rollbackStockBefore + 1]], 'sale', $customerId, null),
+            'Insufficient stock must fail the order transaction.'
+        );
+        $tests->assertSame($rollbackOrderBeforeCount, (int)test_scalar($conn, 'SELECT COUNT(*) FROM `Order`'), 'Insufficient stock rollback left a partial order.');
+        $tests->assertSame($rollbackStockBefore, (int)test_scalar($conn, 'SELECT stock FROM Product WHERE id = ?', 'i', [$orderProductId]), 'Insufficient stock rollback changed inventory.');
+        $tests->assertSame($rollbackMovementBefore, (int)test_scalar($conn, 'SELECT COUNT(*) FROM StockMovement WHERE product_id = ?', 'i', [$orderProductId]), 'Insufficient stock rollback left a stock movement.');
+
         $tests->assertTrue(count_stock_movements($conn) > 0, 'Stock movement count should include transaction history.');
         $tests->assertTrue(count(get_stock_movements_page($conn, null, 10, 0)) <= 10, 'Stock movement page is not bounded.');
         $tests->assertTrue(count(get_stock_movements_page($conn, null, 10, 10)) <= 10, 'Stock movement middle page is not bounded.');
@@ -607,7 +841,7 @@ function run_integration_tests(): int
             test_load_sql_file($schema, dirname(__DIR__, 2) . '/database/batch22_audit_log.sql');
         }
 
-        $tests->assertCount(1, get_orders_for_staff($conn, $cashierId), 'Cashier order history scope is incorrect.');
+        $tests->assertCount($cashierOrderCountBeforePageTests + 1, get_orders_for_staff($conn, $cashierId), 'Cashier order history scope is incorrect.');
         $tests->assertSame(null, get_order_by_id($conn, $tamperedSaleId, $adminId), 'A cashier order must not be visible to another staff scope.');
         $tests->assertCount(0, get_order_details($conn, $tamperedSaleId, $adminId), 'Unauthorized order details must be empty.');
         $tests->assertTrue(is_array(get_order_by_id($conn, $tamperedSaleId)), 'Admin/global order lookup failed.');

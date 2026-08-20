@@ -218,6 +218,59 @@ function run_auth_extraction_unit_tests(): int
         }
     }
 
+    $orders = file_get_contents($repository . '/public/orders.php');
+    $tests->assertTrue(is_string($orders), 'Orders authentication caller source could not be read.');
+    if (is_string($orders)) {
+        preg_match_all(
+            '/\b(?:auth_verify_login|auth_is_admin)\s*\([^)]*\)/',
+            $orders,
+            $orderAuthCalls
+        );
+        $tests->assertSame(
+            [
+                'auth_verify_login($conn)',
+                'auth_is_admin($conn)',
+                'auth_is_admin($conn)',
+            ],
+            $orderAuthCalls[0],
+            'Orders authentication call count or execution order changed.'
+        );
+        $tests->assertContains(
+            '$is_admin_user = auth_is_admin($conn);',
+            $orders,
+            'Orders page must preserve the explicit administrator state assignment.'
+        );
+        foreach (['verify_login', 'is_admin'] as $legacyCall) {
+            $tests->assertFalse(
+                preg_match('/(?<!auth_)\b' . $legacyCall . '\s*\(/', $orders) === 1,
+                'Orders page still uses a legacy authentication wrapper: ' . $legacyCall
+            );
+        }
+
+        $csrfOffset = strpos($orders, 'if (!verify_csrf_token($csrf_token))');
+        $purchaseAuthorizationOffset = strpos($orders, "} elseif (\$order_type === 'purchase' && !auth_is_admin(\$conn))");
+        $tests->assertTrue(
+            $csrfOffset !== false
+                && $purchaseAuthorizationOffset !== false
+                && $csrfOffset < $purchaseAuthorizationOffset,
+            'Orders CSRF validation must remain before purchase authorization.'
+        );
+        foreach ([
+            "http_response_code(403)",
+            "audit_log_denied(\$conn, 'purchase_order_create'",
+            'catalog_get_product_by_id($conn',
+            "\$actual_price = (float)\$prod['price'];",
+            'create_order($conn',
+            "\$_SESSION['last_order_time']",
+        ] as $orderInvariant) {
+            $tests->assertContains(
+                $orderInvariant,
+                $orders,
+                'Order business or security invariant disappeared during auth caller migration: ' . $orderInvariant
+            );
+        }
+    }
+
     $stockMovements = file_get_contents($repository . '/public/stock_movements.php');
     $tests->assertTrue(is_string($stockMovements), 'Stock movement authentication caller source could not be read.');
     if (is_string($stockMovements)) {
@@ -284,7 +337,6 @@ function run_auth_extraction_unit_tests(): int
 
     foreach ([
         'public/login.php' => 'verify_login(false)',
-        'public/orders.php' => 'verify_login();',
         'public/settings.php' => 'verify_login();',
         'public/backup_database.php' => 'verify_login(false)',
         'includes/layouts/sidebar.php' => 'is_admin()',
