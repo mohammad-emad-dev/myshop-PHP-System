@@ -45,18 +45,21 @@ unchanged `public/orders.php` caller.
 
 - Commit: `4b062b7` (`refactor(orders): extract order creation service`)
 - Additional test commit: `098357d` (`test(orders): cover duplicate item aggregation`)
+- Additional test commit: `29a331d` (`test(orders): cover transactional failure rollback`)
 - Focused order contract: PASS, 42 assertions.
 - Focused product contract: PASS, 108 assertions.
 - Focused inventory read contract: PASS, 60 assertions.
 - Focused inventory adjustment contract: PASS, 40 assertions.
-- Full regression after extraction: PASS, 1457 assertions (872 unit, 585 integration).
+- Full regression after extraction: PASS, 1468 assertions (872 unit, 596 integration).
 
 The integration suite directly exercises sale and purchase service paths while
 the existing orders-page tests continue to exercise the compatibility wrapper.
 It also verifies duplicate-item aggregation, client-price tampering resistance,
 cashier sale/purchase policy, customer/supplier validation, exact totals and
 stock changes, movement reasons, audit behavior, insufficient-stock rollback,
-and closed-connection failure.
+closed-connection failure, movement-insertion rollback, audit-insertion
+rollback, and the absence of partial Order, OrderDetail, Product,
+StockMovement, or AuditLog records after those failures.
 
 ## Preserved boundaries
 
