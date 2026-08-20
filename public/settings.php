@@ -327,7 +327,7 @@ require_once '../includes/layouts/header.php';
             </div>
         </div>
 
-<?php if (auth_is_admin($conn)): ?>
+        <?php if (auth_is_admin($conn)): ?>
         <!-- Manage Staff accounts panel -->
         <div class="row my-4 justify-content-center">
             <div class="col-lg-10 col-md-12">
