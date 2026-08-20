@@ -95,7 +95,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['complete_order'])) {
                 $customer_id = isset($_POST['customer_id']) ? intval($_POST['customer_id']) : null;
                 $supplier_id = isset($_POST['supplier_id']) ? intval($_POST['supplier_id']) : null;
 
-                $order_id = create_order($conn, $_SESSION['staff_id'], $order_items, $order_type, $customer_id, $supplier_id);
+                $order_id = orders_create($conn, $_SESSION['staff_id'], $order_items, $order_type, $customer_id, $supplier_id);
                 if ($order_id) {
                     $completed_order_id = (int)$order_id;
                     $_SESSION['last_order_time'] = time(); // Record time to prevent flood
