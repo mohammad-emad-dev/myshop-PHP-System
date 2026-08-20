@@ -3,7 +3,7 @@ require_once '../includes/functions.php';
 start_secure_session();
 require_once '../config/db.php';
 
-verify_login();
+auth_verify_login($conn);
 
 $success = '';
 $error = '';
@@ -15,7 +15,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         http_response_code(403);
         audit_log_current_actor($conn, 'product_mutation', 'Product', null, false, ['reason' => 'csrf_validation_failed']);
         $error = 'Security check failed. Invalid request token.';
-    } elseif (!is_admin()) {
+    } elseif (!auth_is_admin($conn)) {
         http_response_code(403);
         audit_log_denied($conn, 'product_mutation', 'Product', null);
         $error = 'Access denied. You do not have permission to modify products.';
@@ -181,7 +181,7 @@ require_once '../includes/layouts/header.php';
                                 <p class="text-muted mb-0 mt-1">Manage all your products, pricing, and stock alerts.</p>
                             </div>
                             <div class="d-flex gap-2">
-                                <?php if (is_admin()): ?>
+                                <?php if (auth_is_admin($conn)): ?>
                                 <a href="export_report.php?entity=products" class="btn btn-success rounded-3 shadow-sm px-4 fw-medium" target="_blank">
                                     <i class="fas fa-file-excel me-2"></i>Export CSV
                                 </a>
@@ -298,7 +298,7 @@ require_once '../includes/layouts/header.php';
                                                  <a href="stock_movements.php?product_id=<?php echo $product['id']; ?>" class="btn btn-sm btn-outline-secondary me-1" title="Stock History">
                                                      <i class="fas fa-history"></i>
                                                  </a>
-                                                 <?php if (is_admin()): ?>
+                                                 <?php if (auth_is_admin($conn)): ?>
                                                  <button type="button" class="btn btn-sm btn-outline-info me-1 edit-product-btn"
                                                          aria-label="Edit product" title="Edit product"
                                                          data-product-id="<?php echo (int)$product['id']; ?>"

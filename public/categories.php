@@ -5,7 +5,7 @@ require_once '../config/db.php';
 
 // Authenticate first so POST requests can return a consistent CSRF response
 // before the administrator authorization check.
-verify_login();
+auth_verify_login($conn);
 
 $success = '';
 $error = '';
@@ -17,7 +17,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         http_response_code(403);
         audit_log_current_actor($conn, 'category_mutation', 'Category', null, false, ['reason' => 'csrf_validation_failed']);
         $error = 'Security check failed. Invalid request token.';
-    } elseif (!is_admin()) {
+    } elseif (!auth_is_admin($conn)) {
         http_response_code(403);
         audit_log_denied($conn, 'category_mutation', 'Category', null);
         $error = 'Access denied. Administrator privileges are required for category changes.';
@@ -71,7 +71,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 }
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    require_admin();
+    auth_require_admin($conn);
 }
 
 $search = truncate_list_search($_GET['search'] ?? '');

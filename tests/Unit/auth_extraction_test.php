@@ -170,12 +170,72 @@ function run_auth_extraction_unit_tests(): int
         }
     }
 
+    $explicitCrudCallers = [
+        'public/products.php' => [
+            'auth_verify_login($conn)',
+            'auth_is_admin($conn)',
+            'auth_is_admin($conn)',
+            'auth_is_admin($conn)',
+        ],
+        'public/categories.php' => [
+            'auth_verify_login($conn)',
+            'auth_is_admin($conn)',
+            'auth_require_admin($conn)',
+        ],
+        'public/customers.php' => [
+            'auth_verify_login($conn)',
+            'auth_is_admin($conn)',
+            'auth_is_admin($conn)',
+        ],
+        'public/suppliers.php' => [
+            'auth_verify_login($conn)',
+            'auth_is_admin($conn)',
+            'auth_is_admin($conn)',
+        ],
+    ];
+    foreach ($explicitCrudCallers as $relativePath => $expectedSequence) {
+        $source = file_get_contents($repository . '/' . $relativePath);
+        $tests->assertTrue(is_string($source), 'CRUD authentication caller source could not be read: ' . $relativePath);
+        if (!is_string($source)) {
+            continue;
+        }
+
+        preg_match_all(
+            '/\\b(?:auth_verify_login|auth_is_admin|auth_require_admin)\\s*\\([^)]*\\)/',
+            $source,
+            $authCalls
+        );
+        $tests->assertSame(
+            $expectedSequence,
+            $authCalls[0],
+            'CRUD authentication call count or execution order changed: ' . $relativePath
+        );
+        foreach (['verify_login', 'is_admin', 'require_admin'] as $legacyCall) {
+            $tests->assertFalse(
+                preg_match('/(?<!auth_)\\b' . $legacyCall . '\\s*\\(/', $source) === 1,
+                'CRUD caller still uses a legacy authentication wrapper: ' . $relativePath . ' -> ' . $legacyCall
+            );
+        }
+    }
+
+    foreach ([
+        'public/products.php' => ['verify_csrf_token($csrf_token)', "audit_log_current_actor(\$conn, 'product_mutation'", "audit_log_denied(\$conn, 'product_mutation'", 'handle_image_upload('],
+        'public/categories.php' => ['verify_csrf_token($csrf_token)', "audit_log_current_actor(\$conn, 'category_mutation'", "audit_log_denied(\$conn, 'category_mutation'"],
+        'public/customers.php' => ['verify_csrf_token($csrf_token)', "audit_log_current_actor(\$conn, 'customer_mutation'", "audit_log_denied(\$conn, 'customer_mutation'"],
+        'public/suppliers.php' => ['verify_csrf_token($csrf_token)', "audit_log_current_actor(\$conn, 'supplier_mutation'", "audit_log_denied(\$conn, 'supplier_mutation'"],
+    ] as $relativePath => $securityContracts) {
+        $source = file_get_contents($repository . '/' . $relativePath);
+        foreach ($securityContracts as $securityContract) {
+            $tests->assertContains(
+                $securityContract,
+                $source,
+                'CRUD security contract changed for ' . $relativePath . ': ' . $securityContract
+            );
+        }
+    }
+
     foreach ([
         'public/login.php' => 'verify_login(false)',
-        'public/products.php' => 'verify_login();',
-        'public/categories.php' => 'verify_login();',
-        'public/customers.php' => 'verify_login();',
-        'public/suppliers.php' => 'verify_login();',
         'public/stock_movements.php' => 'verify_login();',
         'public/orders.php' => 'verify_login();',
         'public/settings.php' => 'verify_login();',

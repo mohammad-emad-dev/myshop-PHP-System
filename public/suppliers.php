@@ -4,7 +4,7 @@ start_secure_session();
 require_once '../config/db.php';
 
 // Enforce authentication
-verify_login();
+auth_verify_login($conn);
 
 $success = '';
 $error = '';
@@ -16,7 +16,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         http_response_code(403);
         audit_log_current_actor($conn, 'supplier_mutation', 'Supplier', null, false, ['reason' => 'csrf_validation_failed']);
         $error = 'Security check failed. Invalid request token.';
-    } elseif (!is_admin()) {
+    } elseif (!auth_is_admin($conn)) {
         http_response_code(403);
         audit_log_denied($conn, 'supplier_mutation', 'Supplier', null);
         $error = 'Access denied. Administrator privileges are required for supplier changes.';
@@ -134,7 +134,7 @@ require_once '../includes/layouts/header.php';
                             </h2>
                         </div>
                         <div class="d-flex gap-2">
-                            <?php if (is_admin()): ?>
+                            <?php if (auth_is_admin($conn)): ?>
                             <a href="export_report.php?entity=suppliers" class="btn btn-success rounded-3 shadow-sm px-4 fw-medium" target="_blank">
                                 <i class="fas fa-file-excel me-2"></i>Export CSV
                             </a>
