@@ -41,6 +41,20 @@ function run_dashboard_integration_tests(): int
         $productId = (int)test_scalar($conn, 'SELECT id FROM Product WHERE barcode = ?', 's', [$barcode]);
         $tests->assertTrue($productId > 0, 'Dashboard product fixture was not created.');
 
+        $valuation = dashboard_get_inventory_valuation($conn);
+        $tests->assertSame(1000.0, $valuation, 'Inventory valuation must sum current stock multiplied by price.');
+        $tests->assertTrue(is_float($valuation), 'Inventory valuation must remain a float.');
+        $tests->assertSame(
+            $valuation,
+            get_inventory_valuation($conn),
+            'The legacy inventory valuation wrapper must preserve the focused service result.'
+        );
+        test_execute($conn, 'UPDATE Product SET stock = 0 WHERE id = ?', 'i', [$productId]);
+        $zeroValuation = dashboard_get_inventory_valuation($conn);
+        $tests->assertSame(0.0, $zeroValuation, 'Zero-stock products must produce a zero valuation.');
+        $tests->assertTrue(is_float($zeroValuation), 'Zero inventory valuation must remain a float.');
+        test_execute($conn, 'UPDATE Product SET stock = 100 WHERE id = ?', 'i', [$productId]);
+
         test_execute(
             $conn,
             'INSERT INTO `Order` (total_amount, staff_id, order_type, customer_id, supplier_id) VALUES (?, ?, \'sale\', ?, NULL)',
@@ -114,6 +128,9 @@ function run_dashboard_integration_tests(): int
             $database->portForTests()
         );
         $closedConnection->close();
+        $closedValuation = dashboard_get_inventory_valuation($closedConnection);
+        $tests->assertSame(0.0, $closedValuation, 'Closed database connections must return zero valuation.');
+        $tests->assertTrue(is_float($closedValuation), 'Closed-connection valuation fallback must remain a float.');
         $defaultStats = [
             'total_products' => 0,
             'total_orders' => 0,

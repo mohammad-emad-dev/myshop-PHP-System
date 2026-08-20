@@ -84,7 +84,6 @@ function run_dashboard_unit_tests(): int
         'Dashboard page must not call the legacy statistics function.'
     );
     foreach ([
-        'get_inventory_valuation($conn)',
         'get_top_selling_products($conn, 5, $dashboard_staff_id)',
         'get_category_sales_distribution($conn, $dashboard_staff_id)',
         'get_low_stock_products($conn)',
@@ -147,6 +146,58 @@ function run_dashboard_unit_tests(): int
         0,
         preg_match('/\bget_chart_data\s*\(/', $index),
         'Dashboard page must not call the legacy chart-data function.'
+    );
+
+    $tests->assertContains(
+        'function dashboard_get_inventory_valuation($conn)',
+        $module,
+        'Dashboard module must expose the explicit inventory valuation service.'
+    );
+    foreach ([
+        'SELECT SUM(stock * price) as valuation FROM Product',
+        "return (float)(\$row['valuation'] ?? 0.0);",
+        "error_log('Inventory valuation query failed: ' . \$conn->error)",
+        "error_log('Inventory valuation query failed: ' . \$exception->getMessage())",
+        'return 0.0;',
+    ] as $valuationContract) {
+        $tests->assertContains(
+            $valuationContract,
+            $module,
+            'Dashboard inventory valuation contract is missing: ' . $valuationContract
+        );
+    }
+
+    $valuationWrapperPattern = '/function get_inventory_valuation\s*\([^)]*\)\s*\{(?<body>.*?)\n\}/s';
+    $valuationWrapperMatched = preg_match($valuationWrapperPattern, $facade, $valuationMatches) === 1;
+    $tests->assertTrue($valuationWrapperMatched, 'Inventory valuation compatibility wrapper is missing.');
+    if ($valuationWrapperMatched) {
+        $tests->assertContains(
+            'return dashboard_get_inventory_valuation($conn);',
+            $valuationMatches['body'],
+            'Inventory valuation compatibility wrapper must delegate exactly once.'
+        );
+        $tests->assertSame(
+            1,
+            substr_count($valuationMatches['body'], 'dashboard_get_inventory_valuation('),
+            'Inventory valuation compatibility wrapper must contain one delegation.'
+        );
+        foreach (['SELECT ', 'query(', 'prepare(', 'bind_param', 'fetch_assoc'] as $implementationDetail) {
+            $tests->assertFalse(
+                strpos($valuationMatches['body'], $implementationDetail) !== false,
+                'Inventory valuation compatibility wrapper still contains implementation detail: ' . $implementationDetail
+            );
+        }
+    }
+
+    $tests->assertContains(
+        'dashboard_get_inventory_valuation($conn)',
+        $index,
+        'Dashboard page must call the focused inventory valuation service directly.'
+    );
+    $tests->assertSame(
+        0,
+        preg_match('/\bget_inventory_valuation\s*\(/', $index),
+        'Dashboard page must not call the legacy inventory valuation function.'
     );
 
     return $tests->assertions();

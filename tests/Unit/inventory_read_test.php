@@ -101,7 +101,11 @@ function run_inventory_read_unit_tests(): int
         $tests->assertContains($legacyFunction, $facade, 'Out-of-scope Inventory read function changed: ' . $legacyFunction);
     }
     $tests->assertContains('fetch_all(MYSQLI_ASSOC)', $facade, 'Unbounded stock-movement compatibility behavior was unexpectedly removed.');
-    $tests->assertContains('get_inventory_valuation($conn)', $index, 'Dashboard inventory valuation caller changed out of scope.');
+    $tests->assertContains(
+        'dashboard_get_inventory_valuation($conn)',
+        $index,
+        'Dashboard inventory valuation caller must use the focused Dashboard service.'
+    );
     $tests->assertContains('get_low_stock_products($conn)', $index, 'Dashboard low-stock caller changed out of scope.');
     $tests->assertContains('get_low_stock_products($conn)', $navbar, 'Navbar low-stock caller changed out of scope.');
 
