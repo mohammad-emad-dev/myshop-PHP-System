@@ -2199,22 +2199,11 @@ function delete_supplier($conn, $id)
 }
 
 /**
- * Compute inventory valuation based on current stock levels and unit prices.
+ * Compatibility wrapper for the focused Dashboard inventory valuation service.
  */
 function get_inventory_valuation($conn)
 {
-    $sql = "SELECT SUM(stock * price) as valuation FROM Product";
-    try {
-        $result = $conn->query($sql);
-        if ($result) {
-            $row = $result->fetch_assoc();
-            return (float)($row['valuation'] ?? 0.0);
-        }
-        error_log('Inventory valuation query failed: ' . $conn->error);
-    } catch (Throwable $exception) {
-        error_log('Inventory valuation query failed: ' . $exception->getMessage());
-    }
-    return 0.0;
+    return dashboard_get_inventory_valuation($conn);
 }
 
 /**

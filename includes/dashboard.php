@@ -176,3 +176,22 @@ function dashboard_get_chart_data($conn, $days = 7, $staff_id = null)
 
     return array_values($data);
 }
+
+/**
+ * Compute inventory valuation based on current stock levels and unit prices.
+ */
+function dashboard_get_inventory_valuation($conn)
+{
+    $sql = "SELECT SUM(stock * price) as valuation FROM Product";
+    try {
+        $result = $conn->query($sql);
+        if ($result) {
+            $row = $result->fetch_assoc();
+            return (float)($row['valuation'] ?? 0.0);
+        }
+        error_log('Inventory valuation query failed: ' . $conn->error);
+    } catch (Throwable $exception) {
+        error_log('Inventory valuation query failed: ' . $exception->getMessage());
+    }
+    return 0.0;
+}
