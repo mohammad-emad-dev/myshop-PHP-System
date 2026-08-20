@@ -2834,93 +2834,12 @@ function get_categories($conn)
 
 function count_categories($conn, $search = '')
 {
-    $search = truncate_list_search($search);
-    $stmt = null;
-    try {
-        if ($search === '') {
-            $stmt = $conn->prepare("SELECT COUNT(*) AS total FROM Category");
-        } else {
-            $stmt = $conn->prepare("SELECT COUNT(*) AS total FROM Category WHERE name LIKE ? OR description LIKE ?");
-        }
-        if (!$stmt) {
-            error_log('Category count prepare failed: ' . $conn->error);
-            return 0;
-        }
-        if ($search !== '') {
-            $pattern = '%' . $search . '%';
-            if (!$stmt->bind_param('ss', $pattern, $pattern)) {
-                error_log('Category count bind failed: ' . $stmt->error);
-                return 0;
-            }
-        }
-        if (!$stmt->execute()) {
-            error_log('Category count execute failed: ' . $stmt->error);
-            return 0;
-        }
-        $result = $stmt->get_result();
-        if (!$result) {
-            error_log('Category count result failed: ' . $stmt->error);
-            return 0;
-        }
-        $row = $result->fetch_assoc();
-        return $row ? max(0, (int)$row['total']) : 0;
-    } catch (Throwable $exception) {
-        error_log('Category count failed: ' . $exception->getMessage());
-        return 0;
-    } finally {
-        if ($stmt instanceof mysqli_stmt) {
-            $stmt->close();
-        }
-    }
+    return catalog_count_categories($conn, $search);
 }
 
 function get_categories_page($conn, $search = '', $limit = 25, $offset = 0)
 {
-    $search = truncate_list_search($search);
-    $limit = normalize_page_size($limit, 25);
-    $offset = max(0, (int)$offset);
-    $stmt = null;
-    try {
-        $sql = "SELECT c.*, COUNT(p.id) AS product_count
-                FROM Category c
-                LEFT JOIN Product p ON c.id = p.category_id";
-        if ($search !== '') {
-            $sql .= " WHERE c.name LIKE ? OR c.description LIKE ?";
-        }
-        $sql .= " GROUP BY c.id ORDER BY c.name ASC, c.id ASC LIMIT ? OFFSET ?";
-        $stmt = $conn->prepare($sql);
-        if (!$stmt) {
-            error_log('Category page prepare failed: ' . $conn->error);
-            return [];
-        }
-        if ($search !== '') {
-            $pattern = '%' . $search . '%';
-            $bound = $stmt->bind_param('ssii', $pattern, $pattern, $limit, $offset);
-        } else {
-            $bound = $stmt->bind_param('ii', $limit, $offset);
-        }
-        if (!$bound) {
-            error_log('Category page bind failed: ' . $stmt->error);
-            return [];
-        }
-        if (!$stmt->execute()) {
-            error_log('Category page execute failed: ' . $stmt->error);
-            return [];
-        }
-        $result = $stmt->get_result();
-        if (!$result) {
-            error_log('Category page result failed: ' . $stmt->error);
-            return [];
-        }
-        return $result->fetch_all(MYSQLI_ASSOC);
-    } catch (Throwable $exception) {
-        error_log('Category page failed: ' . $exception->getMessage());
-        return [];
-    } finally {
-        if ($stmt instanceof mysqli_stmt) {
-            $stmt->close();
-        }
-    }
+    return catalog_get_categories_page($conn, $search, $limit, $offset);
 }
 
 function get_categories_for_selector($conn, $limit = 100)

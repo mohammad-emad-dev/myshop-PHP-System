@@ -78,13 +78,13 @@ $search = truncate_list_search($_GET['search'] ?? '');
 $page_size_options = [10, 25, 50, 100];
 $page_size = normalize_page_size($_GET['page_size'] ?? 25, 25, $page_size_options);
 $page = normalize_page_number($_GET['page'] ?? 1);
-$total_categories = count_categories($conn, $search);
+$total_categories = catalog_count_categories($conn, $search);
 $total_pages = max(1, (int)ceil($total_categories / $page_size));
 if ($page > $total_pages) {
     $page = $total_pages;
 }
 $offset = ($page - 1) * $page_size;
-$categories = get_categories_page($conn, $search, $page_size, $offset);
+$categories = catalog_get_categories_page($conn, $search, $page_size, $offset);
 $range_start = $total_categories > 0 ? $offset + 1 : 0;
 $range_end = $total_categories > 0 ? min($offset + count($categories), $total_categories) : 0;
 $category_page_url = static function ($target_page) use ($search, $page_size) {

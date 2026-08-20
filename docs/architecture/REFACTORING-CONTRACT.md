@@ -1,7 +1,8 @@
 # MyShop refactoring contract
 
-This contract is the safety boundary for future modularization. Batch 2
-extracts only Catalog read queries and preserves application behavior.
+This contract is the safety boundary for future modularization. Batch 3
+extracts only bounded Catalog category reads and preserves application
+behavior.
 
 ## Behavior that must remain unchanged
 
@@ -26,6 +27,8 @@ extracts only Catalog read queries and preserves application behavior.
 - Catalog search, pagination, ordering, bounded POS loading, exact barcode
   lookup, category selector ordering, and their legacy failure values remain
   unchanged.
+- Category search, pagination, deterministic name/ID ordering, `product_count`,
+  bounded page sizes, and empty-result behavior remain unchanged.
 
 ## URLs and routes that must remain unchanged
 
@@ -142,7 +145,7 @@ with the exact command and environment.
 
 ## Recommended next batch
 
-After Batch 2, the next candidate is a similarly bounded read-side extraction
+After Batch 3, the next candidate is a similarly bounded read-side extraction
 for customer and supplier pagination. It must be planned separately and must
 not include customer/supplier writes.
 
@@ -157,12 +160,12 @@ Acceptance criteria:
 
 ## Rollback instructions
 
-Batch 2 can be rolled back without a schema or data rollback:
+Batch 3 can be rolled back without a schema or data rollback:
 
-1. Revert the local Batch 2 commit, or restore the previous local commit if it
+1. Revert the local Batch 3 commit, or restore the previous local commit if it
    is not shared.
-2. Confirm the three page callers use the legacy function names again and that
-   `includes/functions.php` no longer requires `catalog.php`.
+2. Confirm `public/categories.php` uses the legacy category read names again
+   and that the category wrappers still delegate through `catalog.php`.
 3. Re-run `git diff --check` and the previously passing test suite.
 
 No database rollback, migration rollback, container rollback, or production

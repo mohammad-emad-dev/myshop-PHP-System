@@ -1,8 +1,8 @@
 # MyShop dependency map
 
 This map records current call-site and dependency relationships after the
-Batch 2 Catalog read extraction. It remains a characterization artifact; the
-compatibility wrappers are still required.
+Batch 3 Catalog category read extraction. It remains a characterization
+artifact; the compatibility wrappers are still required.
 
 ## Public-page to shared-function map
 
@@ -13,7 +13,7 @@ names are grouped only for readability; the source remains the authority.
 |---|---|
 | `audit_log.php` | `start_secure_session`, `verify_login`, `require_admin`, `normalize_page_number`, `normalize_page_size`, `truncate_list_search`, `count_audit_logs`, `get_audit_logs_page` |
 | `backup_database.php` | `start_secure_session`, `verify_login`, `is_admin`, `verify_csrf_token`, `audit_log`, `get_backup_table_allowlist`, `quote_backup_table`, `stream_database_backup` |
-| `categories.php` | `start_secure_session`, `verify_login`, `is_admin`, `require_admin`, `verify_csrf_token`, `generate_csrf_token`, `sanitize_input`, `normalize_page_number`, `normalize_page_size`, `truncate_list_search`, `create_category`, `update_category`, `delete_category`, `count_categories`, `get_categories_page`, `audit_log_current_actor`, `audit_log_denied` |
+| `categories.php` | `start_secure_session`, `verify_login`, `is_admin`, `require_admin`, `verify_csrf_token`, `generate_csrf_token`, `sanitize_input`, `normalize_page_number`, `normalize_page_size`, `truncate_list_search`, `create_category`, `update_category`, `delete_category`, `catalog_count_categories`, `catalog_get_categories_page`, `audit_log_current_actor`, `audit_log_denied` |
 | `customers.php` | `start_secure_session`, `verify_login`, `is_admin`, `verify_csrf_token`, `generate_csrf_token`, `sanitize_input`, `normalize_page_number`, `normalize_page_size`, `truncate_list_search`, `create_customer`, `update_customer`, `delete_customer`, `count_customers`, `get_customers_page`, `audit_log_current_actor`, `audit_log_denied` |
 | `export_report.php` | `start_secure_session`, `verify_login`, `require_admin`, `export_report_definitions`, `export_validate_entity`, `export_validate_order_filters`, `export_csv_text`, `export_csv_write_row`, `export_csv_fail`, `export_stream_entity` |
 | `get_order_details.php` | `start_secure_session`, `verify_login`, `is_admin`, `get_order_by_id`, `get_order_details`, `audit_log_current_actor` |
@@ -58,12 +58,17 @@ normalization helpers and accepts `$conn` explicitly for every query.
 | `catalog_get_pos_product_by_barcode` | Exact barcode lookup | Prepared value; returns `null` on empty, missing, or failed lookup |
 | `catalog_get_product_by_id` | Single product lookup for server-side revalidation/selectors | Prepared value; returns `null` for invalid or failed lookup |
 | `catalog_get_categories_for_selector` | Bounded category selector list ordered by name and ID | Prepared limit; returns `[]` on failure |
+| `catalog_count_categories` | Category count using optional name/description search | Prepared values; returns `0` on failure |
+| `catalog_get_categories_page` | Bounded category page with `product_count`, search, and deterministic ordering | Prepared values; returns `[]` on failure |
 
 The legacy names `get_products_page`, `count_products`, `get_pos_products`,
 `get_pos_product_by_barcode`, `get_product_by_id`, and
-`get_categories_for_selector` remain in `functions.php` as delegation-only
-compatibility wrappers. Unmigrated callers, including
-`public/stock_movements.php`, continue to use those wrappers.
+`get_categories_for_selector`, `count_categories`, and `get_categories_page`
+remain in `functions.php` as delegation-only compatibility wrappers.
+Unmigrated callers, including `public/stock_movements.php` for product reads,
+continue to use those wrappers. `get_categories()` remains an unbounded
+legacy loader and `get_category_by_id()` remains an uncalled legacy lookup;
+neither was moved without a verified caller.
 
 ## Read-only functions
 
@@ -109,9 +114,11 @@ errors and may depend on `$conn` or session scope.
 ### Reference and staff reads
 
 - `get_staff_members`
-- `get_categories`, `count_categories`, `get_categories_page`,
+- `get_categories` (legacy unbounded loader),
+  `catalog_count_categories` (`count_categories` compatibility wrapper),
+  `catalog_get_categories_page` (`get_categories_page` compatibility wrapper),
   `catalog_get_categories_for_selector` (`get_categories_for_selector` compatibility wrapper),
-  `get_category_by_id`
+  `get_category_by_id` (uncalled legacy lookup)
 - `get_customers`, `count_customers`, `get_customers_page`,
   `get_customers_for_selector`, `get_customer_by_id`
 - `get_suppliers`, `count_suppliers`, `get_suppliers_page`,
@@ -187,11 +194,12 @@ of those invariants.
 The safest remaining candidates are read-side boundaries with existing bounded tests:
 
 1. Customer and supplier paginated reads.
-2. Remaining category list/page reads.
-3. Dashboard read model after current query behavior is characterized.
+2. Dashboard read model after current query behavior is characterized.
 
-Batch 2 completed the Catalog read extraction behind compatibility wrappers. It
-did not include product writes, stock updates, uploads, or orders.
+Batch 3 completed the bounded category count/page extraction behind
+compatibility wrappers. It did not move the unbounded `get_categories()`
+loader or the uncalled `get_category_by_id()` lookup, and it did not include
+category writes, product writes, stock updates, uploads, or orders.
 
 ## Functions that must not move early
 

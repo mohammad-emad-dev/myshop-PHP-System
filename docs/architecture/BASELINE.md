@@ -1,6 +1,6 @@
 # MyShop architecture baseline
 
-Status: Batch 2 catalog read extraction baseline
+Status: Batch 3 catalog category read extraction baseline
 
 Captured from the `security-hardening-baseline` branch at starting revision
 `61e8128a66e0bd98c3bfa5470299c7cad40bcf68`.
@@ -128,8 +128,8 @@ Focused shared modules already extracted from the facade:
 - `includes/export.php`: allow-listed, bounded CSV streaming.
 - `includes/backup.php`: allow-listed, snapshot-based SQL backup streaming.
 - `includes/catalog.php`: read-only product, POS, barcode, product-page, and
-  category-selector queries. The legacy public function names remain thin
-  wrappers in `functions.php`.
+  category-selector, category-count, and category-page queries. The legacy
+  public function names remain thin wrappers in `functions.php`.
 
 ## Public pages and responsibilities
 
@@ -138,7 +138,7 @@ Focused shared modules already extracted from the facade:
 | `public/login.php` | Login, logout, rate-limit interaction, session changes, authentication audit, login view |
 | `public/index.php` | Dashboard authorization, dashboard queries, chart data preparation, dashboard view |
 | `public/products.php` | Product CRUD request dispatch, image upload handling, Catalog search/pagination, product table and forms |
-| `public/categories.php` | Category CRUD request dispatch, admin checks, search/pagination, category view |
+| `public/categories.php` | Category CRUD request dispatch, admin checks, Catalog search/pagination, category view |
 | `public/stock_movements.php` | Manual stock adjustment transaction, movement history filtering/pagination, stock ledger view |
 | `public/orders.php` | POS cart submission, Catalog product/category reads, product revalidation, sale/purchase policy, order creation, POS view and JavaScript |
 | `public/order_history.php` | Scoped order history filters, pagination, summaries, order-history view and interactions |
@@ -174,8 +174,9 @@ Application pages with direct SQL ownership:
 
 Shared modules own most other application SQL:
 
-- `includes/catalog.php`: product/POS/barcode/product-page and category
-  selector reads; `includes/functions.php` retains compatibility wrappers.
+- `includes/catalog.php`: product/POS/barcode/product-page and bounded category
+  count/page/selector reads; `includes/functions.php` retains compatibility
+  wrappers.
 - `includes/functions.php`: legacy full product reads, inventory, order, staff,
   remaining reference-data, and dashboard queries, plus protected mutations.
 - `includes/audit.php:62-300`: audit writes and reads.

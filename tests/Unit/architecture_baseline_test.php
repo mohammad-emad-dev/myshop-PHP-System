@@ -18,6 +18,7 @@ function run_architecture_baseline_unit_tests(): int
     $catalog = file_get_contents($repository . '/includes/catalog.php');
     $security = file_get_contents($repository . '/includes/security.php');
     $orders = file_get_contents($repository . '/public/orders.php');
+    $categories = file_get_contents($repository . '/public/categories.php');
     $products = file_get_contents($repository . '/public/products.php');
     $backup = file_get_contents($repository . '/public/backup_database.php');
     $export = file_get_contents($repository . '/public/export_report.php');
@@ -29,6 +30,7 @@ function run_architecture_baseline_unit_tests(): int
         $catalog,
         $security,
         $orders,
+        $categories,
         $products,
         $backup,
         $export,
@@ -88,6 +90,9 @@ function run_architecture_baseline_unit_tests(): int
     }
     foreach (['catalog_get_pos_products', 'catalog_get_categories_for_selector', 'catalog_get_product_by_id', 'create_order'] as $orderFunction) {
         $tests->assertContains($orderFunction . '(', $orders, 'Orders page dependency contract changed: ' . $orderFunction);
+    }
+    foreach (['catalog_count_categories', 'catalog_get_categories_page', 'create_category', 'update_category', 'delete_category'] as $categoryFunction) {
+        $tests->assertContains($categoryFunction . '(', $categories, 'Categories page dependency contract changed: ' . $categoryFunction);
     }
     $tests->assertContains('catalog_get_pos_product_by_barcode(', file_get_contents($repository . '/public/pos_product_lookup.php'), 'Barcode endpoint dependency contract changed.');
     $tests->assertContains('stream_database_backup(', $backup, 'Backup endpoint must retain the streaming service boundary.');

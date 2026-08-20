@@ -3,8 +3,9 @@
 This inventory records current return and control-flow behavior. Future
 modules must preserve these contracts until callers are migrated deliberately.
 
-Batch 2 places the focused Catalog read implementations in
-`includes/catalog.php`. The legacy names listed below remain available from
+Batch 3 places the bounded Catalog category count/page implementations in
+`includes/catalog.php`; Batch 2 placed the product-side reads there. The
+legacy names listed below remain available from
 `includes/functions.php` as compatibility wrappers, so existing scripts and
 unmigrated pages retain the same return and failure contracts.
 
@@ -21,7 +22,8 @@ callers must not assume the distinction is currently available.
 - `get_stock_movements_page()` — bounded movement page.
 - `get_low_stock_products()` — bounded low-stock array.
 - `get_products_page()` — bounded product page.
-- `get_categories()` and `get_categories_page()` — category arrays.
+- `get_categories()` — complete legacy category array with product counts.
+- `get_categories_page()` — bounded category page with product counts.
 - `get_customers()` and `get_customers_page()` — customer arrays.
 - `get_suppliers()` and `get_suppliers_page()` — supplier arrays.
 - Selector functions — bounded arrays.
@@ -89,9 +91,9 @@ Count and numeric functions use zero for empty results and often also for
 database failure:
 
 - `count_products()`
+- `count_categories()`
 - `count_stock_movements()`
 - `count_orders()`
-- `count_categories()`
 - `count_customers()`
 - `count_suppliers()`
 - `count_audit_logs()`

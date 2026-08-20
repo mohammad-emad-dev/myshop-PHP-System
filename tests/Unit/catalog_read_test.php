@@ -17,10 +17,11 @@ function run_catalog_read_unit_tests(): int
     $module = file_get_contents($repository . '/includes/catalog.php');
     $facade = file_get_contents($repository . '/includes/functions.php');
     $products = file_get_contents($repository . '/public/products.php');
+    $categories = file_get_contents($repository . '/public/categories.php');
     $orders = file_get_contents($repository . '/public/orders.php');
     $lookup = file_get_contents($repository . '/public/pos_product_lookup.php');
 
-    foreach ([$module, $facade, $products, $orders, $lookup] as $fixture) {
+    foreach ([$module, $facade, $products, $categories, $orders, $lookup] as $fixture) {
         $tests->assertTrue(is_string($fixture), 'Catalog extraction source fixture could not be read.');
     }
 
@@ -38,6 +39,8 @@ function run_catalog_read_unit_tests(): int
         'catalog_get_products_page',
         'catalog_get_product_by_id',
         'catalog_get_categories_for_selector',
+        'catalog_count_categories',
+        'catalog_get_categories_page',
     ] as $functionName) {
         $tests->assertContains('function ' . $functionName, $module, 'Catalog read function is missing: ' . $functionName);
     }
@@ -48,6 +51,21 @@ function run_catalog_read_unit_tests(): int
         'catalog_get_categories_for_selector',
     ] as $functionName) {
         $tests->assertContains($functionName . '(', $products, 'Products page was not migrated to the Catalog module: ' . $functionName);
+    }
+    foreach ([
+        'catalog_count_categories',
+        'catalog_get_categories_page',
+    ] as $functionName) {
+        $tests->assertContains($functionName . '(', $categories, 'Categories page was not migrated to the Catalog module: ' . $functionName);
+    }
+    foreach ([
+        '/(?<!catalog_)\\bcount_categories\\s*\\(/',
+        '/(?<!catalog_)\\bget_categories_page\\s*\\(/',
+    ] as $legacyCallPattern) {
+        $tests->assertFalse(
+            preg_match($legacyCallPattern, $categories) === 1,
+            'Categories page still calls a legacy Catalog read function directly.'
+        );
     }
     foreach ([
         'catalog_get_pos_products',
@@ -90,6 +108,8 @@ function run_catalog_read_unit_tests(): int
         'get_products_page' => 'catalog_get_products_page',
         'get_product_by_id' => 'catalog_get_product_by_id',
         'get_categories_for_selector' => 'catalog_get_categories_for_selector',
+        'count_categories' => 'catalog_count_categories',
+        'get_categories_page' => 'catalog_get_categories_page',
     ] as $legacyName => $catalogName) {
         $wrapperPattern = '/function ' . preg_quote($legacyName, '/') . '\\s*\\([^)]*\\)\\s*\\{(?<body>.*?)\\n\\}/s';
         $matched = preg_match($wrapperPattern, $facade, $matches) === 1;
@@ -98,6 +118,13 @@ function run_catalog_read_unit_tests(): int
             $tests->assertContains($catalogName . '(', $matches['body'], 'Compatibility wrapper does not delegate: ' . $legacyName);
             $tests->assertFalse(stripos($matches['body'], 'SELECT ') !== false, 'Compatibility wrapper contains duplicated SQL: ' . $legacyName);
         }
+    }
+
+    foreach ([
+        'function get_categories($conn)',
+        'function get_category_by_id($conn, $id)',
+    ] as $legacyReadFunction) {
+        $tests->assertContains($legacyReadFunction, $facade, 'Uncalled category legacy function changed: ' . $legacyReadFunction);
     }
 
     foreach ([

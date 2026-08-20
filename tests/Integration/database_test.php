@@ -228,7 +228,14 @@ function run_integration_tests(): int
         $tests->assertCount(1, get_products_page($conn, $prefix . '-PAGE-7', '', 10, 0), 'Barcode search did not return one matching product.');
         $tests->assertSame(0, count_products($conn, $prefix . '_DOES_NOT_EXIST', ''), 'Empty product search should return zero results.');
         $tests->assertSame(1, count_categories($conn, $paginationCategoryName), 'Category search count is incorrect.');
-        $tests->assertCount(1, get_categories_page($conn, $paginationCategoryName, 10, 0), 'Category search page is incorrect.');
+        $paginationCategoryRows = get_categories_page($conn, $paginationCategoryName, 10, 0);
+        $tests->assertCount(1, $paginationCategoryRows, 'Category search page is incorrect.');
+        $tests->assertSame(11, (int)$paginationCategoryRows[0]['product_count'], 'Category product count is incorrect.');
+        $categoryRows = get_categories_page($conn, '', 100, 0);
+        $categoryNames = array_map(static fn(array $row): string => (string)$row['name'], $categoryRows);
+        $sortedCategoryNames = $categoryNames;
+        sort($sortedCategoryNames, SORT_NATURAL | SORT_FLAG_CASE);
+        $tests->assertSame($sortedCategoryNames, $categoryNames, 'Categories must be ordered by name.');
         $tests->assertTrue(count(get_categories_page($conn, '', 10, 0)) <= 10, 'Category first page is not bounded.');
         $tests->assertCount(0, get_categories_page($conn, '', 10, 999), 'Empty category page should return an empty list.');
         $tests->assertCount(0, get_categories_page($conn, $prefix . '_MISSING_CATEGORY', 10, 0), 'Empty category search should return zero results.');
