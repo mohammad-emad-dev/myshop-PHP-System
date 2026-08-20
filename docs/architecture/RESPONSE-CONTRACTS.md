@@ -21,6 +21,24 @@ wrapper while the public POS page calls the focused service directly. Batch 8C
 places bounded and scoped order reads in the same module, and Batch 8D migrates
 the order-history, order-detail, and invoice pages to those focused services.
 
+## Focused Dashboard statistics contract
+
+`dashboard_get_stats($conn, $staff_id = null)` accepts the database connection
+and optional staff scope explicitly and returns the fixed associative keys
+`total_products`, `total_orders`, `total_sales`, and `total_stock`. Product and
+stock totals remain global. With a null scope, order count and sale-only revenue
+are global; with a staff ID, those two values are scoped to that staff member.
+Purchases are excluded from `total_sales`, and numeric types remain integer for
+counts/stock and float for sales.
+
+The service catches database/query failures, logs only the existing server-side
+diagnostic, and returns the documented zero defaults without exposing database
+details. It does not read session or global state. `public/index.php` calls the
+focused service directly after its existing authentication and authorization
+scope decision. `get_dashboard_stats()` remains a delegation-only compatibility
+wrapper in `includes/functions.php` with its original signature and return
+contract.
+
 ## Focused Product mutation contracts
 
 The focused product services accept explicit database and actor dependencies
@@ -123,7 +141,9 @@ callers must not assume the distinction is currently available.
   return an empty array.
 - `get_order_summary()` — summary associative array with numeric defaults on
   failure.
-- `get_dashboard_stats()` — default statistics array on query failure.
+- `dashboard_get_stats()` / `get_dashboard_stats()` — fixed dashboard KPI
+  array with zero defaults on query failure; the legacy name is a compatibility
+  wrapper.
 - `get_chart_data()` — padded chart array with zero values on failure.
 - `get_top_selling_products()` and `get_category_sales_distribution()` —
   report arrays.
@@ -196,8 +216,8 @@ extracting modules unless callers are migrated and tested together.
 
 ## Default-value returns
 
-- `get_dashboard_stats()` returns zeroed KPI values when one or more queries
-  fail.
+- `dashboard_get_stats()` and its `get_dashboard_stats()` compatibility wrapper
+  return zeroed KPI values when one or more queries fail.
 - `get_chart_data()` returns a complete date range padded with zero values when
   the query fails.
 - `get_order_summary()` returns default numeric summary fields on failure.

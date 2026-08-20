@@ -1,7 +1,7 @@
 # MyShop dependency map
 
 This map records current call-site and dependency relationships after the
-Batch 8A order-creation service extraction. It remains a
+Phase 3B dashboard statistics service extraction. It remains a
 characterization artifact; the compatibility wrappers are still required.
 
 ## Public-page to shared-function map
@@ -18,7 +18,7 @@ names are grouped only for readability; the source remains the authority.
 | `export_report.php` | `start_secure_session`, `verify_login`, `require_admin`, `export_report_definitions`, `export_validate_entity`, `export_validate_order_filters`, `export_csv_text`, `export_csv_write_row`, `export_csv_fail`, `export_stream_entity` |
 | `get_order_details.php` | `start_secure_session`, `verify_login`, `is_admin`, `orders_get_by_id`, `orders_get_details`, `audit_log_current_actor` |
 | `health.php` | `initialize_request_context` |
-| `index.php` | `start_secure_session`, `verify_login`, `is_admin`, `get_dashboard_stats`, `get_chart_data`, `get_inventory_valuation`, `get_top_selling_products`, `get_category_sales_distribution`, `get_low_stock_products` |
+| `index.php` | `start_secure_session`, `verify_login`, `is_admin`, `dashboard_get_stats`, `get_chart_data`, `get_inventory_valuation`, `get_top_selling_products`, `get_category_sales_distribution`, `get_low_stock_products` |
 | `login.php` | `start_secure_session`, `send_security_headers`, `verify_csrf_token`, `get_login_source_ip`, `build_login_rate_limit_key`, `login_rate_limit_check`, `login_rate_limit_record_failure`, `login_rate_limit_reset`, `audit_log`, `audit_log_current_actor`, `destroy_current_session`, `generate_csrf_token`, `redirect`, `verify_login`, `get_asset_integrity` |
 | `order_history.php` | `start_secure_session`, `verify_login`, `is_admin`, `sanitize_input`, `normalize_page_number`, `normalize_page_size`, `orders_count`, `orders_get_summary`, `orders_get_page` |
 | `orders.php` | `start_secure_session`, `verify_login`, `is_admin`, `verify_csrf_token`, `generate_csrf_token`, `truncate_list_search`, `catalog_get_pos_products`, `catalog_get_categories_for_selector`, `people_get_customers_for_selector`, `people_get_suppliers_for_selector`, `catalog_get_product_by_id`, `orders_create`, `audit_log_current_actor`, `audit_log_denied` |
@@ -153,6 +153,22 @@ The five legacy names remain delegation-only wrappers in `functions.php` for
 remaining callers and compatibility tests. `get_orders()` and
 `get_orders_for_staff()` remain unbounded legacy loaders and were not extracted.
 
+## Dashboard module boundary
+
+`includes/dashboard.php` has no dependency on `includes/functions.php`. It
+accepts the database connection and optional staff scope explicitly, reads no
+session or global state, and owns only the bounded dashboard KPI aggregation.
+
+| Focused function | Read behavior | Return contract |
+|---|---|---|
+| `dashboard_get_stats` | Global Product count and stock totals; global or optional staff-scoped Order count and sale-only totals | Fixed associative array with `total_products`, `total_orders`, `total_sales`, and `total_stock`; numeric zero defaults on query or connection failure |
+
+`public/index.php` calls `dashboard_get_stats()` directly after its existing
+authentication and authorization scope decision. The legacy
+`get_dashboard_stats()` name remains a delegation-only compatibility wrapper
+in `functions.php`; chart and other dashboard/report reads remain in the
+facade and were not moved in this batch.
+
 ## Inventory module boundary
 
 `includes/inventory.php` has no dependency on `includes/functions.php`. It
@@ -237,7 +253,7 @@ errors and may depend on `$conn` or session scope.
 - `orders_get_by_id` (`get_order_by_id` compatibility wrapper)
 - `orders_get_details` (`get_order_details` compatibility wrapper)
 - `get_orders` and `get_orders_for_staff` (legacy unbounded loaders)
-- `get_dashboard_stats`
+- `dashboard_get_stats` (`get_dashboard_stats` compatibility wrapper)
 - `get_chart_data`
 - `get_inventory_valuation`
 - `get_top_selling_products`
@@ -338,8 +354,10 @@ the compatibility wrapper remains available for un-migrated callers and tests.
 
 ## Safe remaining extraction candidates
 
-The safest remaining candidate is the dashboard read model after its current
-query and default-value behavior is characterized.
+Dashboard KPI aggregation is now extracted and characterized in
+`includes/dashboard.php`. Remaining dashboard/report functions, including
+chart data, inventory valuation, and product/category sales aggregates, remain
+in the facade and require separate caller and contract audits before any move.
 
 Batch 6A moved only active-session verification, the administrator role check,
 the administrator denial path, and redirect implementation behind wrappers. It
