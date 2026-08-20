@@ -934,76 +934,7 @@ function delete_newly_uploaded_image($relative_path)
  */
 function get_chart_data($conn, $days = 7, $staff_id = null)
 {
-    $days = max(1, min((int)$days, 31));
-    $data = [];
-    
-    // Generate empty values for the last N days to ensure complete timeline
-    for ($i = $days - 1; $i >= 0; $i--) {
-        $date = date('Y-m-d', strtotime("-$i days"));
-        $data[$date] = [
-            'label' => date('M d', strtotime($date)),
-            'sales' => 0.0,
-            'purchases' => 0.0
-        ];
-    }
-    
-    // Fetch aggregated daily sales and purchases
-    $query = "SELECT DATE(order_date) as order_day, order_type, SUM(total_amount) as total 
-              FROM `Order` 
-              WHERE order_date >= DATE_SUB(CURDATE(), INTERVAL ? DAY)";
-    if ($staff_id !== null) {
-        $query .= " AND staff_id = ?";
-    }
-    $query .= " GROUP BY DATE(order_date), order_type
-                ORDER BY DATE(order_date) ASC";
-              
-    $stmt = null;
-    try {
-        $stmt = $conn->prepare($query);
-        if (!$stmt) {
-            error_log('Chart data prepare failed: ' . $conn->error);
-            return array_values($data);
-        }
-        if ($staff_id === null) {
-            if (!$stmt->bind_param('i', $days)) {
-                error_log('Chart data bind failed: ' . $stmt->error);
-                return array_values($data);
-            }
-        } else {
-            $staff_id = (int)$staff_id;
-            if (!$stmt->bind_param('ii', $days, $staff_id)) {
-                error_log('Scoped chart data bind failed: ' . $stmt->error);
-                return array_values($data);
-            }
-        }
-        if (!$stmt->execute()) {
-            error_log('Chart data execute failed: ' . $stmt->error);
-            return array_values($data);
-        }
-        $result = $stmt->get_result();
-        if (!$result) {
-            error_log('Chart data result failed: ' . $stmt->error);
-            return array_values($data);
-        }
-        while ($row = $result->fetch_assoc()) {
-            $day = $row['order_day'];
-            if (isset($data[$day])) {
-                if ($row['order_type'] === 'sale') {
-                    $data[$day]['sales'] = floatval($row['total']);
-                } else if ($row['order_type'] === 'purchase') {
-                    $data[$day]['purchases'] = floatval($row['total']);
-                }
-            }
-        }
-    } catch (Throwable $exception) {
-        error_log('Chart data query failed: ' . $exception->getMessage());
-    } finally {
-        if ($stmt instanceof mysqli_stmt) {
-            $stmt->close();
-        }
-    }
-    
-    return array_values($data);
+    return dashboard_get_chart_data($conn, $days, $staff_id);
 }
 
 /**

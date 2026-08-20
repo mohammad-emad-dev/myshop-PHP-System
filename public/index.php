@@ -22,7 +22,7 @@ $dashboard_staff_id = auth_is_admin($conn) ? null : (int)$_SESSION['staff_id'];
  * DATA LAYER — Fetch all analytics in one pass.
  * ────────────────────────────────────────────── */
 $stats               = dashboard_get_stats($conn, $dashboard_staff_id);
-$chart_data           = get_chart_data($conn, 7, $dashboard_staff_id);
+$chart_data           = dashboard_get_chart_data($conn, 7, $dashboard_staff_id);
 $inventory_valuation  = get_inventory_valuation($conn);
 $top_selling_products = get_top_selling_products($conn, 5, $dashboard_staff_id);
 $category_sales       = get_category_sales_distribution($conn, $dashboard_staff_id);

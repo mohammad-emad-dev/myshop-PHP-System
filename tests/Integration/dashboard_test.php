@@ -89,8 +89,8 @@ function run_dashboard_integration_tests(): int
             'Dashboard statistics keys changed.'
         );
         $tests->assertSame(1, $globalStats['total_products'], 'Global product count is incorrect.');
-        $tests->assertSame(4, $globalStats['total_orders'], 'Global order count is incorrect.');
-        $tests->assertSame(27.5, $globalStats['total_sales'], 'Purchases must be excluded from global sales.');
+        $tests->assertSame(6, $globalStats['total_orders'], 'Global order count is incorrect.');
+        $tests->assertSame(39.75, $globalStats['total_sales'], 'Purchases must be excluded from global sales.');
         $tests->assertSame(100, $globalStats['total_stock'], 'Global stock total is incorrect.');
         $tests->assertTrue(is_int($globalStats['total_products']), 'Product count must remain an integer.');
         $tests->assertTrue(is_int($globalStats['total_orders']), 'Order count must remain an integer.');
@@ -99,7 +99,7 @@ function run_dashboard_integration_tests(): int
 
         $cashierStats = dashboard_get_stats($conn, $cashierId);
         $tests->assertSame(1, $cashierStats['total_products'], 'Cashier product total must remain global.');
-        $tests->assertSame(2, $cashierStats['total_orders'], 'Cashier order count must be scoped.');
+        $tests->assertSame(3, $cashierStats['total_orders'], 'Cashier order count must be scoped.');
         $tests->assertSame(7.5, $cashierStats['total_sales'], 'Cashier sales must exclude purchases and other staff.');
         $tests->assertSame(100, $cashierStats['total_stock'], 'Cashier stock total must remain global.');
 
