@@ -3,7 +3,7 @@ require_once '../includes/functions.php';
 start_secure_session();
 require_once '../config/db.php';
 
-verify_login();
+auth_verify_login($conn);
 
 $staff_id = $_SESSION['staff_id'];
 $success = '';
@@ -54,7 +54,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $action = $_POST['action'] ?? 'update_profile';
         // All Staff table mutations are administrator-only. Cashiers may log in
         // and use the POS, but cannot change staff records, including profiles.
-        require_admin();
+        auth_require_admin($conn);
 
         if ($action === 'update_profile') {
             $full_name = sanitize_input($_POST['full_name']);
@@ -327,7 +327,7 @@ require_once '../includes/layouts/header.php';
             </div>
         </div>
 
-        <?php if (is_admin()): ?>
+<?php if (auth_is_admin($conn)): ?>
         <!-- Manage Staff accounts panel -->
         <div class="row my-4 justify-content-center">
             <div class="col-lg-10 col-md-12">

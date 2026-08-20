@@ -177,6 +177,90 @@ function test_run_orders_page_request(
     ];
 }
 
+function test_run_settings_page_request(
+    string $repository,
+    int $staffId,
+    string $action,
+    array $fields,
+    bool $validCsrf
+): array {
+    $functionsPath = $repository . '/includes/functions.php';
+    $pagePath = $repository . '/public/settings.php';
+    $csrfExpression = $validCsrf
+        ? 'generate_csrf_token()'
+        : var_export('invalid-settings-csrf-token', true);
+    $postFields = array_merge(['action' => $action], $fields);
+    $postExpression = var_export($postFields, true);
+    $script = '$_SERVER[\'REQUEST_METHOD\'] = \'POST\';'
+        . '$_SERVER[\'REQUEST_URI\'] = \'/settings.php\';'
+        . '$_SERVER[\'SCRIPT_NAME\'] = \'/settings.php\';'
+        . '$_SERVER[\'REMOTE_ADDR\'] = \'127.0.0.1\';'
+        . 'require ' . var_export($functionsPath, true) . ';'
+        . 'start_secure_session();'
+        . '$_SESSION = [\'staff_id\' => ' . $staffId . '];'
+        . '$settingsPageCsrfToken = ' . $csrfExpression . ';'
+        . '$_POST = ' . $postExpression . ';'
+        . '$_POST[\'csrf_token\'] = $settingsPageCsrfToken;'
+        . '$settingsPageMarkerWritten = false;'
+        . 'register_shutdown_function(static function () use (&$settingsPageMarkerWritten): void {'
+        . 'if ($settingsPageMarkerWritten) { return; }'
+        . '$settingsPageStatus = http_response_code();'
+        . 'echo \'RESULT_STATUS=\' . ($settingsPageStatus === false ? \'default\' : (string)$settingsPageStatus);'
+        . '});'
+        . 'ob_start();'
+        . 'require ' . var_export($pagePath, true) . ';'
+        . 'ob_end_clean();'
+        . '$settingsPageMarkerWritten = true;'
+        . '$settingsPageStatus = http_response_code();'
+        . 'echo \'RESULT_STATUS=\' . ($settingsPageStatus === false ? \'default\' : (string)$settingsPageStatus);';
+
+    $descriptors = [
+        0 => ['pipe', 'r'],
+        1 => ['pipe', 'w'],
+        2 => ['pipe', 'w'],
+    ];
+    $process = proc_open(
+        [PHP_BINARY, '-d', 'display_errors=1', '-d', 'log_errors=0', '-r', $script],
+        $descriptors,
+        $pipes,
+        $repository . '/public'
+    );
+    if (!is_resource($process)) {
+        throw new TestFailure('Settings page subprocess could not start.');
+    }
+
+    fclose($pipes[0]);
+    $stdout = stream_get_contents($pipes[1]);
+    fclose($pipes[1]);
+    $stderr = stream_get_contents($pipes[2]);
+    fclose($pipes[2]);
+    $exitCode = proc_close($process);
+    $output = (string)$stdout . (string)$stderr;
+
+    if ($exitCode !== 0) {
+        $diagnostics = [];
+        foreach (preg_split('/\R/', $output) ?: [] as $line) {
+            if (preg_match('/(?:Warning|Notice|Fatal error|Parse error|Uncaught)/i', $line) !== 1) {
+                continue;
+            }
+            $line = preg_replace('/(?i)(password|secret|token|cookie|authorization)[^\r\n]*/', '$1=[redacted]', $line);
+            $diagnostics[] = substr((string)$line, 0, 400);
+        }
+        throw new TestFailure(
+            'Settings page subprocess failed: ' . substr(implode(' | ', $diagnostics), 0, 800)
+        );
+    }
+
+    if (preg_match('/RESULT_STATUS=(default|[0-9]+)/', $output, $matches) !== 1) {
+        throw new TestFailure('Settings page subprocess did not return a safe status marker.');
+    }
+
+    return [
+        'status' => $matches[1],
+        'output' => $output,
+    ];
+}
+
 function run_integration_tests(): int
 {
     $tests = new TestContext();
@@ -332,6 +416,251 @@ function run_integration_tests(): int
         } else {
             unset($GLOBALS['conn']);
         }
+
+        $settingsBefore = test_fetch_one(
+            $conn,
+            'SELECT username, full_name, password FROM Staff WHERE id = ?',
+            'i',
+            [$adminId]
+        );
+        $settingsWrongPassword = test_run_settings_page_request(
+            dirname(__DIR__, 2),
+            $adminId,
+            'update_profile',
+            [
+                'full_name' => $prefix . '_WRONG_PASSWORD',
+                'username' => $settingsBefore['username'],
+                'current_password' => $prefix . '_WRONG_CURRENT_PASSWORD',
+                'new_password' => '',
+                'confirm_password' => '',
+            ],
+            true
+        );
+        $tests->assertSame('default', $settingsWrongPassword['status'], 'Incorrect settings reauthentication should retain the normal response status.');
+        $settingsAfterWrongPassword = test_fetch_one($conn, 'SELECT username, full_name FROM Staff WHERE id = ?', 'i', [$adminId]);
+        $tests->assertSame($settingsBefore['username'], $settingsAfterWrongPassword['username'], 'Incorrect current password changed the profile username.');
+        $tests->assertSame($settingsBefore['full_name'], $settingsAfterWrongPassword['full_name'], 'Incorrect current password changed the profile name.');
+
+        $settingsPolicyRequest = test_run_settings_page_request(
+            dirname(__DIR__, 2),
+            $adminId,
+            'update_profile',
+            [
+                'full_name' => $prefix . '_POLICY',
+                'username' => $settingsBefore['username'],
+                'current_password' => $adminPassword,
+                'new_password' => 'short',
+                'confirm_password' => 'short',
+            ],
+            true
+        );
+        $tests->assertSame('400', $settingsPolicyRequest['status'], 'Invalid profile password policy must retain HTTP 400.');
+        $settingsAfterPolicy = test_fetch_one($conn, 'SELECT username, full_name FROM Staff WHERE id = ?', 'i', [$adminId]);
+        $tests->assertSame($settingsBefore['full_name'], $settingsAfterPolicy['full_name'], 'Password policy rejection changed the profile.');
+
+        $settingsRollbackRequest = test_run_settings_page_request(
+            dirname(__DIR__, 2),
+            $adminId,
+            'update_profile',
+            [
+                'full_name' => $prefix . '_ROLLBACK',
+                'username' => $settingsBefore['username'],
+                'current_password' => $adminPassword,
+                'new_password' => $prefix . '_VALID_NEW_PASSWORD',
+                'confirm_password' => $prefix . '_MISMATCHED_PASSWORD',
+            ],
+            true
+        );
+        $tests->assertSame('default', $settingsRollbackRequest['status'], 'Profile transaction failure must retain the generic response status.');
+        $settingsAfterRollback = test_fetch_one($conn, 'SELECT username, full_name, password FROM Staff WHERE id = ?', 'i', [$adminId]);
+        $tests->assertSame($settingsBefore['username'], $settingsAfterRollback['username'], 'Profile rollback changed the username.');
+        $tests->assertSame($settingsBefore['full_name'], $settingsAfterRollback['full_name'], 'Profile rollback changed the full name.');
+        $tests->assertSame($settingsBefore['password'], $settingsAfterRollback['password'], 'Profile rollback changed the password hash.');
+
+        $settingsCsrfRequest = test_run_settings_page_request(
+            dirname(__DIR__, 2),
+            $adminId,
+            'update_profile',
+            [
+                'full_name' => $prefix . '_INVALID_CSRF',
+                'username' => $settingsBefore['username'],
+                'current_password' => $adminPassword,
+                'new_password' => '',
+                'confirm_password' => '',
+            ],
+            false
+        );
+        $tests->assertSame('403', $settingsCsrfRequest['status'], 'Invalid settings CSRF must remain denied with HTTP 403.');
+        $settingsAfterCsrf = test_fetch_one($conn, 'SELECT username, full_name FROM Staff WHERE id = ?', 'i', [$adminId]);
+        $tests->assertSame($settingsBefore['full_name'], $settingsAfterCsrf['full_name'], 'Invalid settings CSRF changed the profile.');
+
+        $cashierSettingsRequest = test_run_settings_page_request(
+            dirname(__DIR__, 2),
+            $cashierId,
+            'update_profile',
+            [
+                'full_name' => $prefix . '_CASHIER_MUTATION',
+                'username' => $cashierUsername,
+                'current_password' => $cashierPassword,
+                'new_password' => '',
+                'confirm_password' => '',
+            ],
+            true
+        );
+        $tests->assertSame('403', $cashierSettingsRequest['status'], 'Cashier settings mutations must remain denied with HTTP 403.');
+        $cashierAfterSettings = test_fetch_one($conn, 'SELECT full_name FROM Staff WHERE id = ?', 'i', [$cashierId]);
+        $tests->assertSame($prefix . ' Cashier', $cashierAfterSettings['full_name'], 'Cashier settings denial changed the cashier profile.');
+
+        $settingsSuccessFullName = $prefix . '_PROFILE_UPDATED';
+        $settingsSuccessRequest = test_run_settings_page_request(
+            dirname(__DIR__, 2),
+            $adminId,
+            'update_profile',
+            [
+                'full_name' => $settingsSuccessFullName,
+                'username' => $settingsBefore['username'],
+                'current_password' => $adminPassword,
+                'new_password' => '',
+                'confirm_password' => '',
+            ],
+            true
+        );
+        $tests->assertSame('default', $settingsSuccessRequest['status'], 'Valid profile reauthentication should retain the normal response status.');
+        $settingsAfterSuccess = test_fetch_one($conn, 'SELECT full_name, password FROM Staff WHERE id = ?', 'i', [$adminId]);
+        $tests->assertSame($settingsSuccessFullName, $settingsAfterSuccess['full_name'], 'Valid profile update did not persist the full name.');
+        $tests->assertSame($settingsBefore['password'], $settingsAfterSuccess['password'], 'A profile update without a new password changed the password hash.');
+
+        $settingsPolicyStaffUsername = $prefix . '_POLICY_STAFF';
+        $settingsPolicyStaffRequest = test_run_settings_page_request(
+            dirname(__DIR__, 2),
+            $adminId,
+            'create_staff',
+            [
+                'staff_username' => $settingsPolicyStaffUsername,
+                'staff_full_name' => 'Policy Staff',
+                'staff_role' => 'cashier',
+                'staff_password' => 'short',
+            ],
+            true
+        );
+        $tests->assertSame('400', $settingsPolicyStaffRequest['status'], 'Staff password policy rejection must retain HTTP 400.');
+        $tests->assertSame(null, test_scalar($conn, 'SELECT id FROM Staff WHERE username = ?', 's', [$settingsPolicyStaffUsername]), 'Rejected staff password policy created an account.');
+
+        $settingsDeniedStaffUsername = $prefix . '_CASHIER_STAFF';
+        $settingsDeniedStaffRequest = test_run_settings_page_request(
+            dirname(__DIR__, 2),
+            $cashierId,
+            'create_staff',
+            [
+                'staff_username' => $settingsDeniedStaffUsername,
+                'staff_full_name' => 'Denied Staff',
+                'staff_role' => 'cashier',
+                'staff_password' => $prefix . '_DENIED_STAFF_PASSWORD',
+            ],
+            true
+        );
+        $tests->assertSame('403', $settingsDeniedStaffRequest['status'], 'Cashier staff creation must remain denied with HTTP 403.');
+        $tests->assertSame(null, test_scalar($conn, 'SELECT id FROM Staff WHERE username = ?', 's', [$settingsDeniedStaffUsername]), 'Cashier staff denial created an account.');
+
+        $settingsStaffUsername = $prefix . '_PAGE_STAFF';
+        $settingsStaffPassword = $prefix . '_PAGE_STAFF_PASSWORD';
+        $settingsCreateRequest = test_run_settings_page_request(
+            dirname(__DIR__, 2),
+            $adminId,
+            'create_staff',
+            [
+                'staff_username' => $settingsStaffUsername,
+                'staff_full_name' => 'Page Staff',
+                'staff_role' => 'cashier',
+                'staff_password' => $settingsStaffPassword,
+            ],
+            true
+        );
+        $tests->assertSame('default', $settingsCreateRequest['status'], 'Admin staff creation should retain the normal response status.');
+        $settingsStaffId = (int)test_scalar($conn, 'SELECT id FROM Staff WHERE username = ?', 's', [$settingsStaffUsername]);
+        $tests->assertTrue($settingsStaffId > 0, 'Admin staff creation did not persist the account.');
+        $settingsCreatedStaff = test_fetch_one($conn, 'SELECT full_name, role, is_active, password FROM Staff WHERE id = ?', 'i', [$settingsStaffId]);
+        $tests->assertSame('cashier', $settingsCreatedStaff['role'], 'Admin staff creation changed the requested role.');
+        $tests->assertTrue(password_verify($settingsStaffPassword, $settingsCreatedStaff['password']), 'Admin staff creation did not preserve password hashing.');
+
+        $settingsUpdatedStaffUsername = $prefix . '_PAGE_STAFF_UPDATED';
+        $settingsUpdateRequest = test_run_settings_page_request(
+            dirname(__DIR__, 2),
+            $adminId,
+            'update_staff',
+            [
+                'staff_id' => $settingsStaffId,
+                'staff_username' => $settingsUpdatedStaffUsername,
+                'staff_full_name' => 'Page Staff Updated',
+                'staff_role' => 'cashier',
+                'staff_password' => '',
+            ],
+            true
+        );
+        $tests->assertSame('default', $settingsUpdateRequest['status'], 'Admin staff update should retain the normal response status.');
+        $settingsUpdatedStaff = test_fetch_one($conn, 'SELECT username, full_name, role FROM Staff WHERE id = ?', 'i', [$settingsStaffId]);
+        $tests->assertSame($settingsUpdatedStaffUsername, $settingsUpdatedStaff['username'], 'Admin staff update did not persist the username.');
+        $tests->assertSame('Page Staff Updated', $settingsUpdatedStaff['full_name'], 'Admin staff update did not persist the full name.');
+        $tests->assertSame('cashier', $settingsUpdatedStaff['role'], 'Admin staff update changed the role unexpectedly.');
+
+        $settingsDisableRequest = test_run_settings_page_request(
+            dirname(__DIR__, 2),
+            $adminId,
+            'set_staff_active',
+            ['staff_id' => $settingsStaffId, 'is_active' => 0],
+            true
+        );
+        $tests->assertSame('default', $settingsDisableRequest['status'], 'Admin staff deactivation should retain the normal response status.');
+        $tests->assertSame(0, (int)test_scalar($conn, 'SELECT is_active FROM Staff WHERE id = ?', 'i', [$settingsStaffId]), 'Admin staff deactivation did not persist.');
+        $settingsEnableRequest = test_run_settings_page_request(
+            dirname(__DIR__, 2),
+            $adminId,
+            'set_staff_active',
+            ['staff_id' => $settingsStaffId, 'is_active' => 1],
+            true
+        );
+        $tests->assertSame('default', $settingsEnableRequest['status'], 'Admin staff activation should retain the normal response status.');
+        $tests->assertSame(1, (int)test_scalar($conn, 'SELECT is_active FROM Staff WHERE id = ?', 'i', [$settingsStaffId]), 'Admin staff activation did not persist.');
+
+        $settingsSelfDeactivateRequest = test_run_settings_page_request(
+            dirname(__DIR__, 2),
+            $adminId,
+            'delete_staff',
+            ['staff_id' => $adminId],
+            true
+        );
+        $tests->assertSame('default', $settingsSelfDeactivateRequest['status'], 'Self-deactivation must retain the normal response status.');
+        $tests->assertSame(1, (int)test_scalar($conn, 'SELECT is_active FROM Staff WHERE id = ?', 'i', [$adminId]), 'Self-deactivation changed the administrator state.');
+
+        $settingsDeleteRequest = test_run_settings_page_request(
+            dirname(__DIR__, 2),
+            $adminId,
+            'delete_staff',
+            ['staff_id' => $settingsStaffId],
+            true
+        );
+        $tests->assertSame('default', $settingsDeleteRequest['status'], 'Admin staff deactivation should retain the normal response status.');
+        $tests->assertSame(0, (int)test_scalar($conn, 'SELECT is_active FROM Staff WHERE id = ?', 'i', [$settingsStaffId]), 'Admin staff deactivation did not persist through the page.');
+
+        $soleAdminPeerUsername = $prefix . '_SOLE_ADMIN_PEER';
+        $soleAdminPeerPassword = $prefix . '_SOLE_ADMIN_PASSWORD';
+        $tests->assertTrue(
+            create_staff_member($conn, $soleAdminPeerUsername, $soleAdminPeerPassword, 'Sole Admin Peer', 'admin'),
+            'Disposable settings fixture could not create a second administrator.'
+        );
+        $soleAdminPeerId = (int)test_scalar(
+            $conn,
+            "SELECT id FROM Staff WHERE role = 'admin' AND is_active = 1 AND id <> ? LIMIT 1",
+            'i',
+            [$adminId]
+        );
+        $tests->assertTrue($soleAdminPeerId > 0, 'Disposable settings fixture requires a second administrator.');
+        test_execute($schema, 'UPDATE Staff SET is_active = 0 WHERE id = ?', 'i', [$soleAdminPeerId]);
+        $tests->assertFalse(
+            update_staff_member($conn, $adminId, (string)$settingsBefore['username'], $settingsSuccessFullName, 'cashier'),
+            'The sole active administrator must not be demoted.'
+        );
+        $tests->assertSame('admin', test_scalar($conn, 'SELECT role FROM Staff WHERE id = ?', 'i', [$adminId]), 'Sole-admin demotion protection changed the role.');
 
         $customerName = $prefix . '_CUSTOMER';
         $supplierName = $prefix . '_SUPPLIER';

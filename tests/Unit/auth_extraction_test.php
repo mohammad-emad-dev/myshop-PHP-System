@@ -391,7 +391,6 @@ function run_auth_extraction_unit_tests(): int
 
     foreach ([
         'public/login.php' => 'verify_login(false)',
-        'public/settings.php' => 'verify_login();',
         'public/backup_database.php' => 'verify_login(false)',
         'includes/layouts/sidebar.php' => 'is_admin()',
     ] as $relativePath => $legacyCall) {
