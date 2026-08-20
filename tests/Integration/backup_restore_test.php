@@ -5,6 +5,88 @@ declare(strict_types=1);
 require_once __DIR__ . '/../bootstrap.php';
 require_once dirname(__DIR__, 2) . '/includes/backup.php';
 
+function test_run_backup_page_request(
+    string $repository,
+    int $staffId,
+    string $currentPassword,
+    bool $validCsrf
+): array {
+    $functionsPath = $repository . '/includes/functions.php';
+    $pagePath = $repository . '/public/backup_database.php';
+    $csrfExpression = $validCsrf
+        ? 'generate_csrf_token()'
+        : var_export('invalid-backup-csrf-token', true);
+    $script = '$_SERVER[\'REQUEST_METHOD\'] = \'POST\';'
+        . '$_SERVER[\'REQUEST_URI\'] = \'/backup_database.php\';'
+        . '$_SERVER[\'SCRIPT_NAME\'] = \'/backup_database.php\';'
+        . '$_SERVER[\'REMOTE_ADDR\'] = \'127.0.0.1\';'
+        . 'require ' . var_export($functionsPath, true) . ';'
+        . 'start_secure_session();'
+        . '$_SESSION = [\'staff_id\' => ' . $staffId . '];'
+        . '$backupPageCsrfToken = ' . $csrfExpression . ';'
+        . '$_POST = [\'csrf_token\' => $backupPageCsrfToken, \'current_password\' => '
+        . var_export($currentPassword, true) . '];'
+        . '$backupPageMarkerWritten = false;'
+        . 'register_shutdown_function(static function () use (&$backupPageMarkerWritten): void {'
+        . 'if ($backupPageMarkerWritten) { return; }'
+        . '$backupPageStatus = http_response_code();'
+        . 'echo "\\nRESULT_STATUS=" . ($backupPageStatus === false ? "default" : (string)$backupPageStatus);'
+        . '});'
+        . 'ob_start();'
+        . 'require ' . var_export($pagePath, true) . ';'
+        . 'ob_end_clean();'
+        . '$backupPageMarkerWritten = true;'
+        . '$backupPageStatus = http_response_code();'
+        . 'echo "RESULT_STATUS=" . ($backupPageStatus === false ? "default" : (string)$backupPageStatus);';
+
+    $descriptors = [
+        0 => ['pipe', 'r'],
+        1 => ['pipe', 'w'],
+        2 => ['pipe', 'w'],
+    ];
+    $process = proc_open(
+        [PHP_BINARY, '-d', 'display_errors=1', '-d', 'log_errors=0', '-r', $script],
+        $descriptors,
+        $pipes,
+        $repository . '/public'
+    );
+    if (!is_resource($process)) {
+        throw new TestFailure('Backup page subprocess could not start.');
+    }
+
+    fclose($pipes[0]);
+    $stdout = stream_get_contents($pipes[1]);
+    fclose($pipes[1]);
+    $stderr = stream_get_contents($pipes[2]);
+    fclose($pipes[2]);
+    $exitCode = proc_close($process);
+    $responseBody = (string)$stdout;
+    $diagnosticOutput = $responseBody . (string)$stderr;
+
+    if ($exitCode !== 0) {
+        $diagnostics = [];
+        foreach (preg_split('/\R/', $diagnosticOutput) ?: [] as $line) {
+            if (preg_match('/(?:Warning|Notice|Fatal error|Parse error|Uncaught)/i', $line) !== 1) {
+                continue;
+            }
+            $line = preg_replace('/(?i)(password|secret|token|cookie|authorization)[^\r\n]*/', '$1=[redacted]', $line);
+            $diagnostics[] = substr((string)$line, 0, 400);
+        }
+        throw new TestFailure(
+            'Backup page subprocess failed: ' . substr(implode(' | ', $diagnostics), 0, 800)
+        );
+    }
+
+    if (preg_match('/RESULT_STATUS=(default|[0-9]+)/', $responseBody, $matches) !== 1) {
+        throw new TestFailure('Backup page subprocess did not return a safe status marker.');
+    }
+
+    return [
+        'status' => $matches[1],
+        'output' => $responseBody,
+    ];
+}
+
 /**
  * Verify the application backup format against two disposable databases.
  * This test never selects DB_NAME/ioms_db and never writes a backup artifact
@@ -42,13 +124,23 @@ function run_backup_restore_tests(): int
         $adminUsername = 'QA_BATCH23_ADMIN_' . strtoupper(bin2hex(random_bytes(4)));
         $adminPassword = bin2hex(random_bytes(24));
         $adminHash = password_hash($adminPassword, PASSWORD_DEFAULT);
+        $cashierUsername = 'QA_BATCH23_CASHIER_' . strtoupper(bin2hex(random_bytes(4)));
+        $cashierPassword = bin2hex(random_bytes(24));
         test_execute(
             $sourceSchema,
             'INSERT INTO Staff (username, password, full_name, role, is_active) VALUES (?, ?, ?, ?, ?)',
             'ssssi',
             [$adminUsername, $adminHash, 'Batch 23 Backup Admin', 'admin', 1]
         );
+        test_execute(
+            $sourceSchema,
+            'INSERT INTO Staff (username, password, full_name, role, is_active) VALUES (?, ?, ?, ?, ?)',
+            'ssssi',
+            [$cashierUsername, password_hash($cashierPassword, PASSWORD_DEFAULT), 'Batch 23 Backup Cashier', 'cashier', 1]
+        );
         $adminId = (int)test_scalar($sourceConnection, 'SELECT id FROM Staff WHERE username = ?', 's', [$adminUsername]);
+        $cashierId = (int)test_scalar($sourceConnection, 'SELECT id FROM Staff WHERE username = ?', 's', [$cashierUsername]);
+        $tests->assertTrue($adminId > 0 && $cashierId > 0, 'Backup page staff fixtures were not created.');
 
         $customerName = 'QA_BATCH23_CUSTOMER_' . strtoupper(bin2hex(random_bytes(3))) . "'quoted";
         $tests->assertTrue(
@@ -82,6 +174,29 @@ function run_backup_restore_tests(): int
 
         $rateKey = build_login_rate_limit_key('QA_BATCH23_RATE', '203.0.113.23');
         $tests->assertSame('recorded', login_rate_limit_record_failure($sourceConnection, $rateKey)['status'], 'Rate-limit fixture failed.');
+
+        $adminPage = test_run_backup_page_request($repositoryRoot, $adminId, $adminPassword, true);
+        $tests->assertSame('default', $adminPage['status'], 'Administrator backup success changed the normal response status.');
+        $tests->assertContains('-- MYSHOP_BACKUP_COMPLETE', $adminPage['output'], 'Administrator backup page omitted the completion marker.');
+        $tests->assertFalse(strpos($adminPage['output'], $adminPassword) !== false, 'Backup page output exposed the plaintext administrator password.');
+        $tests->assertFalse(strpos($adminPage['output'], 'CREATE TABLE `LoginRateLimit`') !== false, 'Backup page output included the excluded rate-limit table definition.');
+        $tests->assertFalse(strpos($adminPage['output'], 'INSERT INTO `LoginRateLimit`') !== false, 'Backup page output included excluded rate-limit state.');
+
+        $cashierPage = test_run_backup_page_request($repositoryRoot, $cashierId, $cashierPassword, true);
+        $tests->assertSame('403', $cashierPage['status'], 'Cashier backup access must remain denied with HTTP 403.');
+        $tests->assertFalse(strpos($cashierPage['output'], '-- MYSHOP_BACKUP_COMPLETE') !== false, 'Cashier denial started a backup stream.');
+
+        $invalidSessionPage = test_run_backup_page_request($repositoryRoot, 2147483647, $adminPassword, true);
+        $tests->assertSame('401', $invalidSessionPage['status'], 'Invalid backup sessions must retain HTTP 401 behavior.');
+        $tests->assertFalse(strpos($invalidSessionPage['output'], '-- MYSHOP_BACKUP_COMPLETE') !== false, 'Invalid backup sessions started a backup stream.');
+
+        $invalidCsrfPage = test_run_backup_page_request($repositoryRoot, $adminId, $adminPassword, false);
+        $tests->assertSame('403', $invalidCsrfPage['status'], 'Invalid backup CSRF must remain denied with HTTP 403.');
+        $tests->assertFalse(strpos($invalidCsrfPage['output'], '-- MYSHOP_BACKUP_COMPLETE') !== false, 'Invalid backup CSRF started a backup stream.');
+
+        $wrongPasswordPage = test_run_backup_page_request($repositoryRoot, $adminId, 'wrong-backup-password', true);
+        $tests->assertSame('403', $wrongPasswordPage['status'], 'Invalid backup reauthentication must remain denied with HTTP 403.');
+        $tests->assertFalse(strpos($wrongPasswordPage['output'], '-- MYSHOP_BACKUP_COMPLETE') !== false, 'Invalid backup reauthentication started a backup stream.');
 
         $backupPath = tempnam(sys_get_temp_dir(), 'myshop_backup_qa_');
         if ($backupPath === false) {
