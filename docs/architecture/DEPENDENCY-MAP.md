@@ -21,7 +21,7 @@ names are grouped only for readability; the source remains the authority.
 | `index.php` | `start_secure_session`, `verify_login`, `is_admin`, `get_dashboard_stats`, `get_chart_data`, `get_inventory_valuation`, `get_top_selling_products`, `get_category_sales_distribution`, `get_low_stock_products` |
 | `login.php` | `start_secure_session`, `send_security_headers`, `verify_csrf_token`, `get_login_source_ip`, `build_login_rate_limit_key`, `login_rate_limit_check`, `login_rate_limit_record_failure`, `login_rate_limit_reset`, `audit_log`, `audit_log_current_actor`, `destroy_current_session`, `generate_csrf_token`, `redirect`, `verify_login`, `get_asset_integrity` |
 | `order_history.php` | `start_secure_session`, `verify_login`, `is_admin`, `sanitize_input`, `normalize_page_number`, `normalize_page_size`, `count_orders`, `get_order_summary`, `get_orders_page` |
-| `orders.php` | `start_secure_session`, `verify_login`, `is_admin`, `verify_csrf_token`, `generate_csrf_token`, `truncate_list_search`, `catalog_get_pos_products`, `catalog_get_categories_for_selector`, `people_get_customers_for_selector`, `people_get_suppliers_for_selector`, `catalog_get_product_by_id`, `create_order`, `audit_log_current_actor`, `audit_log_denied` |
+| `orders.php` | `start_secure_session`, `verify_login`, `is_admin`, `verify_csrf_token`, `generate_csrf_token`, `truncate_list_search`, `catalog_get_pos_products`, `catalog_get_categories_for_selector`, `people_get_customers_for_selector`, `people_get_suppliers_for_selector`, `catalog_get_product_by_id`, `orders_create`, `audit_log_current_actor`, `audit_log_denied` |
 | `pos_product_lookup.php` | `start_secure_session`, `verify_login`, `truncate_list_search`, `catalog_get_pos_product_by_barcode` |
 | `print_invoice.php` | `start_secure_session`, `send_security_headers`, `verify_login`, `is_admin`, `sanitize_id`, `get_order_by_id`, `get_order_details`, `audit_log_current_actor` |
 | `products.php` | `start_secure_session`, `verify_login`, `is_admin`, `verify_csrf_token`, `generate_csrf_token`, `sanitize_input`, `normalize_page_number`, `normalize_page_size`, `truncate_list_search`, `catalog_get_categories_for_selector`, `catalog_get_products_page`, `catalog_count_products`, `products_create`, `products_update`, `products_delete`, `handle_image_upload`, `delete_newly_uploaded_image`, `audit_log_current_actor`, `audit_log_denied` |
@@ -116,9 +116,10 @@ ownership of request validation, authorization, CSRF checks, upload handling,
 generic messages, HTTP responses, and page rendering.
 
 The legacy `create_order()` name remains in `functions.php` as a
-delegation-only compatibility wrapper. `public/orders.php` intentionally still
-calls that wrapper in this batch; it owns request parsing, CSRF, page-level
-purchase authorization, POS validation, generic messages, and rendering.
+delegation-only compatibility wrapper for remaining callers. `public/orders.php`
+calls `orders_create()` directly and continues to own request parsing, CSRF,
+page-level purchase authorization, POS validation, generic messages, and
+rendering.
 Staff administration, category/customer/supplier writes, and other
 not-yet-extracted workflows remain in `includes/functions.php` or their existing
 page controllers.
@@ -307,8 +308,8 @@ errors and may depend on `$conn` or session scope.
 - Commits or rolls back on failure.
 
 The implementation was moved only after characterization tests covered all of
-these invariants. `public/orders.php` remains on the compatibility wrapper until
-a later caller-migration batch.
+these invariants. `public/orders.php` now calls the focused service directly;
+the compatibility wrapper remains available for un-migrated callers and tests.
 
 ### Other transaction participants
 

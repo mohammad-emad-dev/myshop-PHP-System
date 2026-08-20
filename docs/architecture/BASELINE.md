@@ -162,7 +162,7 @@ Focused shared modules already extracted from the facade:
 | `public/products.php` | Product CRUD request dispatch, request validation, authorization, CSRF, image upload handling, generic messages, Catalog search/pagination, product table, forms, and rendering; delegates product database mutations directly to `products_create()`, `products_update()`, and `products_delete()` |
 | `public/categories.php` | Category CRUD request dispatch, admin checks, Catalog search/pagination, category view |
 | `public/stock_movements.php` | Manual stock adjustment request validation, CSRF and authorization boundary, delegation to the Inventory service, movement history filtering/pagination, and stock ledger view |
-| `public/orders.php` | POS request parsing, CSRF and page-level purchase authorization, Catalog product/category and People customer/supplier-selector reads, product revalidation, delegation to the `create_order()` compatibility wrapper, POS view and JavaScript |
+| `public/orders.php` | POS request parsing, CSRF and page-level purchase authorization, Catalog product/category and People customer/supplier-selector reads, product revalidation, delegation to `orders_create()`, POS view and JavaScript; the legacy `create_order()` wrapper remains for other callers |
 | `public/order_history.php` | Scoped order history filters, pagination, summaries, order-history view and interactions |
 | `public/get_order_details.php` | Scoped JSON order-detail endpoint |
 | `public/pos_product_lookup.php` | Authenticated barcode lookup endpoint backed by the Catalog module |

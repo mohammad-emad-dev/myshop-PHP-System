@@ -17,7 +17,7 @@ Batch 7D, 7E, and 7F place product creation, update, and deletion
 transactions in includes/products.php; the legacy product names remain
 delegation-only wrappers. Batch 8A places the order-creation transaction in
 includes/orders.php; the legacy create_order() name remains a delegation-only
-wrapper and the public POS page remains on that wrapper.
+wrapper while the public POS page calls the focused service directly.
 
 ## Focused Product mutation contracts
 
@@ -60,8 +60,9 @@ success/failure audit metadata, statement cleanup, commit order, rollback, and
 safe rollback diagnostics. It uses `inventory_log_stock_movement()` directly
 and has no session or global dependency. `create_order()` remains a thin
 compatibility wrapper with its original signature and order-ID-or-false return
-contract; `public/orders.php` continues to own request parsing, CSRF, page-level
-authorization, generic messages, and rendering.
+contract; `public/orders.php` calls `orders_create()` directly while continuing
+to own request parsing, CSRF, page-level authorization, generic messages, and
+rendering.
 
 ## Array-returning functions
 
