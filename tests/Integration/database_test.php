@@ -1014,7 +1014,7 @@ function run_integration_tests(): int
         $orderBarcode = $prefix . '-ORDER';
         $tests->assertTrue(create_product($conn, $adminId, $prefix . '_ORDER_PRODUCT', 'Order product', 12.34, 20, null, 5, null, $orderBarcode), 'Order product creation failed.');
         $orderProductId = (int)test_scalar($conn, 'SELECT id FROM Product WHERE barcode = ?', 's', [$orderBarcode]);
-        $tamperedSaleId = create_order(
+        $tamperedSaleId = orders_create(
             $conn,
             $cashierId,
             [[
@@ -1039,7 +1039,7 @@ function run_integration_tests(): int
         $orderCountBeforePurchase = (int)test_scalar($conn, 'SELECT COUNT(*) FROM `Order`');
         $tests->assertFalse(create_order($conn, $cashierId, [['product_id' => $orderProductId, 'quantity' => 1]], 'purchase', null, $supplierId), 'Cashiers must not create purchases.');
         $tests->assertSame($orderCountBeforePurchase, (int)test_scalar($conn, 'SELECT COUNT(*) FROM `Order`'), 'Rejected cashier purchase mutated orders.');
-        $adminPurchaseId = create_order($conn, $adminId, [['product_id' => $orderProductId, 'quantity' => 3]], 'purchase', null, $supplierId);
+        $adminPurchaseId = orders_create($conn, $adminId, [['product_id' => $orderProductId, 'quantity' => 3]], 'purchase', null, $supplierId);
         $tests->assertTrue(is_int($adminPurchaseId) && $adminPurchaseId > 0, 'Admin purchase creation failed.');
         $tests->assertSame(21, (int)test_scalar($conn, 'SELECT stock FROM Product WHERE id = ?', 'i', [$orderProductId]), 'Purchase stock update was incorrect.');
         $tests->assertFalse(create_order($conn, $adminId, [['product_id' => $orderProductId, 'quantity' => 1]], 'invalid', $customerId, null), 'Invalid order types must be rejected by the database-facing function.');
@@ -1617,6 +1617,10 @@ function run_integration_tests(): int
         $tests->assertFalse(
             products_update($failureConnection, $adminId, $orderProductId, 'Failure', '', 1.00, 1),
             'Update DB failures must return false.'
+        );
+        $tests->assertFalse(
+            orders_create($failureConnection, $adminId, [['product_id' => $orderProductId, 'quantity' => 1]], 'sale', $customerId, null),
+            'Order creation must fail safely when the database connection is unavailable.'
         );
         $tests->assertFalse(delete_category($failureConnection, 2), 'Delete DB failures must return false.');
 
