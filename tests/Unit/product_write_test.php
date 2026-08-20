@@ -51,6 +51,33 @@ function run_product_write_unit_tests(): int
     $tests->assertFalse(strpos($module, '$_SESSION') !== false, 'Product module must not read session state.');
     $tests->assertFalse(strpos($module, '$GLOBALS') !== false, 'Product module must not read global state.');
 
+    foreach ([
+        'function products_update($conn, $staff_id, $id, $name, $description, $price, $stock, $image_path = null, $alert_threshold = 10, $category_id = null, $barcode = null): bool',
+        '$id = (int)$id;',
+        'filter_var($stock, FILTER_VALIDATE_INT',
+        'SELECT stock FROM Product WHERE id = ? FOR UPDATE',
+        '$product_stmt->bind_param("i", $id)',
+        '$delta = $stock - $old_stock;',
+        "SELECT id FROM Category WHERE name = 'General' LIMIT 1",
+        'empty(trim((string)$barcode))',
+        'UPDATE Product SET name = ?, description = ?, price = ?, stock = ?, image_path = ?, alert_threshold = ?, category_id = ?, barcode = ? WHERE id = ?',
+        '$stmt->bind_param("ssdisiisi"',
+        'UPDATE Product SET name = ?, description = ?, price = ?, stock = ?, alert_threshold = ?, category_id = ?, barcode = ? WHERE id = ?',
+        '$stmt->bind_param("ssdiiisi"',
+        '$stmt->affected_rows < 0 || $stmt->affected_rows > 1',
+        'Manual stock adjustment (from ',
+        'inventory_log_stock_movement($conn, $id, $staff_id, $delta, \'manual_adjustment\', $reason)',
+        'audit_log($conn, $staff_id, \'product_update\', \'Product\', $id, true',
+        '$conn->commit()',
+        '$conn->rollback()',
+        'inventory_rollback_error($conn)',
+        'audit_log($conn, $staff_id, \'product_update\', \'Product\', $id, false',
+        'return true;',
+        'return false;',
+    ] as $contract) {
+        $tests->assertContains($contract, $module, 'Product update contract is missing: ' . $contract);
+    }
+
     $wrapperPattern = '/function create_product\s*\([^)]*\)\s*\{(?<body>.*?)\n\}/s';
     $wrapperMatched = preg_match($wrapperPattern, $facade, $matches) === 1;
     $tests->assertTrue($wrapperMatched, 'create_product compatibility wrapper is missing.');
@@ -71,6 +98,26 @@ function run_product_write_unit_tests(): int
 
     $tests->assertContains('create_product($conn,', $page, 'Product page must retain the compatibility wrapper caller.');
     $tests->assertFalse(strpos($page, 'products_create(') !== false, 'Product page must not call the new service directly yet.');
+    $tests->assertContains('update_product($conn,', $page, 'Product page must retain the update compatibility wrapper caller.');
+    $tests->assertFalse(strpos($page, 'products_update(') !== false, 'Product page must not call the update service directly yet.');
+
+    $updateWrapperPattern = '/function update_product\s*\([^)]*\)\s*\{(?<body>.*?)\n\}/s';
+    $updateWrapperMatched = preg_match($updateWrapperPattern, $facade, $updateMatches) === 1;
+    $tests->assertTrue($updateWrapperMatched, 'update_product compatibility wrapper is missing.');
+    if ($updateWrapperMatched) {
+        $tests->assertContains(
+            'function update_product($conn, $staff_id, $id, $name, $description, $price, $stock, $image_path = null, $alert_threshold = 10, $category_id = null, $barcode = null)',
+            $facade,
+            'update_product compatibility signature changed.'
+        );
+        $tests->assertContains('products_update(', $updateMatches['body'], 'update_product does not delegate to products_update.');
+        foreach (['begin_transaction', 'SELECT stock FROM Product', 'UPDATE Product', 'inventory_log_stock_movement', 'audit_log', 'commit', 'rollback'] as $implementationDetail) {
+            $tests->assertFalse(
+                strpos($updateMatches['body'], $implementationDetail) !== false,
+                'update_product wrapper still contains implementation detail: ' . $implementationDetail
+            );
+        }
+    }
 
     $tests->assertTrue(function_exists('products_create'), 'Product creation service is unavailable.');
     if (function_exists('products_create')) {
@@ -85,6 +132,21 @@ function run_product_write_unit_tests(): int
         }
         $tests->assertFalse($escaped, 'Invalid product creation connections must fail without escaping an exception.');
         $tests->assertFalse($result, 'Invalid product creation connections must return false.');
+    }
+
+    $tests->assertTrue(function_exists('products_update'), 'Product update service is unavailable.');
+    if (function_exists('products_update')) {
+        $closedConnection = mysqli_init();
+        $result = true;
+        $escaped = false;
+        try {
+            $closedConnection->close();
+            $result = products_update($closedConnection, 1, 1, 'closed-connection', '', 1.00, 1);
+        } catch (Throwable $exception) {
+            $escaped = true;
+        }
+        $tests->assertFalse($escaped, 'Invalid product update connections must fail without escaping an exception.');
+        $tests->assertFalse($result, 'Invalid product update connections must return false.');
     }
 
     return $tests->assertions();

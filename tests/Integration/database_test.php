@@ -723,12 +723,72 @@ function run_integration_tests(): int
         $tests->assertSame(3, (int)($serviceAuditMetadata['stock'] ?? 0), 'Product-create audit stock metadata changed.');
         $tests->assertSame(false, $serviceAuditMetadata['has_image'] ?? null, 'Product-create audit image metadata changed.');
 
+        $updatedServiceBarcode = $prefix . '-SERVICE-UPDATED';
+        $tests->assertTrue(
+            products_update($conn, $adminId, $serviceProductId, $prefix . '_SERVICE_PRODUCT_UPDATED', 'Updated explicit service product', 10.99, 5, null, 6, null, '  ' . $updatedServiceBarcode . '  '),
+            'Direct product update service no-image path failed.'
+        );
+        $updatedServiceProduct = test_fetch_one($conn, 'SELECT name, stock, category_id, barcode, image_path FROM Product WHERE id = ?', 'i', [$serviceProductId]);
+        $tests->assertSame($prefix . '_SERVICE_PRODUCT_UPDATED', (string)($updatedServiceProduct['name'] ?? ''), 'Direct product update name was not persisted.');
+        $tests->assertSame(5, (int)($updatedServiceProduct['stock'] ?? 0), 'Direct product update stock increase was not persisted.');
+        $tests->assertSame(1, (int)($updatedServiceProduct['category_id'] ?? 0), 'Product update must default to the General category.');
+        $tests->assertSame($updatedServiceBarcode, (string)($updatedServiceProduct['barcode'] ?? ''), 'Product update barcode normalization changed.');
+        $tests->assertSame(null, $updatedServiceProduct['image_path'] ?? null, 'No-image product update changed the stored image unexpectedly.');
+        $serviceIncreaseMovement = test_fetch_one(
+            $conn,
+            'SELECT quantity, reason FROM StockMovement WHERE product_id = ? AND movement_type = ? ORDER BY id DESC LIMIT 1',
+            'is',
+            [$serviceProductId, 'manual_adjustment']
+        );
+        $tests->assertSame(2, (int)($serviceIncreaseMovement['quantity'] ?? 0), 'Product stock increase movement delta changed.');
+        $tests->assertSame('Manual stock adjustment (from 3 to 5)', (string)($serviceIncreaseMovement['reason'] ?? ''), 'Product stock increase movement reason changed.');
+        $serviceUpdateAudit = test_fetch_one(
+            $conn,
+            "SELECT actor_staff_id, outcome, metadata FROM AuditLog WHERE action = 'product_update' AND entity_id = ? ORDER BY id DESC LIMIT 1",
+            'i',
+            [$serviceProductId]
+        );
+        $serviceUpdateMetadata = json_decode((string)($serviceUpdateAudit['metadata'] ?? ''), true);
+        $tests->assertSame($adminId, (int)($serviceUpdateAudit['actor_staff_id'] ?? 0), 'Product-update audit actor changed.');
+        $tests->assertSame('success', (string)($serviceUpdateAudit['outcome'] ?? ''), 'Product-update audit outcome changed.');
+        $tests->assertSame(2, (int)($serviceUpdateMetadata['stock_delta'] ?? 0), 'Product-update audit stock delta changed.');
+        $tests->assertSame(false, $serviceUpdateMetadata['has_image'] ?? null, 'No-image product-update audit metadata changed.');
+
+        $serviceMovementCountBeforeNoOp = (int)test_scalar($conn, 'SELECT COUNT(*) FROM StockMovement WHERE product_id = ?', 'i', [$serviceProductId]);
+        $tests->assertTrue(
+            products_update($conn, $adminId, $serviceProductId, $prefix . '_SERVICE_PRODUCT_UPDATED', 'Updated explicit service product', 10.99, 5, 'uploads/qa-product.png', 6, $categoryId, $updatedServiceBarcode),
+            'Direct product update service image path failed.'
+        );
+        $imageServiceProduct = test_fetch_one($conn, 'SELECT stock, category_id, barcode, image_path FROM Product WHERE id = ?', 'i', [$serviceProductId]);
+        $tests->assertSame(5, (int)($imageServiceProduct['stock'] ?? 0), 'No-op image update changed stock.');
+        $tests->assertSame($categoryId, (int)($imageServiceProduct['category_id'] ?? 0), 'Image product update category changed.');
+        $tests->assertSame($updatedServiceBarcode, (string)($imageServiceProduct['barcode'] ?? ''), 'Image product update barcode changed.');
+        $tests->assertSame('uploads/qa-product.png', (string)($imageServiceProduct['image_path'] ?? ''), 'Image product update path was not persisted.');
+        $tests->assertSame($serviceMovementCountBeforeNoOp, (int)test_scalar($conn, 'SELECT COUNT(*) FROM StockMovement WHERE product_id = ?', 'i', [$serviceProductId]), 'No-op product update created a stock movement.');
+        $imageUpdateAudit = test_fetch_one(
+            $conn,
+            "SELECT metadata FROM AuditLog WHERE action = 'product_update' AND entity_id = ? ORDER BY id DESC LIMIT 1",
+            'i',
+            [$serviceProductId]
+        );
+        $imageUpdateMetadata = json_decode((string)($imageUpdateAudit['metadata'] ?? ''), true);
+        $tests->assertSame(0, (int)($imageUpdateMetadata['stock_delta'] ?? -1), 'No-op product-update audit stock delta changed.');
+        $tests->assertSame(true, $imageUpdateMetadata['has_image'] ?? null, 'Image product-update audit metadata changed.');
+
         $historyBarcode = $prefix . '-HISTORY';
         $tests->assertTrue(create_product($conn, $adminId, $prefix . '_HISTORY_PRODUCT', 'History product', 12.34, 20, null, 5, $categoryId, $historyBarcode), 'Historical product creation failed.');
         $historyProductId = (int)test_scalar($conn, 'SELECT id FROM Product WHERE barcode = ?', 's', [$historyBarcode]);
         $tests->assertTrue($historyProductId > 0, 'Historical product ID was not found.');
         $tests->assertTrue(update_product($conn, $adminId, $historyProductId, $prefix . '_HISTORY_PRODUCT_UPDATED', 'Updated history product', 13.34, 22, null, 6, $categoryId, $historyBarcode), 'Product update failed.');
         $tests->assertSame(22, (int)test_scalar($conn, 'SELECT stock FROM Product WHERE id = ?', 'i', [$historyProductId]), 'Product stock update was not persisted.');
+        $wrapperUpdateMovement = test_fetch_one(
+            $conn,
+            'SELECT quantity, reason FROM StockMovement WHERE product_id = ? AND movement_type = ? ORDER BY id DESC LIMIT 1',
+            'is',
+            [$historyProductId, 'manual_adjustment']
+        );
+        $tests->assertSame(2, (int)($wrapperUpdateMovement['quantity'] ?? 0), 'Compatibility-wrapper update movement delta changed.');
+        $tests->assertSame('Manual stock adjustment (from 20 to 22)', (string)($wrapperUpdateMovement['reason'] ?? ''), 'Compatibility-wrapper update movement reason changed.');
 
         $_SERVER['REMOTE_ADDR'] = '127.0.0.1';
         $_SESSION = ['staff_id' => $adminId];
@@ -1475,7 +1535,69 @@ function run_integration_tests(): int
         $tests->assertCount(0, get_orders($failureConnection), 'List DB failures must return an empty array.');
         $tests->assertCount(0, get_order_details($failureConnection, 1), 'Order-detail DB failures must return an empty array.');
         $tests->assertFalse(create_product($failureConnection, $adminId, $prefix . '_DB_FAILURE', 'Failure', 1.00, 1), 'Create DB failures must return false.');
+        $tests->assertFalse(
+            products_update($failureConnection, $adminId, $orderProductId, 'Failure', '', 1.00, 1),
+            'Update DB failures must return false.'
+        );
         $tests->assertFalse(delete_category($failureConnection, 2), 'Delete DB failures must return false.');
+
+        $missingUpdateAuditBefore = (int)test_scalar($conn, "SELECT COUNT(*) FROM AuditLog WHERE action = 'product_update' AND outcome = 'failure'");
+        $tests->assertFalse(
+            products_update($conn, $adminId, 999999999, $prefix . '_MISSING_UPDATE', 'Missing', 1.00, 1),
+            'Missing product updates must fail.'
+        );
+        $tests->assertSame($missingUpdateAuditBefore, (int)test_scalar($conn, "SELECT COUNT(*) FROM AuditLog WHERE action = 'product_update' AND outcome = 'failure'"), 'Missing product update unexpectedly persisted a failure audit.');
+        $invalidUpdateStockBefore = (int)test_scalar($conn, 'SELECT stock FROM Product WHERE id = ?', 'i', [$serviceProductId]);
+        $invalidUpdateMovementBefore = (int)test_scalar($conn, 'SELECT COUNT(*) FROM StockMovement WHERE product_id = ?', 'i', [$serviceProductId]);
+        $tests->assertFalse(
+            products_update($conn, $adminId, $serviceProductId, 'Invalid stock', '', 1.00, -1),
+            'Invalid product update stock must fail.'
+        );
+        $tests->assertSame($invalidUpdateStockBefore, (int)test_scalar($conn, 'SELECT stock FROM Product WHERE id = ?', 'i', [$serviceProductId]), 'Invalid product update stock changed the product.');
+        $tests->assertSame($invalidUpdateMovementBefore, (int)test_scalar($conn, 'SELECT COUNT(*) FROM StockMovement WHERE product_id = ?', 'i', [$serviceProductId]), 'Invalid product update stock created a movement.');
+
+        $updateMovementFailureStockBefore = (int)test_scalar($conn, 'SELECT stock FROM Product WHERE id = ?', 'i', [$serviceProductId]);
+        $updateMovementFailureBefore = (int)test_scalar($conn, 'SELECT COUNT(*) FROM StockMovement WHERE product_id = ?', 'i', [$serviceProductId]);
+        $updateSuccessAuditBefore = (int)test_scalar($conn, "SELECT COUNT(*) FROM AuditLog WHERE action = 'product_update' AND entity_id = ? AND outcome = 'success'", 'i', [$serviceProductId]);
+        $updateFailureAuditBefore = (int)test_scalar($conn, "SELECT COUNT(*) FROM AuditLog WHERE action = 'product_update' AND entity_id = ? AND outcome = 'failure'", 'i', [$serviceProductId]);
+        $updateMovementFailureTrigger = 'qa_batch7e_update_movement_failure_' . strtolower(bin2hex(random_bytes(4)));
+        $schema->query(
+            'CREATE TRIGGER ' . test_sql_identifier($updateMovementFailureTrigger) .
+            " BEFORE INSERT ON StockMovement FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'QA product update movement failure'"
+        );
+        try {
+            $tests->assertFalse(
+                products_update($conn, $adminId, $serviceProductId, 'Movement failure', '', 10.99, $updateMovementFailureStockBefore + 1, null, 6, null, $updatedServiceBarcode),
+                'Movement insertion failure must fail the product update service.'
+            );
+            $tests->assertSame($updateMovementFailureStockBefore, (int)test_scalar($conn, 'SELECT stock FROM Product WHERE id = ?', 'i', [$serviceProductId]), 'Movement insertion failure left a partial product update.');
+            $tests->assertSame($updateMovementFailureBefore, (int)test_scalar($conn, 'SELECT COUNT(*) FROM StockMovement WHERE product_id = ?', 'i', [$serviceProductId]), 'Movement insertion failure left a partial stock movement.');
+            $tests->assertSame($updateSuccessAuditBefore, (int)test_scalar($conn, "SELECT COUNT(*) FROM AuditLog WHERE action = 'product_update' AND entity_id = ? AND outcome = 'success'", 'i', [$serviceProductId]), 'Movement insertion failure left a success audit.');
+            $tests->assertSame($updateFailureAuditBefore + 1, (int)test_scalar($conn, "SELECT COUNT(*) FROM AuditLog WHERE action = 'product_update' AND entity_id = ? AND outcome = 'failure'", 'i', [$serviceProductId]), 'Movement insertion failure did not persist the expected failure audit.');
+        } finally {
+            $schema->query('DROP TRIGGER IF EXISTS ' . test_sql_identifier($updateMovementFailureTrigger));
+        }
+
+        $updateAuditRollbackStockBefore = (int)test_scalar($conn, 'SELECT stock FROM Product WHERE id = ?', 'i', [$serviceProductId]);
+        $updateAuditRollbackMovementBefore = (int)test_scalar($conn, 'SELECT COUNT(*) FROM StockMovement WHERE product_id = ?', 'i', [$serviceProductId]);
+        $schema->query('DROP TABLE AuditLog');
+        $tests->assertFalse(
+            products_update($conn, $adminId, $serviceProductId, 'Audit failure', '', 10.99, $updateAuditRollbackStockBefore - 1, null, 6, null, $updatedServiceBarcode),
+            'Audit insertion failure must fail the product update service.'
+        );
+        $tests->assertSame($updateAuditRollbackStockBefore, (int)test_scalar($conn, 'SELECT stock FROM Product WHERE id = ?', 'i', [$serviceProductId]), 'Audit insertion failure left a partial product update.');
+        test_load_sql_file($schema, dirname(__DIR__, 2) . '/database/batch22_audit_log.sql');
+        $tests->assertSame($updateAuditRollbackMovementBefore, (int)test_scalar($conn, 'SELECT COUNT(*) FROM StockMovement WHERE product_id = ?', 'i', [$serviceProductId]), 'Audit insertion failure left a partial stock movement.');
+        $tests->assertSame(
+            0,
+            (int)test_scalar(
+                $conn,
+                "SELECT COUNT(*) FROM AuditLog WHERE actor_staff_id = ? AND action = 'product_update' AND entity_id = ? AND outcome = 'failure'",
+                'ii',
+                [$adminId, $serviceProductId]
+            ),
+            'Audit insertion failure left a partial failure audit record.'
+        );
 
         $rollbackBarcode = $prefix . '-ROLLBACK';
         $rollbackMovementBefore = (int)test_scalar(
