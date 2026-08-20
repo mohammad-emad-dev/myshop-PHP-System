@@ -27,6 +27,56 @@ function auth_extraction_test_open_session(array $values): void
     unset($GLOBALS['current_staff_record']);
 }
 
+function auth_extraction_test_capture_errors(callable $callback): array
+{
+    $errors = [];
+    set_error_handler(static function (int $severity, string $message) use (&$errors): bool {
+        if ((error_reporting() & $severity) === 0) {
+            return false;
+        }
+
+        $errors[] = $message;
+        return true;
+    });
+
+    try {
+        $result = $callback();
+    } finally {
+        restore_error_handler();
+    }
+
+    return [$result, $errors];
+}
+
+function auth_extraction_test_run_php_process(string $script, string $workingDirectory): array
+{
+    $descriptors = [
+        0 => ['pipe', 'r'],
+        1 => ['pipe', 'w'],
+        2 => ['pipe', 'w'],
+    ];
+    $process = proc_open(
+        [PHP_BINARY, '-d', 'display_errors=1', '-d', 'log_errors=0', '-r', $script],
+        $descriptors,
+        $pipes,
+        $workingDirectory
+    );
+    if (!is_resource($process)) {
+        throw new TestFailure('Authentication compatibility subprocess could not start.');
+    }
+
+    fclose($pipes[0]);
+    $stdout = stream_get_contents($pipes[1]);
+    fclose($pipes[1]);
+    $stderr = stream_get_contents($pipes[2]);
+    fclose($pipes[2]);
+
+    return [
+        'exit_code' => proc_close($process),
+        'output' => (string)$stdout . (string)$stderr,
+    ];
+}
+
 /**
  * Characterizes the transitional authentication boundary before callers move
  * away from the legacy facade.
@@ -79,6 +129,38 @@ function run_auth_extraction_unit_tests(): int
     }
     $tests->assertContains('function http_redirect', $http, 'HTTP redirect implementation is missing.');
 
+    unset($GLOBALS['conn']);
+    auth_extraction_test_open_session(['staff_id' => 123]);
+    [$legacyVerifyResult, $legacyVerifyErrors] = auth_extraction_test_capture_errors(
+        static fn() => verify_login(false)
+    );
+    $tests->assertFalse($legacyVerifyResult, 'Legacy verification must fail safely without a global database connection.');
+    $tests->assertCount(0, $legacyVerifyErrors, 'Legacy verification emitted a PHP warning for an unset global connection.');
+
+    unset($GLOBALS['conn']);
+    auth_extraction_test_open_session(['staff_id' => 123]);
+    [$legacyAdminResult, $legacyAdminErrors] = auth_extraction_test_capture_errors(
+        static fn() => is_admin()
+    );
+    $tests->assertFalse($legacyAdminResult, 'Legacy admin checks must fail safely without a global database connection.');
+    $tests->assertCount(0, $legacyAdminErrors, 'Legacy admin checks emitted a PHP warning for an unset global connection.');
+
+    $requireAdminScript = 'require ' . var_export($repository . '/includes/functions.php', true) . ';'
+        . ' start_secure_session();'
+        . ' $_SESSION["staff_id"] = 123;'
+        . ' unset($GLOBALS["conn"]);'
+        . ' require_admin();';
+    $legacyRequireAdmin = auth_extraction_test_run_php_process($requireAdminScript, $repository);
+    $tests->assertSame(0, $legacyRequireAdmin['exit_code'], 'Legacy admin enforcement did not terminate through its redirect path.');
+    $tests->assertFalse(
+        strpos($legacyRequireAdmin['output'], 'Warning:') !== false,
+        'Legacy admin enforcement emitted a PHP warning without a global database connection.'
+    );
+    $tests->assertFalse(
+        strpos($legacyRequireAdmin['output'], 'Undefined variable $conn') !== false,
+        'Legacy admin enforcement emitted a PHP warning for an unset global connection.'
+    );
+
     foreach ([
         'verify_login' => 'auth_verify_login',
         'redirect' => 'http_redirect',
@@ -91,6 +173,18 @@ function run_auth_extraction_unit_tests(): int
         if ($matched) {
             $body = $matches['body'];
             $tests->assertContains($moduleName . '(', $body, 'Authentication wrapper does not delegate: ' . $legacyName);
+            if (in_array($legacyName, ['verify_login', 'is_admin', 'require_admin'], true)) {
+                $tests->assertContains(
+                    '$database = $conn ?? null;',
+                    $body,
+                    'Authentication wrapper does not null-normalize the global connection: ' . $legacyName
+                );
+                $tests->assertContains(
+                    $moduleName . '($database',
+                    $body,
+                    'Authentication wrapper does not delegate with its null-safe connection: ' . $legacyName
+                );
+            }
             foreach (['SELECT ', '$_SESSION', '$GLOBALS[', 'audit_log_denied(', 'http_response_code('] as $implementationDetail) {
                 $tests->assertFalse(
                     strpos($body, $implementationDetail) !== false,

@@ -488,7 +488,8 @@ function login_rate_limit_reset($conn, $rate_limit_key)
 function verify_login($redirect_on_failure = true)
 {
     global $conn;
-    return auth_verify_login($conn, $redirect_on_failure);
+    $database = $conn ?? null;
+    return auth_verify_login($database, $redirect_on_failure);
 }
 
 function redirect($url)
@@ -2238,7 +2239,8 @@ function get_chart_data($conn, $days = 7, $staff_id = null)
 function is_admin()
 {
     global $conn;
-    return auth_is_admin($conn);
+    $database = $conn ?? null;
+    return auth_is_admin($database);
 }
 
 /**
@@ -2247,7 +2249,8 @@ function is_admin()
 function require_admin()
 {
     global $conn;
-    auth_require_admin($conn);
+    $database = $conn ?? null;
+    auth_require_admin($database);
 }
 
 /**
