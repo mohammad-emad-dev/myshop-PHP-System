@@ -5,8 +5,8 @@ declare(strict_types=1);
 require_once __DIR__ . '/../bootstrap.php';
 
 /**
- * Characterize the dashboard statistics boundary before moving its
- * implementation out of the compatibility facade.
+ * Characterize the dashboard statistics and chart-data boundaries before
+ * moving their implementations out of the compatibility facade.
  */
 function run_dashboard_unit_tests(): int
 {
@@ -84,7 +84,6 @@ function run_dashboard_unit_tests(): int
         'Dashboard page must not call the legacy statistics function.'
     );
     foreach ([
-        'get_chart_data($conn, 7, $dashboard_staff_id)',
         'get_inventory_valuation($conn)',
         'get_top_selling_products($conn, 5, $dashboard_staff_id)',
         'get_category_sales_distribution($conn, $dashboard_staff_id)',
@@ -92,6 +91,63 @@ function run_dashboard_unit_tests(): int
     ] as $unchangedCaller) {
         $tests->assertContains($unchangedCaller, $index, 'Unrelated dashboard caller changed: ' . $unchangedCaller);
     }
+
+    $tests->assertContains(
+        'function dashboard_get_chart_data($conn, $days = 7, $staff_id = null)',
+        $module,
+        'Dashboard module must expose the explicit chart-data service.'
+    );
+    foreach ([
+        'max(1, min((int)$days, 31))',
+        "date('Y-m-d', strtotime(\"-\$i days\"))",
+        "'label' => date('M d', strtotime(\$date))",
+        "'sales' => 0.0",
+        "'purchases' => 0.0",
+        'DATE(order_date) as order_day',
+        'DATE_SUB(CURDATE(), INTERVAL ? DAY)',
+        'GROUP BY DATE(order_date), order_type',
+        'ORDER BY DATE(order_date) ASC',
+        "bind_param('i', \$days)",
+        "bind_param('ii', \$days, \$staff_id)",
+        'return array_values($data);',
+        'finally',
+        '$stmt->close();',
+    ] as $contract) {
+        $tests->assertContains($contract, $module, 'Dashboard chart-data contract is missing: ' . $contract);
+    }
+
+    $chartWrapperPattern = '/function get_chart_data\s*\([^)]*\)\s*\{(?<body>.*?)\n\}/s';
+    $chartWrapperMatched = preg_match($chartWrapperPattern, $facade, $chartMatches) === 1;
+    $tests->assertTrue($chartWrapperMatched, 'Chart-data compatibility wrapper is missing.');
+    if ($chartWrapperMatched) {
+        $tests->assertContains(
+            'return dashboard_get_chart_data($conn, $days, $staff_id);',
+            $chartMatches['body'],
+            'Chart-data compatibility wrapper must delegate exactly once.'
+        );
+        $tests->assertSame(
+            1,
+            substr_count($chartMatches['body'], 'dashboard_get_chart_data('),
+            'Chart-data compatibility wrapper must contain one delegation.'
+        );
+        foreach (['SELECT ', 'query(', 'prepare(', 'bind_param', 'fetch_assoc'] as $implementationDetail) {
+            $tests->assertFalse(
+                strpos($chartMatches['body'], $implementationDetail) !== false,
+                'Chart-data compatibility wrapper still contains implementation detail: ' . $implementationDetail
+            );
+        }
+    }
+
+    $tests->assertContains(
+        'dashboard_get_chart_data($conn, 7, $dashboard_staff_id)',
+        $index,
+        'Dashboard page must call the focused chart-data service directly.'
+    );
+    $tests->assertSame(
+        0,
+        preg_match('/\bget_chart_data\s*\(/', $index),
+        'Dashboard page must not call the legacy chart-data function.'
+    );
 
     return $tests->assertions();
 }

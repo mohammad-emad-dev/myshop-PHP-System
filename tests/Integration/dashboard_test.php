@@ -66,6 +66,22 @@ function run_dashboard_integration_tests(): int
             [40.00, $cashierId, 1]
         );
 
+        $today = date('Y-m-d');
+        $yesterday = date('Y-m-d', strtotime('-1 day'));
+        $twoDaysAgo = date('Y-m-d', strtotime('-2 days'));
+        test_execute(
+            $conn,
+            'INSERT INTO `Order` (order_date, total_amount, staff_id, order_type, customer_id, supplier_id) VALUES (?, ?, ?, \'sale\', ?, NULL)',
+            'sdii',
+            [$twoDaysAgo . ' 12:00:00', 12.25, $adminId, 1]
+        );
+        test_execute(
+            $conn,
+            'INSERT INTO `Order` (order_date, total_amount, staff_id, order_type, customer_id, supplier_id) VALUES (?, ?, ?, \'purchase\', NULL, ?)',
+            'sdii',
+            [$yesterday . ' 12:00:00', 9.75, $cashierId, 1]
+        );
+
         $globalStats = dashboard_get_stats($conn);
         $tests->assertSame(
             ['total_products', 'total_orders', 'total_sales', 'total_stock'],
@@ -113,6 +129,48 @@ function run_dashboard_integration_tests(): int
             $defaultStats,
             get_dashboard_stats($closedConnection),
             'The compatibility wrapper must preserve closed-connection defaults.'
+        );
+
+        $globalChart = dashboard_get_chart_data($conn, 3);
+        $tests->assertCount(3, $globalChart, 'Chart data must contain the requested complete date series.');
+        $tests->assertSame(date('M d', strtotime($twoDaysAgo)), $globalChart[0]['label'], 'Chart labels must be chronological.');
+        $tests->assertSame(date('M d', strtotime($yesterday)), $globalChart[1]['label'], 'Chart labels must preserve date order.');
+        $tests->assertSame(date('M d', strtotime($today)), $globalChart[2]['label'], 'Chart labels must include today.');
+        $tests->assertSame(12.25, $globalChart[0]['sales'], 'Historical sales total is incorrect.');
+        $tests->assertSame(0.0, $globalChart[0]['purchases'], 'Missing purchase days must be zero-filled.');
+        $tests->assertSame(0.0, $globalChart[1]['sales'], 'Missing sales days must be zero-filled.');
+        $tests->assertSame(9.75, $globalChart[1]['purchases'], 'Historical purchase total is incorrect.');
+        $tests->assertSame(27.5, $globalChart[2]['sales'], 'Current-day global sales total is incorrect.');
+        $tests->assertSame(70.0, $globalChart[2]['purchases'], 'Current-day global purchase total is incorrect.');
+        $tests->assertTrue(is_float($globalChart[0]['sales']), 'Chart sales values must remain floats.');
+        $tests->assertTrue(is_float($globalChart[1]['purchases']), 'Chart purchase values must remain floats.');
+
+        $cashierChart = dashboard_get_chart_data($conn, 3, $cashierId);
+        $tests->assertSame(0.0, $cashierChart[0]['sales'], 'Cashier chart must exclude another staff member\'s sale.');
+        $tests->assertSame(0.0, $cashierChart[0]['purchases'], 'Cashier chart must exclude another staff member\'s purchase.');
+        $tests->assertSame(0.0, $cashierChart[1]['sales'], 'Cashier chart must preserve scoped zero-fill.');
+        $tests->assertSame(9.75, $cashierChart[1]['purchases'], 'Cashier chart purchase scope is incorrect.');
+        $tests->assertSame(7.5, $cashierChart[2]['sales'], 'Cashier chart sale scope is incorrect.');
+        $tests->assertSame(40.0, $cashierChart[2]['purchases'], 'Cashier current-day purchase scope is incorrect.');
+
+        $tests->assertCount(1, dashboard_get_chart_data($conn, 0), 'Chart days must normalize to a minimum of one.');
+        $tests->assertCount(31, dashboard_get_chart_data($conn, 50), 'Chart days must normalize to a maximum of 31.');
+        $tests->assertSame(
+            $globalChart,
+            get_chart_data($conn, 3),
+            'The legacy chart-data wrapper must preserve the focused service result.'
+        );
+
+        $closedChart = dashboard_get_chart_data($closedConnection, 3);
+        $tests->assertCount(3, $closedChart, 'Closed connections must preserve the requested chart shape.');
+        foreach ($closedChart as $point) {
+            $tests->assertSame(0.0, $point['sales'], 'Closed-connection chart sales must default to zero.');
+            $tests->assertSame(0.0, $point['purchases'], 'Closed-connection chart purchases must default to zero.');
+        }
+        $tests->assertSame(
+            $closedChart,
+            get_chart_data($closedConnection, 3),
+            'The legacy chart wrapper must preserve closed-connection fallback behavior.'
         );
     } finally {
         $database->cleanup();
