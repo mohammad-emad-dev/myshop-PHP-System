@@ -325,6 +325,58 @@ function run_auth_extraction_unit_tests(): int
         }
     }
 
+    $backup = file_get_contents($repository . '/public/backup_database.php');
+    $tests->assertTrue(is_string($backup), 'Backup authentication caller source could not be read.');
+    if (is_string($backup)) {
+        preg_match_all(
+            '/\b(?:auth_verify_login|auth_is_admin)\s*\([^)]*\)/',
+            $backup,
+            $backupAuthCalls
+        );
+        $tests->assertSame(
+            [
+                'auth_verify_login($conn, false)',
+                'auth_is_admin($conn)',
+            ],
+            $backupAuthCalls[0],
+            'Backup authentication call count or execution order changed.'
+        );
+        foreach (['verify_login', 'is_admin', 'require_admin'] as $legacyCall) {
+            $tests->assertFalse(
+                preg_match('/(?<!auth_)\b' . $legacyCall . '\s*\(/', $backup) === 1,
+                'Backup page still uses a legacy authentication wrapper: ' . $legacyCall
+            );
+        }
+
+        $authenticationOffset = strpos($backup, 'auth_verify_login($conn, false)');
+        $authorizationOffset = strpos($backup, 'auth_is_admin($conn)');
+        $csrfOffset = strpos($backup, 'verify_csrf_token($csrf_token)');
+        $streamOffset = strpos($backup, 'stream_database_backup($conn');
+        $tests->assertTrue(
+            $authenticationOffset !== false
+                && $authorizationOffset !== false
+                && $csrfOffset !== false
+                && $streamOffset !== false
+                && $authenticationOffset < $authorizationOffset
+                && $authorizationOffset < $csrfOffset
+                && $csrfOffset < $streamOffset,
+            'Backup authentication, authorization, CSRF, and streaming order changed.'
+        );
+        foreach ([
+            "header('Content-Type', 'application/sql; charset=utf-8')",
+            "header('Content-Disposition: attachment; filename=\"' . $filename . '\"')",
+            "-- MYSHOP_BACKUP_COMPLETE",
+            "-- BACKUP FAILED: The generated file is incomplete and must not be restored.",
+            "audit_log($conn, $staff_id, 'database_backup'",
+        ] as $backupInvariant) {
+            $tests->assertContains(
+                $backupInvariant,
+                $backup,
+                'Backup response or audit invariant disappeared during auth caller migration: ' . $backupInvariant
+            );
+        }
+    }
+
     $stockMovements = file_get_contents($repository . '/public/stock_movements.php');
     $tests->assertTrue(is_string($stockMovements), 'Stock movement authentication caller source could not be read.');
     if (is_string($stockMovements)) {
@@ -391,7 +443,6 @@ function run_auth_extraction_unit_tests(): int
 
     foreach ([
         'public/login.php' => 'verify_login(false)',
-        'public/backup_database.php' => 'verify_login(false)',
         'includes/layouts/sidebar.php' => 'is_admin()',
     ] as $relativePath => $legacyCall) {
         $source = file_get_contents($repository . '/' . $relativePath);
