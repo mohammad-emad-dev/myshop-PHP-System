@@ -40,7 +40,7 @@ function run_dashboard_unit_tests(): int
         'WHERE staff_id = ?',
         'COALESCE(SUM(stock), 0)',
         'catch (Throwable $exception)',
-        "error_log('Dashboard stats query failed: ' . $exception->getMessage())",
+        "error_log('Dashboard stats query failed: ' . \$exception->getMessage())",
     ] as $contract) {
         $tests->assertContains($contract, $module, 'Dashboard module contract is missing: ' . $contract);
     }

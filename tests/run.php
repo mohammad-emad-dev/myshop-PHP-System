@@ -50,7 +50,7 @@ try {
     $dashboardIntegrationAssertions = run_dashboard_integration_tests();
     $totalAssertions = $unitAssertions + $architectureAssertions + $catalogAssertions + $productWriteAssertions + $orderWriteAssertions + $orderReadAssertions + $dashboardAssertions + $peopleAssertions + $inventoryAssertions + $inventoryAdjustmentAssertions + $authAssertions + $deploymentAssertions + $httpHarnessAssertions + $securityScanAssertions + $supplyChainAssertions + $releaseIntegrityAssertions + $integrationAssertions + $backupAssertions + $operationalAssertions + $exportAssertions + $dashboardIntegrationAssertions;
     $duration = number_format(microtime(true) - $started, 2);
-    echo "PASS: {$totalAssertions} assertions (" . ($unitAssertions + $architectureAssertions + $catalogAssertions + $productWriteAssertions + $orderWriteAssertions + $orderReadAssertions + $peopleAssertions + $inventoryAssertions + $inventoryAdjustmentAssertions + $authAssertions + $deploymentAssertions + $httpHarnessAssertions + $securityScanAssertions + $supplyChainAssertions + $releaseIntegrityAssertions) . " unit, " .
+    echo "PASS: {$totalAssertions} assertions (" . ($unitAssertions + $architectureAssertions + $catalogAssertions + $productWriteAssertions + $orderWriteAssertions + $orderReadAssertions + $dashboardAssertions + $peopleAssertions + $inventoryAssertions + $inventoryAdjustmentAssertions + $authAssertions + $deploymentAssertions + $httpHarnessAssertions + $securityScanAssertions + $supplyChainAssertions + $releaseIntegrityAssertions) . " unit, " .
         ($integrationAssertions + $backupAssertions + $operationalAssertions + $exportAssertions + $dashboardIntegrationAssertions) . " integration) in {$duration}s\n";
     exit(0);
 } catch (Throwable $exception) {
