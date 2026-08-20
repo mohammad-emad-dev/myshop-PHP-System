@@ -106,7 +106,13 @@ function run_deployment_unit_tests(): int
     $tests->assertContains('HSTS_ENABLED=false', $environmentExample, 'HSTS must default off for local HTTP development.');
     $tests->assertContains('cancel-in-progress: true', $qualityWorkflow, 'Obsolete Quality Gate runs must be cancelled.');
     $tests->assertContains('contents: read', $qualityWorkflow, 'Quality Gate jobs need read-only repository permissions.');
-    $tests->assertContains("printf 'APP_ENV=production\\n'", $qualityWorkflow, 'Production CI configuration must set APP_ENV=production.');
+    foreach (production_preflight_required_environment() as $requiredSetting) {
+        $tests->assertContains(
+            "printf '{$requiredSetting}=",
+            $qualityWorkflow,
+            'Production CI configuration must generate required setting: ' . $requiredSetting . '.'
+        );
+    }
     $tests->assertContains('mysql:8.4.3@sha256:106d5197fd8e4892980469ad42eb20f7a336bd81509aae4ee175d852f5cc4565', $qualityWorkflow, 'CI MySQL must use the reviewed immutable digest.');
     $tests->assertContains('scripts/repository-security-check.php', $qualityWorkflow, 'Quality Gate must run the dependency-free repository security check.');
     $tests->assertContains('scripts/ci-supply-chain-check.php', $qualityWorkflow, 'Quality Gate must run the dependency-free CI supply-chain policy check.');

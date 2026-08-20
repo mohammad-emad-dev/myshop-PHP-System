@@ -99,6 +99,8 @@ jobs:
           root_password="$(openssl rand -hex 24)"
           {
             printf 'APP_ENV=production\n'
+            printf 'DB_HOST=db\n'
+            printf 'DB_PORT=3306\n'
             printf 'DB_NAME=myshop_ci\n'
             printf 'DB_USER=myshop_ci_runtime\n'
             printf 'DB_PASSWORD=%s\n' "$runtime_password"
