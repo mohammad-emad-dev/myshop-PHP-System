@@ -1496,7 +1496,6 @@ function run_integration_tests(): int
         $auditRollbackBarcode = $prefix . '-AUDIT-ROLLBACK';
         $productCountBeforeAuditFailure = (int)test_scalar($conn, 'SELECT COUNT(*) FROM Product');
         $movementCountBeforeAuditFailure = (int)test_scalar($conn, 'SELECT COUNT(*) FROM StockMovement');
-        $auditCountBeforeAuditFailure = (int)test_scalar($conn, 'SELECT COUNT(*) FROM AuditLog');
         $schema->query('DROP TABLE AuditLog');
         $tests->assertFalse(
             create_product($conn, $adminId, $prefix . '_AUDIT_ROLLBACK_PRODUCT', 'Audit rollback', 3.00, 4, null, 5, null, $auditRollbackBarcode),
@@ -1506,7 +1505,16 @@ function run_integration_tests(): int
         test_load_sql_file($schema, dirname(__DIR__, 2) . '/database/batch22_audit_log.sql');
         $tests->assertSame(1, (int)test_scalar($schema, "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'AuditLog'"), 'Audit migration did not restore the disposable table.');
         $tests->assertSame($movementCountBeforeAuditFailure, (int)test_scalar($conn, 'SELECT COUNT(*) FROM StockMovement'), 'Audit failure left a partial stock movement.');
-        $tests->assertSame($auditCountBeforeAuditFailure, (int)test_scalar($conn, 'SELECT COUNT(*) FROM AuditLog'), 'Audit failure left a partial audit record.');
+        $tests->assertSame(
+            0,
+            (int)test_scalar(
+                $conn,
+                "SELECT COUNT(*) FROM AuditLog WHERE actor_staff_id = ? AND action = 'product_create' AND entity_id IS NULL AND outcome = 'failure'",
+                'i',
+                [$adminId]
+            ),
+            'Audit failure left a partial failure audit record.'
+        );
 
         return $tests->assertions();
     } finally {
