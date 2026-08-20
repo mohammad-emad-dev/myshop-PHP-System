@@ -4,7 +4,7 @@ MyShop is a native PHP and MySQL inventory, point-of-sale, and order management 
 
 It is built as a portfolio-grade software engineering project with a focus on secure database access, role-based authorization, transactional stock updates, and practical deployment hygiene.
 
-> **Current status:** Security-hardened Release Candidate. The current baseline is published on `main` and mirrored on the [security-hardening-baseline](https://github.com/mohammad-emad-dev/myshop-PHP-System/tree/security-hardening-baseline) for traceability. It is suitable for portfolio review and local evaluation; production deployment still requires the deployment checklist below.
+> **Current status:** Security-hardened Release Candidate. This release candidate is published on the [security-hardening-baseline](https://github.com/mohammad-emad-dev/myshop-PHP-System/tree/security-hardening-baseline); `main` remains the previous published baseline until this branch is reviewed and merged. It is suitable for portfolio review and local evaluation; production deployment still requires the deployment checklist below.
 
 ## Highlights
 
@@ -368,13 +368,12 @@ Never place backups inside the document root, repository, or a public download d
 
 ## Production readiness roadmap
 
-The current baseline is not certified for a large production deployment. Remaining hardening work includes:
+The current baseline is not independently production-ready. Remaining deployment and operational requirements include:
 
 - HTTPS, secure secret provisioning, production HSTS, firewalling, and monitoring.
-- Pagination or bounded search for large POS, report, history, and selector datasets.
-- Resolving the PHP base and application image to immutable production digests, and patching Debian/Apache/PHP/MySQL through the documented release process.
-- CI checks for syntax, security scanning, migrations, Docker builds, and regression tests.
-- Fresh cross-browser and accessibility verification.
+- Continuing bounded-query review for any remaining large POS, report, history, or selector dataset that is not covered by the existing pagination/export checks.
+- Resolving and externally verifying the deployment-specific PHP base, application, and MySQL image digests, then patching Debian/Apache/PHP/MySQL through the documented release process.
+- Keeping the implemented CI Quality Gate, disposable production smoke, Browser QA, and accessibility checks green for each release candidate.
 - Splitting the large shared functions module into focused application services over time.
 
 These items are tracked as follow-up engineering work rather than hidden behind a production-ready claim.
