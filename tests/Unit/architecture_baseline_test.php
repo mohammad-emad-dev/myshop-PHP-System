@@ -95,7 +95,7 @@ function run_architecture_baseline_unit_tests(): int
         $tests->assertContains($functionContract, $facade, 'Legacy compatibility function disappeared: ' . $functionContract);
     }
 
-    foreach (['catalog_get_products_page', 'catalog_count_products', 'catalog_get_categories_for_selector', 'handle_image_upload', 'delete_product'] as $productFunction) {
+    foreach (['catalog_get_products_page', 'catalog_count_products', 'catalog_get_categories_for_selector', 'handle_image_upload', 'products_create', 'products_update', 'products_delete'] as $productFunction) {
         $tests->assertContains($productFunction . '(', $products, 'Products page dependency contract changed: ' . $productFunction);
     }
     foreach (['catalog_get_pos_products', 'catalog_get_categories_for_selector', 'catalog_get_product_by_id', 'create_order'] as $orderFunction) {
