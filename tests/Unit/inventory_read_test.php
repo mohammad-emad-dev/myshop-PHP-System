@@ -29,7 +29,7 @@ function run_inventory_read_unit_tests(): int
         strpos($module, "require_once __DIR__ . '/functions.php'") !== false,
         'Inventory module must not require the compatibility facade.'
     );
-    foreach (['inventory_count_stock_movements', 'inventory_get_stock_movements_page'] as $functionName) {
+    foreach (['inventory_count_stock_movements', 'inventory_get_stock_movements_page', 'inventory_log_stock_movement'] as $functionName) {
         $tests->assertContains('function ' . $functionName, $module, 'Inventory read function is missing: ' . $functionName);
     }
     foreach (['WHERE sm.product_id = ?', 'ORDER BY sm.created_at DESC, sm.id DESC', 'LIMIT ? OFFSET ?'] as $queryContract) {
@@ -52,6 +52,7 @@ function run_inventory_read_unit_tests(): int
     foreach ([
         'count_stock_movements' => 'inventory_count_stock_movements',
         'get_stock_movements_page' => 'inventory_get_stock_movements_page',
+        'log_stock_movement' => 'inventory_log_stock_movement',
     ] as $legacyName => $inventoryName) {
         $wrapperPattern = '/function ' . preg_quote($legacyName, '/') . '\s*\([^)]*\)\s*\{(?<body>.*?)\n\}/s';
         $matched = preg_match($wrapperPattern, $facade, $matches) === 1;
@@ -60,6 +61,28 @@ function run_inventory_read_unit_tests(): int
             $tests->assertContains($inventoryName . '(', $matches['body'], 'Inventory wrapper does not delegate: ' . $legacyName);
             $tests->assertFalse(stripos($matches['body'], 'SELECT ') !== false, 'Inventory wrapper contains duplicated SQL: ' . $legacyName);
         }
+    }
+
+    foreach ([
+        "INSERT INTO `StockMovement`",
+        '(product_id, staff_id, quantity, movement_type, reason)',
+        'VALUES (?, ?, ?, ?, ?)',
+        "bind_param('iiiss'",
+        "Stock movement prepare failed: '",
+        "Stock movement bind failed: '",
+        "Stock movement insert failed: '",
+        'Stock movement insert affected an unexpected number of rows.',
+        'return true;',
+        'return false;',
+    ] as $writeContract) {
+        $tests->assertContains($writeContract, $module, 'Stock movement write contract changed during extraction: ' . $writeContract);
+    }
+    foreach ([
+        'public/stock_movements.php' => 'log_stock_movement($conn, $adj_product_id',
+        'includes/functions.php' => 'log_stock_movement($conn, $product_id, $staff_id',
+    ] as $callerPath => $callerContract) {
+        $callerSource = $callerPath === 'public/stock_movements.php' ? $stockPage : $facade;
+        $tests->assertContains($callerContract, $callerSource, 'Existing stock movement caller changed: ' . $callerPath);
     }
 
     foreach (['function get_stock_movements($conn, $product_id = null)', 'function get_low_stock_products($conn, $limit = 100)', 'function get_inventory_valuation($conn)'] as $legacyFunction) {
