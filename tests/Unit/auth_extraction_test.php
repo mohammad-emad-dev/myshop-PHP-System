@@ -260,7 +260,7 @@ function run_auth_extraction_unit_tests(): int
             "audit_log_denied(\$conn, 'purchase_order_create'",
             'catalog_get_product_by_id($conn',
             "\$actual_price = (float)\$prod['price'];",
-            'create_order($conn',
+            'orders_create($conn',
             "\$_SESSION['last_order_time']",
         ] as $orderInvariant) {
             $tests->assertContains(
