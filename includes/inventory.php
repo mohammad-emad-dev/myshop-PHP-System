@@ -164,6 +164,23 @@ function inventory_log_stock_movement($conn, $product_id, $staff_id, $quantity, 
 }
 
 /**
+ * Return a safe rollback diagnostic without allowing an invalid mysqli
+ * connection to mask the original transaction failure.
+ */
+function inventory_rollback_error($conn): string
+{
+    try {
+        if (!($conn instanceof mysqli) || !$conn->thread_id) {
+            return 'connection unavailable';
+        }
+
+        return (string)$conn->error;
+    } catch (Throwable $exception) {
+        return 'connection unavailable';
+    }
+}
+
+/**
  * Atomically adjust one product's stock and record its movement and audit
  * events. The caller owns request validation and authorization; this service
  * owns the database transaction and receives the actor explicitly.
@@ -288,7 +305,7 @@ function inventory_adjust_stock($conn, $product_id, $staff_id, $quantity, $reaso
             $rollback_succeeded = false;
         }
         if (!$rollback_succeeded) {
-            error_log('Stock adjustment rollback failed: ' . $conn->error);
+            error_log('Stock adjustment rollback failed: ' . inventory_rollback_error($conn));
         }
         error_log('Stock adjustment failed: ' . $exception->getMessage());
         audit_log($conn, $staff_id, 'stock_adjustment', 'Product', $product_id, false, [
