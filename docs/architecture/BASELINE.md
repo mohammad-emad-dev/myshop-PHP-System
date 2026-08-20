@@ -118,7 +118,7 @@ application service module.
 | `get_low_stock_products()`, stock movement reads, `log_stock_movement()` | Low-stock reads, stock-movement reads/pagination, and compatibility-preserving movement-write wrappers |
 | `create_product()`, `update_product()`, `delete_product()` | Delegation-only compatibility wrappers to `includes/products.php`; upload validation remains page-owned |
 | `create_order()` | Delegation-only compatibility wrapper to `includes/orders.php`; the wrapper preserves the existing order-ID-or-false return contract |
-| `orders_count()`, `orders_get_page()`, `orders_get_summary()`, `orders_get_by_id()`, `orders_get_details()` | Focused bounded and single-record order reads; the legacy names remain delegation-only wrappers and page callers are not yet migrated |
+| `orders_count()`, `orders_get_page()`, `orders_get_summary()`, `orders_get_by_id()`, `orders_get_details()` | Focused bounded and single-record order reads; the legacy names remain delegation-only wrappers for remaining callers |
 | Dashboard, upload, chart, and report functions | Dashboard statistics, uploads, charts, and report aggregates |
 | Role checks and staff administration functions | Authorization and staff administration |
 | Category read/mutation functions | Remaining category reads and category mutations |
@@ -156,9 +156,9 @@ Focused shared modules already extracted from the facade:
 - The same module owns `orders_count()`, `orders_get_page()`,
   `orders_get_summary()`, `orders_get_by_id()`, and `orders_get_details()` for
   bounded and scoped order reads. Their legacy names remain delegation-only
-  wrappers; the current order-history, order-detail, and invoice pages still
-  use those wrappers until a later caller-migration batch. `get_orders()` and
-  `get_orders_for_staff()` remain legacy unbounded loaders.
+  wrappers; the order-history, order-detail, and invoice pages now call the
+  focused services directly. `get_orders()` and `get_orders_for_staff()` remain
+  legacy unbounded loaders.
 
 ## Public pages and responsibilities
 

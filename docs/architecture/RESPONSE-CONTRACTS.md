@@ -18,8 +18,8 @@ transactions in includes/products.php; the legacy product names remain
 delegation-only wrappers. Batch 8A places the order-creation transaction in
 includes/orders.php; the legacy create_order() name remains a delegation-only
 wrapper while the public POS page calls the focused service directly. Batch 8C
-places bounded and scoped order reads in the same module; current read-page
-callers remain on their legacy wrappers until a later caller-migration batch.
+places bounded and scoped order reads in the same module, and Batch 8D migrates
+the order-history, order-detail, and invoice pages to those focused services.
 
 ## Focused Product mutation contracts
 
@@ -87,9 +87,9 @@ pagination ordering, and the existing failure defaults:
 
 `count_orders()`, `get_orders_page()`, `get_order_summary()`,
 `get_order_by_id()`, and `get_order_details()` remain delegation-only wrappers
-with their existing signatures. The order-history, order-detail, and invoice
-pages still call those wrappers in this batch. `get_orders()` and
-`get_orders_for_staff()` remain legacy unbounded loaders.
+with their existing signatures for remaining callers. The order-history,
+order-detail, and invoice pages now call the focused services directly.
+`get_orders()` and `get_orders_for_staff()` remain legacy unbounded loaders.
 
 ## Array-returning functions
 

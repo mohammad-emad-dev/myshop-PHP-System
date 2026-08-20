@@ -16,14 +16,14 @@ names are grouped only for readability; the source remains the authority.
 | `categories.php` | `start_secure_session`, `verify_login`, `is_admin`, `require_admin`, `verify_csrf_token`, `generate_csrf_token`, `sanitize_input`, `normalize_page_number`, `normalize_page_size`, `truncate_list_search`, `create_category`, `update_category`, `delete_category`, `catalog_count_categories`, `catalog_get_categories_page`, `audit_log_current_actor`, `audit_log_denied` |
 | `customers.php` | `start_secure_session`, `verify_login`, `is_admin`, `verify_csrf_token`, `generate_csrf_token`, `sanitize_input`, `normalize_page_number`, `normalize_page_size`, `truncate_list_search`, `create_customer`, `update_customer`, `delete_customer`, `people_count_customers`, `people_get_customers_page`, `audit_log_current_actor`, `audit_log_denied` |
 | `export_report.php` | `start_secure_session`, `verify_login`, `require_admin`, `export_report_definitions`, `export_validate_entity`, `export_validate_order_filters`, `export_csv_text`, `export_csv_write_row`, `export_csv_fail`, `export_stream_entity` |
-| `get_order_details.php` | `start_secure_session`, `verify_login`, `is_admin`, `get_order_by_id`, `get_order_details`, `audit_log_current_actor` |
+| `get_order_details.php` | `start_secure_session`, `verify_login`, `is_admin`, `orders_get_by_id`, `orders_get_details`, `audit_log_current_actor` |
 | `health.php` | `initialize_request_context` |
 | `index.php` | `start_secure_session`, `verify_login`, `is_admin`, `get_dashboard_stats`, `get_chart_data`, `get_inventory_valuation`, `get_top_selling_products`, `get_category_sales_distribution`, `get_low_stock_products` |
 | `login.php` | `start_secure_session`, `send_security_headers`, `verify_csrf_token`, `get_login_source_ip`, `build_login_rate_limit_key`, `login_rate_limit_check`, `login_rate_limit_record_failure`, `login_rate_limit_reset`, `audit_log`, `audit_log_current_actor`, `destroy_current_session`, `generate_csrf_token`, `redirect`, `verify_login`, `get_asset_integrity` |
-| `order_history.php` | `start_secure_session`, `verify_login`, `is_admin`, `sanitize_input`, `normalize_page_number`, `normalize_page_size`, `count_orders`, `get_order_summary`, `get_orders_page` |
+| `order_history.php` | `start_secure_session`, `verify_login`, `is_admin`, `sanitize_input`, `normalize_page_number`, `normalize_page_size`, `orders_count`, `orders_get_summary`, `orders_get_page` |
 | `orders.php` | `start_secure_session`, `verify_login`, `is_admin`, `verify_csrf_token`, `generate_csrf_token`, `truncate_list_search`, `catalog_get_pos_products`, `catalog_get_categories_for_selector`, `people_get_customers_for_selector`, `people_get_suppliers_for_selector`, `catalog_get_product_by_id`, `orders_create`, `audit_log_current_actor`, `audit_log_denied` |
 | `pos_product_lookup.php` | `start_secure_session`, `verify_login`, `truncate_list_search`, `catalog_get_pos_product_by_barcode` |
-| `print_invoice.php` | `start_secure_session`, `send_security_headers`, `verify_login`, `is_admin`, `sanitize_id`, `get_order_by_id`, `get_order_details`, `audit_log_current_actor` |
+| `print_invoice.php` | `start_secure_session`, `send_security_headers`, `verify_login`, `is_admin`, `sanitize_id`, `orders_get_by_id`, `orders_get_details`, `audit_log_current_actor` |
 | `products.php` | `start_secure_session`, `verify_login`, `is_admin`, `verify_csrf_token`, `generate_csrf_token`, `sanitize_input`, `normalize_page_number`, `normalize_page_size`, `truncate_list_search`, `catalog_get_categories_for_selector`, `catalog_get_products_page`, `catalog_count_products`, `products_create`, `products_update`, `products_delete`, `handle_image_upload`, `delete_newly_uploaded_image`, `audit_log_current_actor`, `audit_log_denied` |
 | `ready.php` | `initialize_request_context`, `log_application_error`; `config/db.php` performs the connection and readiness failure contract |
 | `settings.php` | `start_secure_session`, `verify_login`, `is_admin`, `require_admin`, `verify_csrf_token`, `generate_csrf_token`, `sanitize_input`, `password_meets_policy`, `create_staff_member`, `update_staff_member`, `delete_staff_member`, `set_staff_active`, `get_staff_members`, `audit_log_current_actor` |
@@ -148,9 +148,9 @@ metadata. The legacy `create_order()` wrapper preserves the existing signature
 and delegates without duplicating SQL.
 
 The current `public/order_history.php`, `public/get_order_details.php`, and
-`public/print_invoice.php` callers remain on the five legacy read names, which
-are delegation-only wrappers in `functions.php`. A later caller-migration batch
-may move those pages to the focused names. `get_orders()` and
+`public/print_invoice.php` callers use the five focused read names directly.
+The five legacy names remain delegation-only wrappers in `functions.php` for
+remaining callers and compatibility tests. `get_orders()` and
 `get_orders_for_staff()` remain unbounded legacy loaders and were not extracted.
 
 ## Inventory module boundary
