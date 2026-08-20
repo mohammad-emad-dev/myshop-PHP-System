@@ -1,6 +1,6 @@
 # MyShop architecture baseline
 
-Status: Batch 7F product mutation extraction baseline
+Status: Batch 7G product page caller migration baseline
 
 Captured from the `security-hardening-baseline` branch at starting revision
 `b942f1bb611cc79e5cd23238688e5a4197ca18c0`.
@@ -30,8 +30,9 @@ Browser QA is intentionally separate from the dependency-free PHP test harness.
 4. `includes/functions.php` loads `security.php`, `pagination.php`, `audit.php`,
    `http.php`, `auth.php`, `catalog.php`, `people.php`, `inventory.php`,
    and `products.php` as a compatibility facade. Catalog and People page
-   callers may use their focused read functions directly; product mutation
-   callers still use legacy wrappers.
+   callers may use their focused read functions directly; `public/products.php`
+   now calls the focused product mutation services directly while legacy
+   mutation wrappers remain available for other callers.
 5. `config/db.php` reads `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, and
    `DB_PASSWORD` from the process environment and creates the mysqli
    connection. It does not run schema creation or migrations.
@@ -153,7 +154,7 @@ Focused shared modules already extracted from the facade:
 |---|---|
 | `public/login.php` | Login, logout, rate-limit interaction, session changes, authentication audit, login view |
 | `public/index.php` | Dashboard authorization, dashboard queries, chart data preparation, dashboard view |
-| `public/products.php` | Product CRUD request dispatch, request validation, authorization, CSRF, image upload handling, generic messages, Catalog search/pagination, product table, forms, and rendering; delegates product database mutations through compatibility wrappers |
+| `public/products.php` | Product CRUD request dispatch, request validation, authorization, CSRF, image upload handling, generic messages, Catalog search/pagination, product table, forms, and rendering; delegates product database mutations directly to `products_create()`, `products_update()`, and `products_delete()` |
 | `public/categories.php` | Category CRUD request dispatch, admin checks, Catalog search/pagination, category view |
 | `public/stock_movements.php` | Manual stock adjustment request validation, CSRF and authorization boundary, delegation to the Inventory service, movement history filtering/pagination, and stock ledger view |
 | `public/orders.php` | POS cart submission, Catalog product/category and People customer/supplier-selector reads, product revalidation, sale/purchase policy, order creation, POS view and JavaScript |

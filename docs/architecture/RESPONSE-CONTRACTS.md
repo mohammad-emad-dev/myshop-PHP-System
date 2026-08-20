@@ -35,11 +35,12 @@ and return bool:
 All three services roll back and clean up statements on database-operation
 failure, emit the existing failure audit attempt after rollback, use safe
 rollback diagnostics, and return false without exposing database details.
-They do not read session or global state. includes/functions.php keeps
-create_product(), update_product(), and delete_product() as
-delegation-only wrappers with their original signatures and return contracts.
-public/products.php remains responsible for request validation, authorization,
-CSRF, uploads, generic messages, HTTP responses, and rendering.
+They do not read session or global state. `public/products.php` calls these
+focused services directly after its existing request validation, CSRF, and
+authorization gates. includes/functions.php keeps create_product(),
+update_product(), and delete_product() as delegation-only wrappers with their
+original signatures and return contracts for remaining callers. The page
+continues to own uploads, generic messages, HTTP responses, and rendering.
 
 ## Array-returning functions
 
