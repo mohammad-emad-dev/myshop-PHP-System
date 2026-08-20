@@ -1,8 +1,10 @@
 # Batch 7A: Inventory Stock-Movement Read Extraction
 
 This batch moved only bounded stock-movement count and page reads into
-`includes/inventory.php`. Stock mutation, authorization, CSRF, locking,
-movement logging, and audit behavior remain in their existing owners.
+`includes/inventory.php`. Stock mutation, authorization, CSRF, locking, and
+audit behavior remain in their existing owners. Batch 7B subsequently moved
+the movement-writer implementation into the same module behind a legacy
+compatibility wrapper; this document retains the Batch 7A read-scope evidence.
 
 ## Call-site inventory
 

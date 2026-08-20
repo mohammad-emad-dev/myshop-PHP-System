@@ -30,8 +30,13 @@ function run_inventory_read_unit_tests(): int
         'Inventory module must not require the compatibility facade.'
     );
     foreach (['inventory_count_stock_movements', 'inventory_get_stock_movements_page', 'inventory_log_stock_movement'] as $functionName) {
-        $tests->assertContains('function ' . $functionName, $module, 'Inventory read function is missing: ' . $functionName);
+        $tests->assertContains('function ' . $functionName, $module, 'Inventory function is missing: ' . $functionName);
     }
+    $tests->assertContains(
+        'function inventory_log_stock_movement($conn, $product_id, $staff_id, $quantity, $movement_type, $reason = null)',
+        $module,
+        'Inventory stock movement writer arguments changed.'
+    );
     foreach (['WHERE sm.product_id = ?', 'ORDER BY sm.created_at DESC, sm.id DESC', 'LIMIT ? OFFSET ?'] as $queryContract) {
         $tests->assertContains($queryContract, $module, 'Inventory query contract changed: ' . $queryContract);
     }
@@ -60,6 +65,13 @@ function run_inventory_read_unit_tests(): int
         if ($matched) {
             $tests->assertContains($inventoryName . '(', $matches['body'], 'Inventory wrapper does not delegate: ' . $legacyName);
             $tests->assertFalse(stripos($matches['body'], 'SELECT ') !== false, 'Inventory wrapper contains duplicated SQL: ' . $legacyName);
+            if ($legacyName === 'log_stock_movement') {
+                $tests->assertContains(
+                    'return inventory_log_stock_movement($conn, $product_id, $staff_id, $quantity, $movement_type, $reason);',
+                    $matches['body'],
+                    'Stock movement wrapper arguments changed.'
+                );
+            }
         }
     }
 

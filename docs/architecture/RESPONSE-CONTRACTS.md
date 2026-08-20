@@ -7,8 +7,9 @@ Batch 6A places active-session authentication, administrator authorization, and
 redirect implementations in `includes/auth.php` and `includes/http.php`. Batch
 5 placed bounded Supplier reads in `includes/people.php`; earlier batches placed
 Customer and Catalog reads in their focused modules. Batch 7A places bounded
-stock-movement count/page reads in `includes/inventory.php`. Legacy names for moved
-functions remain available from `includes/functions.php` as compatibility
+stock-movement count/page reads in `includes/inventory.php`; Batch 7B places the
+stock-movement history writer there while retaining the legacy wrapper. Legacy
+names for moved functions remain available from `includes/functions.php` as compatibility
 wrappers, while unmoved legacy functions retain their original contracts.
 
 ## Array-returning functions
@@ -83,7 +84,7 @@ failures, and some infrastructure failures.
   allowed staff record.
 - `create_product()`, `update_product()`, and `delete_product()` on rejected or
   failed mutations.
-- `log_stock_movement()` on rejected or failed history writes.
+- `inventory_log_stock_movement()` / `log_stock_movement()` on rejected or failed history writes.
 - `create_order()` on any validation, authorization, transaction, stock,
   audit, or database failure.
 - Staff, category, customer, and supplier mutation functions on rejected or

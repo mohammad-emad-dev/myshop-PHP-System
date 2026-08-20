@@ -112,7 +112,7 @@ application service module.
 | `verify_login()`, `redirect()` | Delegation-only Auth and HTTP compatibility wrappers |
 | `build_product_filter_sql()` | Catalog filter compatibility wrapper |
 | `get_all_products()` and Catalog compatibility wrappers | Legacy full product read plus delegation to `includes/catalog.php` |
-| `get_low_stock_products()`, stock movement reads | Low-stock reads and stock-movement reads/pagination |
+| `get_low_stock_products()`, stock movement reads, `log_stock_movement()` | Low-stock reads, stock-movement reads/pagination, and the compatibility-preserving movement writer |
 | `create_product()`, `update_product()`, `delete_product()` | Product writes, stock history, uploads, and audit coupling |
 | `create_order()` | Transactional sale/purchase order creation |
 | Order list/count/summary/detail functions | Order lists, counts, summaries, scoped lookups, and details |

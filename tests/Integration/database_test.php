@@ -967,6 +967,12 @@ function run_integration_tests(): int
         $tests->assertSame('purchase', $adminPagePurchase['order_type'], 'Admin page purchase order type changed.');
         $tests->assertSame($supplierId, (int)$adminPagePurchase['supplier_id'], 'Admin page purchase supplier association changed.');
         $tests->assertSame($orderPagePurchaseBeforeStock + 2, (int)test_scalar($conn, 'SELECT stock FROM Product WHERE id = ?', 'i', [$orderProductId]), 'Admin page purchase stock mutation changed.');
+        $tests->assertSame(1, (int)test_scalar(
+            $conn,
+            'SELECT COUNT(*) FROM StockMovement WHERE product_id = ? AND staff_id = ? AND movement_type = ? AND quantity = ? AND reason = ?',
+            'iisis',
+            [$orderProductId, $adminId, 'purchase', 2, 'Order #' . $adminPagePurchaseId . ' Purchase']
+        ), 'Admin page purchase stock movement invariant changed.');
 
         $purchaseDeniedBeforeCount = (int)test_scalar($conn, 'SELECT COUNT(*) FROM `Order`');
         $purchaseDeniedBeforeStock = (int)test_scalar($conn, 'SELECT stock FROM Product WHERE id = ?', 'i', [$orderProductId]);
@@ -1035,6 +1041,32 @@ function run_integration_tests(): int
         $tests->assertSame($rollbackOrderBeforeCount, (int)test_scalar($conn, 'SELECT COUNT(*) FROM `Order`'), 'Insufficient stock rollback left a partial order.');
         $tests->assertSame($rollbackStockBefore, (int)test_scalar($conn, 'SELECT stock FROM Product WHERE id = ?', 'i', [$orderProductId]), 'Insufficient stock rollback changed inventory.');
         $tests->assertSame($rollbackMovementBefore, (int)test_scalar($conn, 'SELECT COUNT(*) FROM StockMovement WHERE product_id = ?', 'i', [$orderProductId]), 'Insufficient stock rollback left a stock movement.');
+
+        $directMovementReason = 'Batch 7B direct writer success';
+        $directMovementBefore = (int)test_scalar(
+            $conn,
+            'SELECT COUNT(*) FROM StockMovement WHERE product_id = ? AND staff_id = ? AND movement_type = ? AND quantity = ? AND reason = ?',
+            'iisis',
+            [$orderProductId, $adminId, 'manual_adjustment', 1, $directMovementReason]
+        );
+        $tests->assertTrue(
+            log_stock_movement($conn, $orderProductId, $adminId, 1, 'manual_adjustment', $directMovementReason),
+            'The stock movement compatibility wrapper must preserve successful inserts.'
+        );
+        $tests->assertSame(
+            $directMovementBefore + 1,
+            (int)test_scalar(
+                $conn,
+                'SELECT COUNT(*) FROM StockMovement WHERE product_id = ? AND staff_id = ? AND movement_type = ? AND quantity = ? AND reason = ?',
+                'iisis',
+                [$orderProductId, $adminId, 'manual_adjustment', 1, $directMovementReason]
+            ),
+            'A successful stock movement insert must create exactly one history row.'
+        );
+        $tests->assertFalse(
+            log_stock_movement($conn, 2147483647, $adminId, 1, 'manual_adjustment', 'Batch 7B invalid product'),
+            'A foreign-key stock movement insert must fail safely.'
+        );
 
         $tests->assertTrue(count_stock_movements($conn) > 0, 'Stock movement count should include transaction history.');
         $tests->assertTrue(count(get_stock_movements_page($conn, null, 10, 0)) <= 10, 'Stock movement page is not bounded.');
@@ -1232,6 +1264,10 @@ function run_integration_tests(): int
         );
         $failureConnection->close();
         $tests->assertSame(null, get_product_by_id($failureConnection, 1), 'Single-record DB failures must return null.');
+        $tests->assertFalse(
+            log_stock_movement($failureConnection, $orderProductId, $adminId, 1, 'manual_adjustment', 'Batch 7B closed connection'),
+            'Stock movement insertion must fail safely when the database connection is unavailable.'
+        );
         $tests->assertCount(0, get_orders($failureConnection), 'List DB failures must return an empty array.');
         $tests->assertCount(0, get_order_details($failureConnection, 1), 'Order-detail DB failures must return an empty array.');
         $tests->assertFalse(create_product($failureConnection, $adminId, $prefix . '_DB_FAILURE', 'Failure', 1.00, 1), 'Create DB failures must return false.');

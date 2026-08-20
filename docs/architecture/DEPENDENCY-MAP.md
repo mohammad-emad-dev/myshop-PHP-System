@@ -92,21 +92,24 @@ neither was moved without a verified caller.
 
 `includes/inventory.php` has no dependency on `includes/functions.php`. It
 requires only `pagination.php` for page-size normalization and accepts `$conn`
-explicitly for each bounded stock-movement query.
+explicitly for each stock-movement operation.
 
 | Focused function | Read behavior | Side effects and security notes |
 |---|---|---|
 | `inventory_count_stock_movements` | Count all movements or movements for one product | Prepared optional product filter; returns `0` on invalid input or failure |
 | `inventory_get_stock_movements_page` | Bounded movement page with optional product filter and deterministic newest-first ordering | Prepared product/limit/offset values; returns `[]` on invalid input or failure |
+| `inventory_log_stock_movement` | Inserts one stock-movement history row | Preserves the prepared insert, binding, boolean return, and error-log contract; adds no transaction boundary |
 
-`public/stock_movements.php` calls these focused functions directly for its
+`public/stock_movements.php` calls the focused read functions directly for its
 read path. The legacy `count_stock_movements` and
 `get_stock_movements_page` names remain delegation-only wrappers in
-`functions.php` for un-migrated callers. `get_stock_movements()` remains an
-unbounded legacy loader because the inventory-wide caller inventory found no
-verified runtime caller. `get_low_stock_products()` and
-`get_inventory_valuation()` remain in the facade for the dashboard and navbar
-callers.
+`functions.php` for un-migrated callers. The legacy `log_stock_movement()` name
+also remains a delegation-only wrapper; existing product, order, and manual
+adjustment callers intentionally remain on that wrapper during this batch.
+`get_stock_movements()` remains an unbounded legacy loader because the
+inventory-wide caller inventory found no verified runtime caller.
+`get_low_stock_products()` and `get_inventory_valuation()` remain in the facade
+for the dashboard and navbar callers.
 
 ## People module boundary
 
