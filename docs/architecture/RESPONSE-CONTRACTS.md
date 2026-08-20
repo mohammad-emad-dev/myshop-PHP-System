@@ -20,6 +20,8 @@ includes/orders.php; the legacy create_order() name remains a delegation-only
 wrapper while the public POS page calls the focused service directly. Batch 8C
 places bounded and scoped order reads in the same module, and Batch 8D migrates
 the order-history, order-detail, and invoice pages to those focused services.
+Phase 3D places the inventory valuation read in `includes/dashboard.php`; the
+legacy name remains a delegation-only compatibility wrapper.
 
 ## Focused Dashboard statistics contract
 
@@ -47,6 +49,15 @@ Order aggregate. Prepared bindings, failure logging, statement cleanup, and
 closed-connection fallback are unchanged. `public/index.php` calls this
 focused service directly; `get_chart_data()` remains a delegation-only
 compatibility wrapper.
+
+`dashboard_get_inventory_valuation($conn)` executes the existing
+`SUM(stock * price)` Product aggregate and returns a float. It returns `0.0`
+when the Product result is empty, the query fails, or the connection is closed,
+and preserves the existing server-side error logging without exposing database
+details. It has no session or global dependency. `public/index.php` calls the
+focused service directly; `get_inventory_valuation()` remains a
+delegation-only compatibility wrapper in `includes/functions.php` with the
+original signature and return contract.
 
 ## Focused Product mutation contracts
 
@@ -155,6 +166,9 @@ callers must not assume the distinction is currently available.
   wrapper.
 - `dashboard_get_chart_data()` / `get_chart_data()` — complete padded chart
   array with zero values on failure; the legacy name is a compatibility wrapper.
+- `dashboard_get_inventory_valuation()` / `get_inventory_valuation()` — float
+  Product valuation, with `0.0` on empty results or database failure; the legacy
+  name is a compatibility wrapper.
 - `get_top_selling_products()` and `get_category_sales_distribution()` —
   report arrays.
 
@@ -230,6 +244,9 @@ extracting modules unless callers are migrated and tested together.
   return zeroed KPI values when one or more queries fail.
 - `dashboard_get_chart_data()` and its `get_chart_data()` compatibility wrapper
   return a complete date range padded with zero values when the query fails.
+- `dashboard_get_inventory_valuation()` and its `get_inventory_valuation()`
+  compatibility wrapper return `0.0` when the valuation result is empty or the
+  database operation fails.
 - `get_order_summary()` returns default numeric summary fields on failure.
 - Paginated readers return empty arrays when the query fails.
 
