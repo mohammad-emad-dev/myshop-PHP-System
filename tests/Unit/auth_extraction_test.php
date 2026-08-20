@@ -271,6 +271,60 @@ function run_auth_extraction_unit_tests(): int
         }
     }
 
+    $settings = file_get_contents($repository . '/public/settings.php');
+    $tests->assertTrue(is_string($settings), 'Settings authentication caller source could not be read.');
+    if (is_string($settings)) {
+        preg_match_all(
+            '/\b(?:auth_verify_login|auth_require_admin|auth_is_admin)\s*\([^)]*\)/',
+            $settings,
+            $settingsAuthCalls
+        );
+        $tests->assertSame(
+            [
+                'auth_verify_login($conn)',
+                'auth_require_admin($conn)',
+                'auth_is_admin($conn)',
+            ],
+            $settingsAuthCalls[0],
+            'Settings authentication call count or execution order changed.'
+        );
+        foreach (['verify_login', 'require_admin', 'is_admin'] as $legacyCall) {
+            $tests->assertFalse(
+                preg_match('/(?<!auth_)\b' . $legacyCall . '\s*\(/', $settings) === 1,
+                'Settings page still uses a legacy authentication wrapper: ' . $legacyCall
+            );
+        }
+
+        $csrfOffset = strpos($settings, 'if (!verify_csrf_token($csrf_token))');
+        $authorizationOffset = strpos($settings, 'auth_require_admin($conn)');
+        $tests->assertTrue(
+            $csrfOffset !== false && $authorizationOffset !== false && $csrfOffset < $authorizationOffset,
+            'Settings CSRF validation must remain before authorization.'
+        );
+        foreach ([
+            'password_verify($current_password',
+            'password_meets_policy(',
+            'create_staff_member($conn',
+            'update_staff_member($conn',
+            'delete_staff_member($conn',
+            'set_staff_active($conn',
+            '$conn->begin_transaction()',
+            '$conn->commit()',
+            '$conn->rollback()',
+            "audit_log_current_actor(\$conn, 'settings_change'",
+            "audit_log_current_actor(\$conn, 'staff_create'",
+            "audit_log_current_actor(\$conn, 'staff_update'",
+            "audit_log_current_actor(\$conn, 'staff_deactivate'",
+            "audit_log_current_actor(\$conn, 'staff_status_change'",
+        ] as $settingsInvariant) {
+            $tests->assertContains(
+                $settingsInvariant,
+                $settings,
+                'Settings security or business invariant disappeared during auth caller migration: ' . $settingsInvariant
+            );
+        }
+    }
+
     $stockMovements = file_get_contents($repository . '/public/stock_movements.php');
     $tests->assertTrue(is_string($stockMovements), 'Stock movement authentication caller source could not be read.');
     if (is_string($stockMovements)) {
