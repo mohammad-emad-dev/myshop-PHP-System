@@ -1019,18 +1019,25 @@ function run_integration_tests(): int
             $cashierId,
             [[
                 'product_id' => $orderProductId,
-                'quantity' => 2,
+                'quantity' => 1,
                 'unit_price' => 0.01,
                 'subtotal' => 0.02,
                 'total' => 0.02,
+            ], [
+                'product_id' => $orderProductId,
+                'quantity' => 1,
+                'unit_price' => 0.01,
+                'subtotal' => 0.01,
+                'total' => 0.01,
             ]],
             'sale',
             $customerId,
             null
         );
         $tests->assertTrue(is_int($tamperedSaleId) && $tamperedSaleId > 0, 'Cashier sale creation failed.');
-        $detail = test_fetch_one($conn, 'SELECT unit_price, subtotal FROM OrderDetail WHERE order_id = ?', 'i', [$tamperedSaleId]);
+        $detail = test_fetch_one($conn, 'SELECT quantity, unit_price, subtotal FROM OrderDetail WHERE order_id = ?', 'i', [$tamperedSaleId]);
         $sale = test_fetch_one($conn, 'SELECT total_amount FROM `Order` WHERE id = ?', 'i', [$tamperedSaleId]);
+        $tests->assertSame(2, (int)$detail['quantity'], 'Duplicate cart items were not aggregated into one order detail quantity.');
         $tests->assertSame(12.34, round((float)$detail['unit_price'], 2), 'Client unit price tampering was accepted.');
         $tests->assertSame(24.68, round((float)$detail['subtotal'], 2), 'Client subtotal tampering was accepted.');
         $tests->assertSame(24.68, round((float)$sale['total_amount'], 2), 'Client total tampering was accepted.');
