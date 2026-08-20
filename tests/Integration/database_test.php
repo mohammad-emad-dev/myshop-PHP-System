@@ -690,6 +690,39 @@ function run_integration_tests(): int
         $tests->assertFalse(update_category($conn, 1, $prefix . '_NOT_GENERAL', 'Invalid General rename'), 'The default General category must not be renamed.');
         $tests->assertFalse(delete_category($conn, 1), 'The default General category must not be deleted.');
 
+        $serviceBarcode = $prefix . '-SERVICE';
+        $tests->assertTrue(
+            products_create($conn, $adminId, $prefix . '_SERVICE_PRODUCT', 'Explicit service product', 9.99, 3, null, 5, null, '  ' . $serviceBarcode . '  '),
+            'Direct product creation service success path failed.'
+        );
+        $serviceProduct = test_fetch_one($conn, 'SELECT id, category_id, barcode FROM Product WHERE barcode = ?', 's', [$serviceBarcode]);
+        $tests->assertTrue(is_array($serviceProduct), 'Direct product creation service did not persist the product.');
+        $serviceProductId = (int)($serviceProduct['id'] ?? 0);
+        $tests->assertSame(1, (int)($serviceProduct['category_id'] ?? 0), 'Product creation must default to the General category.');
+        $tests->assertSame($serviceBarcode, (string)($serviceProduct['barcode'] ?? ''), 'Product barcode normalization changed.');
+        $serviceMovement = test_fetch_one(
+            $conn,
+            'SELECT quantity, movement_type, reason FROM StockMovement WHERE product_id = ? AND staff_id = ? ORDER BY id DESC LIMIT 1',
+            'ii',
+            [$serviceProductId, $adminId]
+        );
+        $tests->assertSame(3, (int)($serviceMovement['quantity'] ?? 0), 'Initial product stock movement quantity changed.');
+        $tests->assertSame('manual_adjustment', (string)($serviceMovement['movement_type'] ?? ''), 'Initial product stock movement type changed.');
+        $tests->assertSame('Initial stock allocation', (string)($serviceMovement['reason'] ?? ''), 'Initial product stock movement reason changed.');
+        $serviceAudit = test_fetch_one(
+            $conn,
+            "SELECT actor_staff_id, entity_id, outcome, metadata FROM AuditLog WHERE action = 'product_create' AND entity_id = ? ORDER BY id DESC LIMIT 1",
+            'i',
+            [$serviceProductId]
+        );
+        $serviceAuditMetadata = json_decode((string)($serviceAudit['metadata'] ?? ''), true);
+        $tests->assertSame($adminId, (int)($serviceAudit['actor_staff_id'] ?? 0), 'Product-create audit actor changed.');
+        $tests->assertSame($serviceProductId, (int)($serviceAudit['entity_id'] ?? 0), 'Product-create audit entity changed.');
+        $tests->assertSame('success', (string)($serviceAudit['outcome'] ?? ''), 'Product-create audit outcome changed.');
+        $tests->assertTrue(is_array($serviceAuditMetadata), 'Product-create audit metadata is not valid JSON.');
+        $tests->assertSame(3, (int)($serviceAuditMetadata['stock'] ?? 0), 'Product-create audit stock metadata changed.');
+        $tests->assertSame(false, $serviceAuditMetadata['has_image'] ?? null, 'Product-create audit image metadata changed.');
+
         $historyBarcode = $prefix . '-HISTORY';
         $tests->assertTrue(create_product($conn, $adminId, $prefix . '_HISTORY_PRODUCT', 'History product', 12.34, 20, null, 5, $categoryId, $historyBarcode), 'Historical product creation failed.');
         $historyProductId = (int)test_scalar($conn, 'SELECT id FROM Product WHERE barcode = ?', 's', [$historyBarcode]);
@@ -1445,11 +1478,25 @@ function run_integration_tests(): int
         $tests->assertFalse(delete_category($failureConnection, 2), 'Delete DB failures must return false.');
 
         $rollbackBarcode = $prefix . '-ROLLBACK';
+        $rollbackMovementBefore = (int)test_scalar(
+            $conn,
+            'SELECT COUNT(*) FROM StockMovement WHERE reason = ?',
+            's',
+            ['Initial stock allocation']
+        );
+        $rollbackAuditBefore = (int)test_scalar(
+            $conn,
+            "SELECT COUNT(*) FROM AuditLog WHERE action = 'product_create' AND outcome = 'failure'"
+        );
         $tests->assertFalse(create_product($conn, 999999999, $prefix . '_ROLLBACK_PRODUCT', 'Rollback', 3.00, 4, null, 5, null, $rollbackBarcode), 'A stock-ledger failure must fail product creation.');
         $tests->assertSame(null, test_scalar($conn, 'SELECT id FROM Product WHERE barcode = ?', 's', [$rollbackBarcode]), 'Failed product creation left a partial product row.');
+        $tests->assertSame($rollbackMovementBefore, (int)test_scalar($conn, 'SELECT COUNT(*) FROM StockMovement WHERE reason = ?', 's', ['Initial stock allocation']), 'Failed product creation left a partial stock movement.');
+        $tests->assertSame($rollbackAuditBefore, (int)test_scalar($conn, "SELECT COUNT(*) FROM AuditLog WHERE action = 'product_create' AND outcome = 'failure'"), 'Failed product creation unexpectedly persisted a failure audit with an invalid actor.');
 
         $auditRollbackBarcode = $prefix . '-AUDIT-ROLLBACK';
         $productCountBeforeAuditFailure = (int)test_scalar($conn, 'SELECT COUNT(*) FROM Product');
+        $movementCountBeforeAuditFailure = (int)test_scalar($conn, 'SELECT COUNT(*) FROM StockMovement');
+        $auditCountBeforeAuditFailure = (int)test_scalar($conn, 'SELECT COUNT(*) FROM AuditLog');
         $schema->query('DROP TABLE AuditLog');
         $tests->assertFalse(
             create_product($conn, $adminId, $prefix . '_AUDIT_ROLLBACK_PRODUCT', 'Audit rollback', 3.00, 4, null, 5, null, $auditRollbackBarcode),
@@ -1458,6 +1505,8 @@ function run_integration_tests(): int
         $tests->assertSame($productCountBeforeAuditFailure, (int)test_scalar($conn, 'SELECT COUNT(*) FROM Product'), 'Audit failure left a partial product row.');
         test_load_sql_file($schema, dirname(__DIR__, 2) . '/database/batch22_audit_log.sql');
         $tests->assertSame(1, (int)test_scalar($schema, "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'AuditLog'"), 'Audit migration did not restore the disposable table.');
+        $tests->assertSame($movementCountBeforeAuditFailure, (int)test_scalar($conn, 'SELECT COUNT(*) FROM StockMovement'), 'Audit failure left a partial stock movement.');
+        $tests->assertSame($auditCountBeforeAuditFailure, (int)test_scalar($conn, 'SELECT COUNT(*) FROM AuditLog'), 'Audit failure left a partial audit record.');
 
         return $tests->assertions();
     } finally {
