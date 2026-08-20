@@ -4,6 +4,24 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../bootstrap.php';
 
+function test_open_authentication_session(array $values): void
+{
+    if (session_status() === PHP_SESSION_ACTIVE) {
+        destroy_current_session();
+    }
+    if (session_id() !== '') {
+        session_id('');
+    }
+
+    start_secure_session();
+    if (session_status() !== PHP_SESSION_ACTIVE) {
+        throw new TestFailure('Integration test could not start an authentication session.');
+    }
+
+    $_SESSION = $values;
+    unset($GLOBALS['current_staff_record']);
+}
+
 function run_integration_tests(): int
 {
     $tests = new TestContext();
@@ -94,6 +112,7 @@ function run_integration_tests(): int
 
         $adminUsername = $prefix . '_ADMIN';
         $cashierUsername = $prefix . '_CASHIER';
+        $disabledUsername = $prefix . '_DISABLED';
         $adminPassword = $prefix . '_' . bin2hex(random_bytes(16));
         $cashierPassword = $prefix . '_' . bin2hex(random_bytes(16));
         test_execute(
@@ -108,12 +127,56 @@ function run_integration_tests(): int
             'ssssi',
             [$cashierUsername, $prefix . ' Cashier', password_hash($cashierPassword, PASSWORD_BCRYPT), 'cashier', 1]
         );
+        test_execute(
+            $schema,
+            'INSERT INTO Staff (username, full_name, password, role, is_active) VALUES (?, ?, ?, ?, ?)',
+            'ssssi',
+            [$disabledUsername, $prefix . ' Disabled', password_hash($prefix . '_DISABLED_PASSWORD', PASSWORD_BCRYPT), 'cashier', 0]
+        );
         $adminId = (int)test_scalar($conn, 'SELECT id FROM Staff WHERE username = ?', 's', [$adminUsername]);
         $cashierId = (int)test_scalar($conn, 'SELECT id FROM Staff WHERE username = ?', 's', [$cashierUsername]);
+        $disabledId = (int)test_scalar($conn, 'SELECT id FROM Staff WHERE username = ?', 's', [$disabledUsername]);
         $tests->assertTrue($adminId > 0 && $cashierId > 0, 'Disposable staff fixtures were not created.');
+        $tests->assertTrue($disabledId > 0, 'Disposable disabled staff fixture was not created.');
         $tests->assertTrue(count(get_staff_members($conn, 100, 0)) <= 100, 'Staff list loading must be bounded.');
         $adminRecord = test_fetch_one($conn, 'SELECT password FROM Staff WHERE id = ?', 'i', [$adminId]);
         $tests->assertTrue(password_verify($adminPassword, $adminRecord['password']), 'Seeded password hashes must verify.');
+
+        test_open_authentication_session(['staff_id' => $adminId]);
+        $tests->assertTrue(auth_verify_login($conn, false), 'An active administrator session must authenticate.');
+        $tests->assertSame($adminId, $_SESSION['staff_id'], 'Authentication changed the staff identifier contract.');
+        $tests->assertSame($prefix . ' Admin', $_SESSION['full_name'], 'Authentication changed the full-name session contract.');
+        $tests->assertSame('admin', $_SESSION['role'], 'Authentication changed the role session contract.');
+        $tests->assertTrue(is_int($_SESSION['last_activity']), 'Authentication must refresh integer last-activity state.');
+        $tests->assertSame($adminId, (int)$GLOBALS['current_staff_record']['id'], 'Authentication did not populate the current staff global.');
+        $tests->assertTrue(auth_is_admin($conn), 'The extracted authorization check rejected an administrator.');
+        destroy_current_session();
+
+        test_open_authentication_session(['staff_id' => $cashierId]);
+        $tests->assertTrue(auth_verify_login($conn, false), 'An active cashier session must authenticate.');
+        $tests->assertFalse(auth_is_admin($conn), 'The extracted authorization check accepted a cashier as an administrator.');
+        destroy_current_session();
+
+        test_open_authentication_session(['staff_id' => 2147483647]);
+        $tests->assertFalse(auth_verify_login($conn, false), 'A missing staff record must fail authentication.');
+        $tests->assertSame(PHP_SESSION_NONE, session_status(), 'A missing staff record must invalidate the session.');
+
+        test_open_authentication_session(['staff_id' => $disabledId]);
+        $tests->assertFalse(auth_verify_login($conn, false), 'A disabled staff record must fail authentication.');
+        $tests->assertSame(PHP_SESSION_NONE, session_status(), 'A disabled staff record must invalidate the session.');
+
+        $hadGlobalConnection = array_key_exists('conn', $GLOBALS);
+        $previousGlobalConnection = $GLOBALS['conn'] ?? null;
+        $GLOBALS['conn'] = $conn;
+        test_open_authentication_session(['staff_id' => $adminId]);
+        $tests->assertTrue(verify_login(false), 'The legacy authentication wrapper must use the global database connection.');
+        $tests->assertTrue(is_admin(), 'The legacy administrator wrapper must preserve authorization behavior.');
+        destroy_current_session();
+        if ($hadGlobalConnection) {
+            $GLOBALS['conn'] = $previousGlobalConnection;
+        } else {
+            unset($GLOBALS['conn']);
+        }
 
         $customerName = $prefix . '_CUSTOMER';
         $supplierName = $prefix . '_SUPPLIER';

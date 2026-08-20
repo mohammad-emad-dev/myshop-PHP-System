@@ -17,6 +17,8 @@ function run_architecture_baseline_unit_tests(): int
     $facade = file_get_contents($repository . '/includes/functions.php');
     $catalog = file_get_contents($repository . '/includes/catalog.php');
     $people = file_get_contents($repository . '/includes/people.php');
+    $auth = file_get_contents($repository . '/includes/auth.php');
+    $http = file_get_contents($repository . '/includes/http.php');
     $security = file_get_contents($repository . '/includes/security.php');
     $orders = file_get_contents($repository . '/public/orders.php');
     $categories = file_get_contents($repository . '/public/categories.php');
@@ -31,6 +33,8 @@ function run_architecture_baseline_unit_tests(): int
         $facade,
         $catalog,
         $people,
+        $auth,
+        $http,
         $security,
         $orders,
         $categories,
@@ -67,7 +71,7 @@ function run_architecture_baseline_unit_tests(): int
         $tests->assertTrue(is_file($repository . '/' . $route), 'Documented public route is missing: ' . $route);
     }
 
-    foreach (['security.php', 'pagination.php', 'audit.php', 'catalog.php', 'people.php'] as $module) {
+    foreach (['security.php', 'pagination.php', 'audit.php', 'http.php', 'auth.php', 'catalog.php', 'people.php'] as $module) {
         $tests->assertContains(
             "require_once __DIR__ . '/{$module}'",
             $facade,
@@ -112,7 +116,11 @@ function run_architecture_baseline_unit_tests(): int
     $tests->assertContains('export_stream_entity(', $export, 'Export endpoint must retain the streaming service boundary.');
 
     $tests->assertContains('global $conn', $facade, 'The current global database dependency must remain documented before extraction.');
-    $tests->assertContains('$GLOBALS[\'current_staff_record\']', $facade, 'The current authentication global must remain documented before extraction.');
+    $tests->assertContains('$GLOBALS[\'current_staff_record\']', $auth, 'The current authentication global compatibility contract changed.');
+    $tests->assertFalse(
+        strpos($auth, "require_once __DIR__ . '/functions.php'") !== false,
+        'Authentication module must remain independent from the compatibility facade.'
+    );
     $tests->assertContains('$_SESSION', $security, 'Session state ownership must remain in the security module.');
 
     foreach (['begin_transaction', 'FOR UPDATE', 'commit', 'rollback'] as $orderInvariant) {

@@ -92,20 +92,37 @@ function diagnosticsFor(page) {
   return diagnostics;
 }
 
+async function currentPhpSessionId(page) {
+  const cookies = await page.context().cookies();
+  return cookies.find((cookie) => cookie.name === 'PHPSESSID')?.value ?? null;
+}
+
 async function login(page, credentials) {
   await page.goto('/login.php');
+  const anonymousSession = await currentPhpSessionId(page);
   await page.getByLabel('Username').fill(credentials.username);
   await page.getByLabel('Password').fill(credentials.password);
   await page.getByRole('button', { name: 'Log In' }).click();
   await expect(page).toHaveURL(/\/index\.php$/);
   await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
+  const authenticatedSession = await currentPhpSessionId(page);
+  expect(
+    anonymousSession !== null && authenticatedSession !== null && anonymousSession !== authenticatedSession,
+    'Successful login must regenerate the PHP session identifier',
+  ).toBe(true);
 }
 
 async function logout(page) {
+  const authenticatedSession = await currentPhpSessionId(page);
   page.once('dialog', async (dialog) => dialog.accept());
   await page.getByRole('button', { name: 'Logout' }).first().evaluate((button) => button.click());
   await page.waitForURL(/\/login\.php$/);
   await expect(page.getByLabel('Username')).toBeVisible();
+  const postLogoutSession = await currentPhpSessionId(page);
+  expect(
+    authenticatedSession !== null && postLogoutSession !== null && authenticatedSession !== postLogoutSession,
+    'Logout must invalidate the authenticated PHP session identifier',
+  ).toBe(true);
 }
 
 async function loadPage(page, route, heading) {

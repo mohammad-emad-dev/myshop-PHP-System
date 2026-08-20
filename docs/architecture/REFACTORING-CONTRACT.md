@@ -1,7 +1,8 @@
 # MyShop refactoring contract
 
-This contract is the safety boundary for future modularization. Batch 5
-extracts only bounded Supplier reads and preserves application behavior.
+This contract is the safety boundary for future modularization. Batch 6A moves
+only active-session authentication, administrator authorization, and redirect
+implementation behind compatibility wrappers while preserving public behavior.
 
 ## Behavior that must remain unchanged
 
@@ -152,7 +153,7 @@ with the exact command and environment.
 
 ## Recommended next batch
 
-After Batch 5, the next candidate is the dashboard read model after its query,
+After Batch 6A, the next candidate is the dashboard read model after its query,
 default-value, and display contracts are characterized. It must not include
 dashboard mutations or presentation changes.
 
@@ -167,13 +168,13 @@ Acceptance criteria:
 
 ## Rollback instructions
 
-Batch 5 can be rolled back without a schema or data rollback:
+Batch 6A can be rolled back without a schema or data rollback:
 
-1. Revert the local Batch 5 commit, or restore the previous local commit if it
-   is not shared.
-2. Confirm `public/suppliers.php` and `public/orders.php` use the legacy
-   supplier read names again and that the supplier wrappers still delegate
-   through `people.php`.
+1. Revert the local Batch 6A implementation commit and its characterization
+   checkpoint, or restore the pre-batch commit if neither commit is shared.
+2. Confirm `verify_login()`, `redirect()`, `is_admin()`, and `require_admin()`
+   are restored in `includes/functions.php` and that `auth.php`/`http.php` are
+   no longer loaded.
 3. Re-run `git diff --check` and the previously passing test suite.
 
 No database rollback, migration rollback, container rollback, or production

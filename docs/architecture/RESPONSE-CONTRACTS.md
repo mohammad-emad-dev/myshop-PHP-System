@@ -3,12 +3,12 @@
 This inventory records current return and control-flow behavior. Future
 modules must preserve these contracts until callers are migrated deliberately.
 
-Batch 5 places the bounded Supplier count/page/selector implementations in
-`includes/people.php`; Batch 4 placed Customer reads there, Batch 3 placed
-Catalog category reads, and Batch 2 placed product-side reads in
-`includes/catalog.php`. Legacy names for moved reads remain available from
-`includes/functions.php` as compatibility wrappers, while unmoved legacy reads
-retain their original contracts.
+Batch 6A places active-session authentication, administrator authorization, and
+redirect implementations in `includes/auth.php` and `includes/http.php`. Batch
+5 placed bounded Supplier reads in `includes/people.php`; earlier batches placed
+Customer and Catalog reads in their focused modules. Legacy names for moved
+functions remain available from `includes/functions.php` as compatibility
+wrappers, while unmoved legacy functions retain their original contracts.
 
 ## Array-returning functions
 
@@ -77,8 +77,9 @@ failures, and some infrastructure failures.
   is invalid.
 - `get_login_source_ip()` when the peer address is unavailable or invalid.
 - `login_rate_limit_*()` mutation/check helpers on infrastructure failure.
-- `verify_login(false)` when the current session is not authenticated or no
-  longer represents an active allowed staff record.
+- `auth_verify_login(..., false)`, exposed through `verify_login(false)`, when
+  the current session is not authenticated or no longer represents an active
+  allowed staff record.
 - `create_product()`, `update_product()`, and `delete_product()` on rejected or
   failed mutations.
 - `log_stock_movement()` on rejected or failed history writes.
@@ -138,10 +139,12 @@ convert them to the return values listed above.
 
 ## Redirecting or terminating functions
 
-- `redirect()` sends a `Location` header and terminates execution.
-- `verify_login()` may redirect when called with its default argument.
-- `require_admin()` sends the current authorization failure response and may
-  terminate the request.
+- `http_redirect()`, exposed through `redirect()`, sends a `Location` header and
+  terminates execution.
+- `auth_verify_login()`, exposed through `verify_login()`, may redirect when
+  called with its default argument.
+- `auth_require_admin()`, exposed through `require_admin()`, sends the current
+  authorization failure response and may terminate the request.
 - `config/db.php` terminates on unavailable required configuration or database
   connection. Readiness mode returns HTTP 503 JSON with the exact generic body
   `{"status":"not_ready","check":"database"}`.
@@ -168,8 +171,8 @@ passwords, cookies, CSRF tokens, request bodies, or database credentials.
 - `generate_csrf_token()` creates the session CSRF token.
 - `verify_csrf_token()` reads session CSRF state.
 - `destroy_current_session()` clears session data and expires the cookie.
-- `verify_login()` writes authenticated staff identity, role, last activity, and
-  the current staff global record.
+- `auth_verify_login()`, exposed through `verify_login()`, writes authenticated
+  staff identity, role, last activity, and the current staff global record.
 - `public/login.php` writes login session fields directly after successful
   authentication.
 - `public/settings.php` updates `$_SESSION['full_name']` after a profile update.
@@ -180,7 +183,7 @@ passwords, cookies, CSRF tokens, request bodies, or database credentials.
 |---|---|
 | HTTP headers | Security helpers, redirect/auth helpers, export, backup, endpoints |
 | Process termination | Database failure closure, redirect, admin/auth failures, export/backup failures |
-| Session writes | `security.php`, `functions.php:verify_login`, login/settings pages |
+| Session writes | `security.php`, `auth.php:auth_verify_login`, login/settings pages |
 | Database writes | Rate limiting, audit, catalog, inventory, orders, staff, categories, customers, suppliers |
 | Filesystem writes | `handle_image_upload`, backup/export output streams, test/runner temporary files |
 | Server logs | `log_application_error`, `error_log` calls, audit/operational logging |

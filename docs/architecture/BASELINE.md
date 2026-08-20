@@ -1,9 +1,9 @@
 # MyShop architecture baseline
 
-Status: Batch 5 supplier read extraction baseline
+Status: Batch 6A authentication and authorization extraction baseline
 
 Captured from the `security-hardening-baseline` branch at starting revision
-`61e8128a66e0bd98c3bfa5470299c7cad40bcf68`.
+`69649236b71cf5bcb5c374303129c29bf6a4171b`.
 
 This document describes the current implementation. It is intentionally not a
 target architecture and does not authorize production-code refactoring.
@@ -28,8 +28,9 @@ Browser QA is intentionally separate from the dependency-free PHP test harness.
 3. A page normally requires `includes/functions.php`, starts a secure session,
    loads `config/db.php`, and then performs request-specific work.
 4. `includes/functions.php` loads `security.php`, `pagination.php`, `audit.php`,
-   `catalog.php`, and `people.php` as a compatibility facade. Catalog and
-   People page callers may use their focused read functions directly.
+   `http.php`, `auth.php`, `catalog.php`, and `people.php` as a compatibility
+   facade. Catalog and People page callers may use their focused read functions
+   directly; existing authentication callers still use legacy wrappers.
 5. `config/db.php` reads `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, and
    `DB_PASSWORD` from the process environment and creates the mysqli
    connection. It does not run schema creation or migrations.
@@ -70,9 +71,12 @@ trusted reverse proxy.
   role, refreshes the CSRF token, and writes an audit event.
 - Logout is a POST action that verifies CSRF and destroys the session.
 
-`includes/functions.php:verify_login()` re-checks the current active staff
+`includes/auth.php:auth_verify_login()` re-checks the current active staff
 record from the database and stores it in `$GLOBALS['current_staff_record']`.
-`is_admin()` depends on that global record and may call `verify_login(false)`.
+`auth_is_admin()` depends on that global record and may call
+`auth_verify_login(..., false)`. The public names `verify_login()`, `is_admin()`,
+and `require_admin()` remain thin wrappers in `includes/functions.php`, so page
+callers and the current global database/session contracts remain unchanged.
 
 ## Authorization boundaries
 
@@ -81,8 +85,8 @@ convenience and is not the security boundary.
 
 | Boundary | Current implementation |
 |---|---|
-| Authentication | `verify_login()` in `includes/functions.php:484-567` |
-| Admin role check | `is_admin()` and `require_admin()` at `:2557-2582` |
+| Authentication | `auth_verify_login()` in `includes/auth.php`; `verify_login()` compatibility wrapper |
+| Admin role check | `auth_is_admin()` and `auth_require_admin()` in `includes/auth.php`; legacy wrappers retained |
 | Admin audit log | `public/audit_log.php` requires authenticated admin access |
 | CSV export | `public/export_report.php` requires admin access |
 | Categories | `public/categories.php` protects category administration with admin checks |
@@ -105,8 +109,8 @@ application service module.
 |---|---|
 | `:12-70` | Sanitization, identifiers, password policy, login normalization |
 | `:72-480` | Login rate-limit state, transaction helpers, and cleanup |
-| `:484-567` | Database-backed login verification and session population |
-| `redirect()`, `build_product_filter_sql()` | Redirect helper and Catalog filter compatibility wrapper |
+| `verify_login()`, `redirect()` | Delegation-only Auth and HTTP compatibility wrappers |
+| `build_product_filter_sql()` | Catalog filter compatibility wrapper |
 | `get_all_products()` and Catalog compatibility wrappers | Legacy full product read plus delegation to `includes/catalog.php` |
 | `get_low_stock_products()`, stock movement reads | Low-stock reads and stock-movement reads/pagination |
 | `create_product()`, `update_product()`, `delete_product()` | Product writes, stock history, uploads, and audit coupling |
@@ -182,6 +186,11 @@ Shared modules own most other application SQL:
   wrappers.
 - `includes/people.php`: bounded customer and supplier count/page/selector reads;
   `includes/functions.php` retains compatibility wrappers.
+- `includes/auth.php`: active Staff session revalidation, admin role checks, and
+  admin denial auditing; it accepts the database connection explicitly while
+  preserving the current session/global side effects.
+- `includes/http.php`: terminating redirect implementation; `redirect()` remains
+  available through the compatibility facade.
 - `includes/functions.php`: legacy full product reads, inventory, order, staff,
   remaining reference-data, and dashboard queries, plus protected mutations.
 - `includes/audit.php:62-300`: audit writes and reads.
@@ -246,6 +255,7 @@ The PHP harness is `tests/run.php`. It currently loads:
 - `tests/Unit/repository_security_scan_test.php`
 - `tests/Unit/ci_supply_chain_test.php`
 - `tests/Unit/release_integrity_test.php`
+- `tests/Unit/auth_extraction_test.php`
 - `tests/Integration/database_test.php`
 - `tests/Integration/backup_restore_test.php`
 - `tests/Integration/operational_test.php`

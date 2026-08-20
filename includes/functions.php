@@ -5,6 +5,8 @@
 require_once __DIR__ . '/security.php';
 require_once __DIR__ . '/pagination.php';
 require_once __DIR__ . '/audit.php';
+require_once __DIR__ . '/http.php';
+require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/catalog.php';
 require_once __DIR__ . '/people.php';
 
@@ -486,92 +488,12 @@ function login_rate_limit_reset($conn, $rate_limit_key)
 function verify_login($redirect_on_failure = true)
 {
     global $conn;
-
-    start_secure_session();
-
-    $fail_authentication = static function ($reason) use ($redirect_on_failure) {
-        if ($reason !== null) {
-            error_log('Authentication session invalidated: ' . $reason);
-        }
-
-        destroy_current_session();
-
-        if ($redirect_on_failure) {
-            redirect('login.php');
-        }
-
-        return false;
-    };
-
-    if (!isset($_SESSION['staff_id'])) {
-        return $fail_authentication(null);
-    }
-
-    $staff_id = filter_var($_SESSION['staff_id'], FILTER_VALIDATE_INT);
-    if ($staff_id === false || $staff_id <= 0) {
-        return $fail_authentication('The session contains an invalid staff identifier.');
-    }
-
-    if (!isset($conn) || !($conn instanceof mysqli)) {
-        return $fail_authentication('The database connection is unavailable.');
-    }
-
-    $stmt = null;
-    try {
-        $stmt = $conn->prepare(
-            "SELECT id, full_name, role, is_active FROM Staff WHERE id = ? LIMIT 1"
-        );
-
-        if (!$stmt) {
-            error_log('Authentication staff lookup prepare failed: ' . $conn->error);
-            return $fail_authentication('The staff lookup could not be prepared.');
-        }
-
-        if (!$stmt->bind_param('i', $staff_id)) {
-            error_log('Authentication staff lookup bind failed: ' . $stmt->error);
-            return $fail_authentication('The staff lookup could not be bound.');
-        }
-        if (!$stmt->execute()) {
-            error_log('Authentication staff lookup failed: ' . $stmt->error);
-            return $fail_authentication('The staff lookup failed.');
-        }
-
-        $result = $stmt->get_result();
-        if (!$result) {
-            error_log('Authentication staff lookup result failed: ' . $stmt->error);
-            return $fail_authentication('The staff lookup result failed.');
-        }
-        $staff = $result->fetch_assoc();
-    } catch (Throwable $exception) {
-        error_log('Authentication staff lookup failed: ' . $exception->getMessage());
-        return $fail_authentication('The staff lookup failed.');
-    } finally {
-        if ($stmt instanceof mysqli_stmt) {
-            $stmt->close();
-        }
-    }
-
-    if (
-        !$staff
-        || (int)$staff['is_active'] !== 1
-        || !in_array($staff['role'], ['admin', 'cashier'], true)
-    ) {
-        return $fail_authentication('The staff account is missing, disabled, or has an invalid role.');
-    }
-
-    $_SESSION['staff_id'] = (int)$staff['id'];
-    $_SESSION['full_name'] = $staff['full_name'];
-    $_SESSION['role'] = $staff['role'];
-    $_SESSION['last_activity'] = time();
-    $GLOBALS['current_staff_record'] = $staff;
-
-    return true;
+    return auth_verify_login($conn, $redirect_on_failure);
 }
 
 function redirect($url)
 {
-    header("Location: $url");
-    exit();
+    http_redirect($url);
 }
 
 function build_product_filter_sql($search, $filter, &$search_pattern)
@@ -2315,14 +2237,8 @@ function get_chart_data($conn, $days = 7, $staff_id = null)
  */
 function is_admin()
 {
-    if (!isset($GLOBALS['current_staff_record']) || !is_array($GLOBALS['current_staff_record'])) {
-        if (!verify_login(false)) {
-            return false;
-        }
-    }
-
-    return isset($GLOBALS['current_staff_record']['role'])
-        && $GLOBALS['current_staff_record']['role'] === 'admin';
+    global $conn;
+    return auth_is_admin($conn);
 }
 
 /**
@@ -2331,13 +2247,7 @@ function is_admin()
 function require_admin()
 {
     global $conn;
-    verify_login();
-    if (!is_admin()) {
-        $route = basename((string)($_SERVER['SCRIPT_NAME'] ?? 'admin_route'));
-        audit_log_denied($conn, 'admin_route_access', 'Route', null, ['route' => $route]);
-        http_response_code(403);
-        exit('Access denied.');
-    }
+    auth_require_admin($conn);
 }
 
 /**

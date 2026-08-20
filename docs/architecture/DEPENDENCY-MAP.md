@@ -1,8 +1,8 @@
 # MyShop dependency map
 
 This map records current call-site and dependency relationships after the
-Batch 5 Supplier read extraction. It remains a characterization artifact; the
-compatibility wrappers are still required.
+Batch 6A authentication and authorization extraction. It remains a
+characterization artifact; the compatibility wrappers are still required.
 
 ## Public-page to shared-function map
 
@@ -34,15 +34,33 @@ names are grouped only for readability; the source remains the authority.
 
 | Dependency | Current consumers and behavior |
 |---|---|
-| `$conn` | Most database functions accept it explicitly; `verify_login()`, `require_admin()`, backup request helpers, and some page code use `global $conn` or the page variable directly. |
+| `$conn` | Most database functions accept it explicitly. Auth implementations accept it explicitly; legacy `verify_login()`/`is_admin()`/`require_admin()` wrappers, backup request helpers, and some page code retain the global or page-variable contract. |
 | `$_SESSION` | `security.php` manages lifecycle; login, logout, authorization, page scoping, CSRF, and feedback state read/write session values. |
-| `$GLOBALS['current_staff_record']` | `verify_login()` writes it; `is_admin()` reads it; `destroy_current_session()` clears it. |
+| `$GLOBALS['current_staff_record']` | `auth_verify_login()` writes it; `auth_is_admin()` reads it; `destroy_current_session()` clears it. Legacy wrappers preserve access to this contract. |
 | `$GLOBALS['request_correlation_id']` | `initialize_request_context()` owns it and shutdown logging reads it. |
 | `$GLOBALS['csp_nonce']` | `get_csp_nonce()` and layouts use it for inline CSP nonces. |
 | `$_SERVER` | Request method, URI, peer address, HTTPS state, and forwarded protocol are used by security and page controllers. |
 | Filesystem | `handle_image_upload()` and `delete_newly_uploaded_image()` use `public/uploads`; backup and export use output streams. |
 | Process environment | `config/db.php`, HSTS/proxy handling, production scripts, tests, and Compose provide configuration through environment variables. |
-| Headers/termination | `redirect()`, `require_admin()`, database failure handlers, CSV failure handling, and backup failure handling can send headers or terminate execution. |
+| Headers/termination | `http_redirect()`, `auth_require_admin()`, their legacy wrappers, database failure handlers, CSV failure handling, and backup failure handling can send headers or terminate execution. |
+
+## Authentication and HTTP module boundaries
+
+`includes/auth.php` requires only `security.php`, `audit.php`, and `http.php`;
+it does not require `functions.php`. Database-backed operations accept `$conn`
+explicitly. Existing pages still call the facade names in this batch.
+
+| Focused function | Behavior | Side effects and security notes |
+|---|---|---|
+| `auth_verify_login` | Revalidates `staff_id` through the existing active Staff lookup | Invalidates failed sessions; may redirect; refreshes identity fields and `current_staff_record` on success |
+| `auth_is_admin` | Uses the compatible current-staff global, revalidating if absent | Returns `false` for unauthenticated and cashier sessions |
+| `auth_require_admin` | Enforces active administrator access | Audits denial, sends HTTP 403, and terminates with the existing generic body |
+| `http_redirect` | Sends the existing `Location` response | Terminates the request immediately |
+
+The facade functions `verify_login`, `is_admin`, `require_admin`, and `redirect`
+remain delegation-only wrappers. Login credential verification, rate limiting,
+successful-login session regeneration, logout, and CSRF handling remain in
+their existing owners and were not moved.
 
 ## Catalog module boundary
 
@@ -182,9 +200,10 @@ errors and may depend on `$conn` or session scope.
   `start_secure_session`, `destroy_current_session`, `is_https_request`,
   `send_hsts_header`, `send_security_headers`.
 - CSRF: `generate_csrf_token`, `verify_csrf_token`.
-- Authentication: `verify_login`, all `login_rate_limit_*` functions,
-  `get_login_source_ip`.
-- Authorization: `is_admin`, `require_admin`, scoped order lookups, and
+- Authentication: `auth_verify_login` (through the `verify_login` wrapper), all
+  `login_rate_limit_*` functions, and `get_login_source_ip`.
+- Authorization: `auth_is_admin`, `auth_require_admin` (through legacy
+  wrappers), scoped order lookups, and
   staff-integrity mutation functions.
 - Data protection: `handle_image_upload`, `delete_newly_uploaded_image`,
   `export_csv_text`, `export_validate_entity`, `quote_backup_table`,
@@ -222,10 +241,10 @@ of those invariants.
 The safest remaining candidate is the dashboard read model after its current
 query and default-value behavior is characterized.
 
-Batch 5 completed bounded supplier count/page/selector extraction behind
-compatibility wrappers. It did not move the unbounded `get_suppliers()` loader
-or the uncalled `get_supplier_by_id()` lookup, and it did not include supplier
-writes, product writes, stock updates, uploads, or orders.
+Batch 6A moved only active-session verification, the administrator role check,
+the administrator denial path, and redirect implementation behind wrappers. It
+did not move login credential verification, rate limiting, CSRF, login/logout
+request handling, staff writes, or any business mutation.
 
 ## Functions that must not move early
 
@@ -239,5 +258,5 @@ writes, product writes, stock updates, uploads, or orders.
   guarantees are security boundaries.
 - `stream_database_backup()` because snapshot consistency, table allow-listing,
   sensitive data handling, and completion markers are operational guarantees.
-- `verify_login()` and rate-limit functions until session and login contracts
-  are covered independently.
+- Login credential verification and rate-limit functions until their request,
+  audit, timing, and persistence contracts are covered independently.
