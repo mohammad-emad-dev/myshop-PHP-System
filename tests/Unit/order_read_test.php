@@ -79,13 +79,48 @@ function run_order_read_unit_tests(): int
         }
     }
 
-    $tests->assertContains('count_orders($conn', $historyPage, 'Order history must remain on the compatibility count wrapper in this batch.');
-    $tests->assertContains('get_orders_page($conn', $historyPage, 'Order history must remain on the compatibility page wrapper in this batch.');
-    $tests->assertContains('get_order_summary($conn', $historyPage, 'Order history must remain on the compatibility summary wrapper in this batch.');
-    $tests->assertContains('get_order_by_id($conn', $detailsPage, 'Order details endpoint must remain on the compatibility lookup wrapper in this batch.');
-    $tests->assertContains('get_order_details($conn', $detailsPage, 'Order details endpoint must remain on the compatibility detail wrapper in this batch.');
-    $tests->assertContains('get_order_by_id($conn', $invoicePage, 'Invoice page must remain on the compatibility lookup wrapper in this batch.');
-    $tests->assertContains('get_order_details($conn', $invoicePage, 'Invoice page must remain on the compatibility detail wrapper in this batch.');
+    $tests->assertContains(
+        'orders_count($conn, $order_scope_staff_id, $filter_type)',
+        $historyPage,
+        'Order history must call orders_count with its existing scope and filter.'
+    );
+    $tests->assertContains(
+        'orders_get_page($conn, $order_scope_staff_id, $filter_type, $page_size, $offset)',
+        $historyPage,
+        'Order history must call orders_get_page with its existing scope, page size, and offset.'
+    );
+    $tests->assertContains(
+        'orders_get_summary($conn, $order_scope_staff_id, $filter_type)',
+        $historyPage,
+        'Order history must call orders_get_summary with its existing scope and filter.'
+    );
+    $tests->assertContains(
+        'orders_get_by_id($conn, $order_id, $staff_scope)',
+        $detailsPage,
+        'Order details endpoint must call orders_get_by_id with its existing scope.'
+    );
+    $tests->assertContains(
+        'orders_get_details($conn, $order_id, $staff_scope)',
+        $detailsPage,
+        'Order details endpoint must call orders_get_details with its existing scope.'
+    );
+    $tests->assertContains(
+        'orders_get_by_id($conn, $order_id, $staff_scope)',
+        $invoicePage,
+        'Invoice page must call orders_get_by_id with its existing scope.'
+    );
+    $tests->assertContains(
+        'orders_get_details($conn, $order_id, $staff_scope)',
+        $invoicePage,
+        'Invoice page must call orders_get_details with its existing scope.'
+    );
+    foreach ([$historyPage, $detailsPage, $invoicePage] as $pageSource) {
+        $tests->assertSame(
+            0,
+            preg_match('/\b(count_orders|get_orders_page|get_order_summary|get_order_by_id|get_order_details)\s*\(/', $pageSource),
+            'Migrated order-read page still calls a legacy order-read function.'
+        );
+    }
 
     $tests->assertContains('function get_orders($conn)', $facade, 'Legacy unbounded get_orders() loader must remain available.');
     $tests->assertContains('function get_orders_for_staff($conn, $staff_id)', $facade, 'Legacy get_orders_for_staff() loader must remain available.');
