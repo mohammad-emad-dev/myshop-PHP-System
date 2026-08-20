@@ -33,6 +33,7 @@ delegation-only compatibility boundary.
 | RED | `8abc648` | `docker compose run --rm --no-deps app php -r "require 'tests/Unit/order_write_test.php'; echo run_order_write_unit_tests(), PHP_EOL;"` failed with `Orders page must call orders_create with the established argument order and actor ID.` | The new direct-call, no-legacy-call, and ordering contract executed against the unchanged page and failed for the intended reason. |
 | GREEN | `f023054` | Same focused command passed with `43` assertions. | `public/orders.php` calls `orders_create()` with the established argument order and actor ID; the request/auth/CSRF/purchase-authorization ordering contract remains intact. |
 | Contract synchronization | `2c0df2b` | Focused auth and architecture contracts passed with `231` and `98` assertions. | Existing repository contracts now describe the direct order-service caller rather than the pre-migration wrapper caller. |
+| Contract hardening | `2b4a922` | The focused order source test passed again with `43` assertions. | The legacy-caller check now requires zero `create_order()` matches in `public/orders.php`, preventing multiple stale calls from being accepted. |
 
 ## Preserved page boundary
 
