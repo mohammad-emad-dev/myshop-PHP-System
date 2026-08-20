@@ -1,7 +1,7 @@
 # MyShop dependency map
 
 This map records current call-site and dependency relationships after the
-Batch 7G product-page caller migration. It remains a
+Batch 8A order-creation service extraction. It remains a
 characterization artifact; the compatibility wrappers are still required.
 
 ## Public-page to shared-function map
@@ -115,9 +115,31 @@ compatibility wrappers for tests, CLI utilities, and other un-migrated callers.
 ownership of request validation, authorization, CSRF checks, upload handling,
 generic messages, HTTP responses, and page rendering.
 
-`create_order()`, staff administration, category/customer/supplier writes,
-and other not-yet-extracted workflows remain in `includes/functions.php` or
-their existing page controllers.
+The legacy `create_order()` name remains in `functions.php` as a
+delegation-only compatibility wrapper. `public/orders.php` intentionally still
+calls that wrapper in this batch; it owns request parsing, CSRF, page-level
+purchase authorization, POS validation, generic messages, and rendering.
+Staff administration, category/customer/supplier writes, and other
+not-yet-extracted workflows remain in `includes/functions.php` or their existing
+page controllers.
+
+## Orders module boundary
+
+`includes/orders.php` has no dependency on `includes/functions.php`. It requires
+`inventory.php` for direct stock-movement writes and safe rollback diagnostics,
+and `audit.php` for explicit-actor order audit writes. It accepts `$conn`,
+`$staff_id`, and validated order inputs explicitly; it does not read session or
+global state.
+
+| Focused function | Mutation and transaction behavior | Return contract |
+|---|---|---|
+| `orders_create` | Normalizes duplicate items, validates staff/party/order type, locks products, obtains server-side prices, inserts order/details, updates stock, writes movements and audit, then commits atomically; failures clean up, roll back, log, and attempt the failure audit | `int|false`; returns the created order ID only after commit, otherwise `false` |
+
+`orders_create()` calls `inventory_log_stock_movement()` directly and uses
+`inventory_rollback_error()` for safe rollback diagnostics. The focused service
+preserves sale/purchase movement reasons, totals, role rules, and failure
+metadata. The legacy `create_order()` wrapper preserves the existing signature
+and delegates without duplicating SQL.
 
 ## Inventory module boundary
 
@@ -272,7 +294,7 @@ errors and may depend on `$conn` or session scope.
 
 ### Critical business transaction
 
-`create_order()` at `includes/functions.php:1488-1853`:
+`orders_create()` at `includes/orders.php`:
 
 - Validates order type and staff role.
 - Validates customer/supplier relationship.
@@ -284,8 +306,9 @@ errors and may depend on `$conn` or session scope.
 - Writes stock movement and audit events.
 - Commits or rolls back on failure.
 
-This function must not be moved early without characterization tests around all
-of those invariants.
+The implementation was moved only after characterization tests covered all of
+these invariants. `public/orders.php` remains on the compatibility wrapper until
+a later caller-migration batch.
 
 ### Other transaction participants
 
@@ -308,8 +331,6 @@ request handling, staff writes, or any business mutation.
 
 ## Functions that must not move early
 
-- `create_order()` because it owns price authority, stock locks, order
-  invariants, audit behavior, and rollback.
 - Staff deletion/status functions because they protect the last active admin
   and self-deactivation invariants.
 - `handle_image_upload()` because its path, MIME, dimension, and filesystem

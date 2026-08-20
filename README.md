@@ -59,7 +59,8 @@ Only public/ should be exposed as the web document root. The repository root, co
 - `includes/backup.php` remains separate because backup streaming has its own operational and authorization boundary.
 - `includes/catalog.php` owns bounded product and category reads; `includes/people.php` owns bounded customer and supplier reads; and `includes/inventory.php` owns bounded stock-movement reads, the compatibility-preserving movement writer, and the atomic manual stock-adjustment service.
 - `includes/products.php` owns product creation, update, and deletion transactions, product stock-history integration, and product audit writes. `includes/functions.php` retains only the `create_product()`, `update_product()`, and `delete_product()` compatibility wrappers for these operations.
-- Remaining database/business workflows, including authentication rate limiting, order creation, staff administration, and reference-data CRUD, remain in the facade or page controllers until a future refactor establishes and tests their dependency boundaries.
+- `includes/orders.php` owns atomic sale/purchase order creation, including staff/party validation, product locks, server-side pricing, stock and movement mutations, and order audit writes. `includes/functions.php` retains only the `create_order()` compatibility wrapper; `public/orders.php` continues to own request parsing, CSRF, page authorization, and POS rendering.
+- Remaining database/business workflows, including authentication rate limiting, staff administration, and reference-data CRUD, remain in the facade or page controllers until a future refactor establishes and tests their dependency boundaries.
 
 Future features should place new code in the smallest cohesive module that owns its dependencies, then expose it through the facade only when existing callers require the compatibility surface. Modules must not require the facade back, and functions must not be duplicated across modules.
 

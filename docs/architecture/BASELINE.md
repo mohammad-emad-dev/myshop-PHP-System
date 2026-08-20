@@ -1,9 +1,9 @@
 # MyShop architecture baseline
 
-Status: Batch 7G product page caller migration baseline
+Status: Batch 8A order-creation service extraction baseline
 
 Captured from the `security-hardening-baseline` branch at starting revision
-`b942f1bb611cc79e5cd23238688e5a4197ca18c0`.
+`70d1ad64a5c639b93897c1c1abd2ab28063cef90`.
 
 This document describes the current implementation. It is intentionally not a
 target architecture and does not authorize production-code refactoring.
@@ -29,10 +29,10 @@ Browser QA is intentionally separate from the dependency-free PHP test harness.
    loads `config/db.php`, and then performs request-specific work.
 4. `includes/functions.php` loads `security.php`, `pagination.php`, `audit.php`,
    `http.php`, `auth.php`, `catalog.php`, `people.php`, `inventory.php`,
-   and `products.php` as a compatibility facade. Catalog and People page
-   callers may use their focused read functions directly; `public/products.php`
-   now calls the focused product mutation services directly while legacy
-   mutation wrappers remain available for other callers.
+   `products.php`, and `orders.php` as a compatibility facade. Catalog and People page
+   callers may use their focused read functions directly; product mutations are
+   owned by `includes/products.php`, order creation by `includes/orders.php`,
+   and legacy mutation names remain available as compatibility wrappers.
 5. `config/db.php` reads `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, and
    `DB_PASSWORD` from the process environment and creates the mysqli
    connection. It does not run schema creation or migrations.
@@ -116,7 +116,7 @@ application service module.
 | `get_all_products()` and Catalog compatibility wrappers | Legacy full product read plus delegation to `includes/catalog.php` |
 | `get_low_stock_products()`, stock movement reads, `log_stock_movement()` | Low-stock reads, stock-movement reads/pagination, and compatibility-preserving movement-write wrappers |
 | `create_product()`, `update_product()`, `delete_product()` | Delegation-only compatibility wrappers to `includes/products.php`; upload validation remains page-owned |
-| `create_order()` | Transactional sale/purchase order creation |
+| `create_order()` | Delegation-only compatibility wrapper to `includes/orders.php`; the wrapper preserves the existing order-ID-or-false return contract |
 | Order list/count/summary/detail functions | Order lists, counts, summaries, scoped lookups, and details |
 | Dashboard, upload, chart, and report functions | Dashboard statistics, uploads, charts, and report aggregates |
 | Role checks and staff administration functions | Authorization and staff administration |
@@ -147,6 +147,11 @@ Focused shared modules already extracted from the facade:
   transactions, product stock-history integration, and product audit writes.
   The legacy `create_product()`, `update_product()`, and `delete_product()`
   names remain delegation-only wrappers in `functions.php`.
+- `includes/orders.php`: explicit atomic sale/purchase order creation, including
+  staff and party validation, product row locks, server-side price authority,
+  stock and movement mutations, order audit writes, commit, rollback, and safe
+  rollback diagnostics. The legacy `create_order()` name remains a
+  delegation-only wrapper in `functions.php`.
 
 ## Public pages and responsibilities
 
@@ -157,7 +162,7 @@ Focused shared modules already extracted from the facade:
 | `public/products.php` | Product CRUD request dispatch, request validation, authorization, CSRF, image upload handling, generic messages, Catalog search/pagination, product table, forms, and rendering; delegates product database mutations directly to `products_create()`, `products_update()`, and `products_delete()` |
 | `public/categories.php` | Category CRUD request dispatch, admin checks, Catalog search/pagination, category view |
 | `public/stock_movements.php` | Manual stock adjustment request validation, CSRF and authorization boundary, delegation to the Inventory service, movement history filtering/pagination, and stock ledger view |
-| `public/orders.php` | POS cart submission, Catalog product/category and People customer/supplier-selector reads, product revalidation, sale/purchase policy, order creation, POS view and JavaScript |
+| `public/orders.php` | POS request parsing, CSRF and page-level purchase authorization, Catalog product/category and People customer/supplier-selector reads, product revalidation, delegation to the `create_order()` compatibility wrapper, POS view and JavaScript |
 | `public/order_history.php` | Scoped order history filters, pagination, summaries, order-history view and interactions |
 | `public/get_order_details.php` | Scoped JSON order-detail endpoint |
 | `public/pos_product_lookup.php` | Authenticated barcode lookup endpoint backed by the Catalog module |

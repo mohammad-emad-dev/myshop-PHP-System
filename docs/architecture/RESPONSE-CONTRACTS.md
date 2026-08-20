@@ -15,7 +15,9 @@ names for moved functions remain available from `includes/functions.php` as comp
 wrappers, while unmoved legacy functions retain their original contracts.
 Batch 7D, 7E, and 7F place product creation, update, and deletion
 transactions in includes/products.php; the legacy product names remain
-delegation-only wrappers.
+delegation-only wrappers. Batch 8A places the order-creation transaction in
+includes/orders.php; the legacy create_order() name remains a delegation-only
+wrapper and the public POS page remains on that wrapper.
 
 ## Focused Product mutation contracts
 
@@ -41,6 +43,25 @@ authorization gates. includes/functions.php keeps create_product(),
 update_product(), and delete_product() as delegation-only wrappers with their
 original signatures and return contracts for remaining callers. The page
 continues to own uploads, generic messages, HTTP responses, and rendering.
+
+## Focused Order creation contract
+
+`orders_create()` accepts the database connection, explicit staff ID, normalized
+order items, order type, and customer/supplier ID explicitly. The observed
+success contract is the created order ID, not a boolean: it returns `int` only
+after the transaction commits and returns `false` for validation,
+authorization, stock, audit, transaction, or database failures. This preserves
+the existing `public/orders.php` success message and completed-order state.
+
+The service preserves duplicate-item aggregation, integer and money bounds,
+sale/purchase role and party validation, product row locks, Product price
+authority, Order/OrderDetail writes, stock updates, exact movement reasons,
+success/failure audit metadata, statement cleanup, commit order, rollback, and
+safe rollback diagnostics. It uses `inventory_log_stock_movement()` directly
+and has no session or global dependency. `create_order()` remains a thin
+compatibility wrapper with its original signature and order-ID-or-false return
+contract; `public/orders.php` continues to own request parsing, CSRF, page-level
+authorization, generic messages, and rendering.
 
 ## Array-returning functions
 
@@ -120,8 +141,9 @@ failures, and some infrastructure failures.
 - `inventory_adjust_stock()` on invalid service arguments or any failed lock,
   stock validation, guarded update, movement, audit, commit, or database
   operation; database-operation failures roll back before the failure audit is attempted.
-- `create_order()` on any validation, authorization, transaction, stock,
-  audit, or database failure.
+- `orders_create()` / `create_order()` on any validation, authorization,
+  transaction, stock, audit, or database failure; both preserve `false` on
+  failure, while success returns the created order ID.
 - Staff, category, customer, and supplier mutation functions on rejected or
   failed mutations.
 - `handle_image_upload()` and `delete_newly_uploaded_image()` on invalid input,
