@@ -78,6 +78,54 @@ function run_product_write_unit_tests(): int
         $tests->assertContains($contract, $module, 'Product update contract is missing: ' . $contract);
     }
 
+    foreach ([
+        'function products_delete($conn, $id, $actor_staff_id = null): bool',
+        '$id = (int)$id;',
+        '$conn->begin_transaction()',
+        'SELECT id FROM Product WHERE id = ? FOR UPDATE',
+        'SELECT id FROM OrderDetail WHERE product_id = ? LIMIT 1',
+        'SELECT id FROM StockMovement WHERE product_id = ? LIMIT 1',
+        'DELETE FROM Product WHERE id = ?',
+        '$delete_stmt->bind_param("i", $id)',
+        '$delete_stmt->affected_rows !== 1',
+        'audit_log($conn, $actor_staff_id, \'product_delete\', \'Product\', $id, true, null)',
+        '$conn->commit()',
+        '$conn->rollback()',
+        'inventory_rollback_error($conn)',
+        'audit_log($conn, $actor_staff_id, \'product_delete\', \'Product\', $id, false',
+        'return true;',
+        'return false;',
+    ] as $contract) {
+        $tests->assertContains($contract, $module, 'Product deletion contract is missing: ' . $contract);
+    }
+
+    $deleteWrapperPattern = '/function delete_product\s*\([^)]*\)\s*\{(?<body>.*?)\n\}/s';
+    $deleteWrapperMatched = preg_match($deleteWrapperPattern, $facade, $deleteMatches) === 1;
+    $tests->assertTrue($deleteWrapperMatched, 'delete_product compatibility wrapper is missing.');
+    if ($deleteWrapperMatched) {
+        $tests->assertContains(
+            'function delete_product($conn, $id, $actor_staff_id = null)',
+            $facade,
+            'delete_product compatibility signature changed.'
+        );
+        $tests->assertContains('products_delete(', $deleteMatches['body'], 'delete_product does not delegate to products_delete.');
+        foreach ([
+            'begin_transaction',
+            'SELECT id FROM Product',
+            'OrderDetail',
+            'StockMovement',
+            'DELETE FROM Product',
+            'audit_log',
+            'commit',
+            'rollback',
+        ] as $implementationDetail) {
+            $tests->assertFalse(
+                strpos($deleteMatches['body'], $implementationDetail) !== false,
+                'delete_product wrapper still contains implementation detail: ' . $implementationDetail
+            );
+        }
+    }
+
     $wrapperPattern = '/function create_product\s*\([^)]*\)\s*\{(?<body>.*?)\n\}/s';
     $wrapperMatched = preg_match($wrapperPattern, $facade, $matches) === 1;
     $tests->assertTrue($wrapperMatched, 'create_product compatibility wrapper is missing.');
@@ -100,6 +148,8 @@ function run_product_write_unit_tests(): int
     $tests->assertFalse(strpos($page, 'products_create(') !== false, 'Product page must not call the new service directly yet.');
     $tests->assertContains('update_product($conn,', $page, 'Product page must retain the update compatibility wrapper caller.');
     $tests->assertFalse(strpos($page, 'products_update(') !== false, 'Product page must not call the update service directly yet.');
+    $tests->assertContains('delete_product($conn,', $page, 'Product page must retain the delete compatibility wrapper caller.');
+    $tests->assertFalse(strpos($page, 'products_delete(') !== false, 'Product page must not call the delete service directly yet.');
 
     $updateWrapperPattern = '/function update_product\s*\([^)]*\)\s*\{(?<body>.*?)\n\}/s';
     $updateWrapperMatched = preg_match($updateWrapperPattern, $facade, $updateMatches) === 1;
@@ -147,6 +197,21 @@ function run_product_write_unit_tests(): int
         }
         $tests->assertFalse($escaped, 'Invalid product update connections must fail without escaping an exception.');
         $tests->assertFalse($result, 'Invalid product update connections must return false.');
+    }
+
+    $tests->assertTrue(function_exists('products_delete'), 'Product deletion service is unavailable.');
+    if (function_exists('products_delete')) {
+        $closedConnection = mysqli_init();
+        $result = true;
+        $escaped = false;
+        try {
+            $closedConnection->close();
+            $result = products_delete($closedConnection, 1, null);
+        } catch (Throwable $exception) {
+            $escaped = true;
+        }
+        $tests->assertFalse($escaped, 'Invalid product deletion connections must fail without escaping an exception.');
+        $tests->assertFalse($result, 'Invalid product deletion connections must return false.');
     }
 
     return $tests->assertions();

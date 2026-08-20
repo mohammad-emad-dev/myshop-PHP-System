@@ -841,14 +841,91 @@ function run_integration_tests(): int
         $tests->assertTrue(delete_category($conn, $categoryId), 'Category deletion/reassignment failed.');
         $tests->assertSame(1, (int)test_scalar($conn, 'SELECT category_id FROM Product WHERE id = ?', 'i', [$reassignmentProductId]), 'Product category was not reassigned to General.');
 
+        $orderHistoryDeleteBarcode = $prefix . '-ORDER-HISTORY-DELETE';
+        $tests->assertTrue(
+            create_product($conn, $adminId, $prefix . '_ORDER_HISTORY_DELETE', 'Order history product', 4.00, 0, null, 5, null, $orderHistoryDeleteBarcode),
+            'Order-history deletion fixture creation failed.'
+        );
+        $orderHistoryDeleteProductId = (int)test_scalar($conn, 'SELECT id FROM Product WHERE barcode = ?', 's', [$orderHistoryDeleteBarcode]);
+        test_execute(
+            $conn,
+            'INSERT INTO `Order` (staff_id, order_type, total_amount, customer_id) VALUES (?, ?, ?, ?)',
+            'isdi',
+            [$adminId, 'sale', 4.00, $customerId]
+        );
+        $orderHistoryDeleteOrderId = (int)$conn->insert_id;
+        test_execute(
+            $conn,
+            'INSERT INTO OrderDetail (order_id, product_id, quantity, unit_price, subtotal) VALUES (?, ?, ?, ?, ?)',
+            'iiidd',
+            [$orderHistoryDeleteOrderId, $orderHistoryDeleteProductId, 1, 4.00, 4.00]
+        );
+        $tests->assertFalse(
+            products_delete($conn, $orderHistoryDeleteProductId, $adminId),
+            'Products with historical order details must not be deleted.'
+        );
+        $tests->assertSame(
+            $orderHistoryDeleteProductId,
+            (int)test_scalar($conn, 'SELECT id FROM Product WHERE id = ?', 'i', [$orderHistoryDeleteProductId]),
+            'Order-history product was unexpectedly deleted.'
+        );
+
         $tests->assertFalse(delete_product($conn, $historyProductId), 'Products with stock history must not be deleted.');
         $tests->assertSame($historyProductId, (int)test_scalar($conn, 'SELECT id FROM Product WHERE id = ?', 'i', [$historyProductId]), 'Historical product was unexpectedly deleted.');
+
+        $tests->assertFalse(products_delete($conn, 0, $adminId), 'Non-positive product IDs must be rejected.');
+        $tests->assertFalse(products_delete($conn, 2147483647, $adminId), 'Missing products must not be deleted.');
 
         $noHistoryBarcode = $prefix . '-NOHISTORY';
         $tests->assertTrue(create_product($conn, $adminId, $prefix . '_NO_HISTORY_PRODUCT', 'No history product', 4.00, 0, null, 5, null, $noHistoryBarcode), 'No-history product creation failed.');
         $noHistoryProductId = (int)test_scalar($conn, 'SELECT id FROM Product WHERE barcode = ?', 's', [$noHistoryBarcode]);
         $tests->assertTrue(delete_product($conn, $noHistoryProductId), 'Product without historical rows should be deletable.');
         $tests->assertSame(null, test_scalar($conn, 'SELECT id FROM Product WHERE id = ?', 'i', [$noHistoryProductId]), 'No-history product deletion was not persisted.');
+        $wrapperDeleteAudit = test_fetch_one(
+            $conn,
+            "SELECT actor_staff_id, outcome FROM AuditLog WHERE action = 'product_delete' AND entity_id = ? ORDER BY id DESC LIMIT 1",
+            'i',
+            [$noHistoryProductId]
+        );
+        $tests->assertSame(null, $wrapperDeleteAudit['actor_staff_id'] ?? null, 'Nullable compatibility-wrapper delete actor behavior changed.');
+        $tests->assertSame('success', (string)($wrapperDeleteAudit['outcome'] ?? ''), 'Compatibility-wrapper delete success audit changed.');
+
+        $directDeleteBarcode = $prefix . '-DIRECT-DELETE';
+        $tests->assertTrue(create_product($conn, $adminId, $prefix . '_DIRECT_DELETE', 'Direct delete product', 5.00, 0, null, 5, null, $directDeleteBarcode), 'Direct delete fixture creation failed.');
+        $directDeleteProductId = (int)test_scalar($conn, 'SELECT id FROM Product WHERE barcode = ?', 's', [$directDeleteBarcode]);
+        $tests->assertTrue(products_delete($conn, $directDeleteProductId, null), 'Direct product deletion service success path failed.');
+        $tests->assertSame(null, test_scalar($conn, 'SELECT id FROM Product WHERE id = ?', 'i', [$directDeleteProductId]), 'Direct product deletion was not persisted.');
+        $directDeleteAudit = test_fetch_one(
+            $conn,
+            "SELECT actor_staff_id, outcome FROM AuditLog WHERE action = 'product_delete' AND entity_id = ? ORDER BY id DESC LIMIT 1",
+            'i',
+            [$directDeleteProductId]
+        );
+        $tests->assertSame(null, $directDeleteAudit['actor_staff_id'] ?? null, 'Direct delete must preserve a nullable actor ID.');
+        $tests->assertSame('success', (string)($directDeleteAudit['outcome'] ?? ''), 'Direct delete success audit changed.');
+
+        $auditDeleteBarcode = $prefix . '-AUDIT-DELETE';
+        $tests->assertTrue(create_product($conn, $adminId, $prefix . '_AUDIT_DELETE', 'Audit delete product', 6.00, 0, null, 5, null, $auditDeleteBarcode), 'Audit-failure deletion fixture creation failed.');
+        $auditDeleteProductId = (int)test_scalar($conn, 'SELECT id FROM Product WHERE barcode = ?', 's', [$auditDeleteBarcode]);
+        $auditDeleteMovementBefore = (int)test_scalar($conn, 'SELECT COUNT(*) FROM StockMovement WHERE product_id = ?', 'i', [$auditDeleteProductId]);
+        $schema->query('DROP TABLE AuditLog');
+        try {
+            $tests->assertFalse(products_delete($conn, $auditDeleteProductId, $adminId), 'Audit insertion failure must fail product deletion.');
+            $tests->assertSame($auditDeleteProductId, (int)test_scalar($conn, 'SELECT id FROM Product WHERE id = ?', 'i', [$auditDeleteProductId]), 'Audit insertion failure left a partial product deletion.');
+            $tests->assertSame($auditDeleteMovementBefore, (int)test_scalar($conn, 'SELECT COUNT(*) FROM StockMovement WHERE product_id = ?', 'i', [$auditDeleteProductId]), 'Audit insertion failure changed stock movement history.');
+        } finally {
+            test_load_sql_file($schema, dirname(__DIR__, 2) . '/database/batch22_audit_log.sql');
+        }
+        $tests->assertSame(
+            0,
+            (int)test_scalar(
+                $conn,
+                "SELECT COUNT(*) FROM AuditLog WHERE action = 'product_delete' AND entity_id = ?",
+                'i',
+                [$auditDeleteProductId]
+            ),
+            'Audit insertion failure left a partial delete audit record.'
+        );
 
         $paginationCategoryName = $prefix . '_PAGINATION_CATEGORY';
         $tests->assertTrue(create_category($conn, $paginationCategoryName, 'Pagination category'), 'Pagination category creation failed.');
