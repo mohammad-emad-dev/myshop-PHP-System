@@ -17,7 +17,9 @@ Batch 7D, 7E, and 7F place product creation, update, and deletion
 transactions in includes/products.php; the legacy product names remain
 delegation-only wrappers. Batch 8A places the order-creation transaction in
 includes/orders.php; the legacy create_order() name remains a delegation-only
-wrapper while the public POS page calls the focused service directly.
+wrapper while the public POS page calls the focused service directly. Batch 8C
+places bounded and scoped order reads in the same module; current read-page
+callers remain on their legacy wrappers until a later caller-migration batch.
 
 ## Focused Product mutation contracts
 
@@ -63,6 +65,31 @@ compatibility wrapper with its original signature and order-ID-or-false return
 contract; `public/orders.php` calls `orders_create()` directly while continuing
 to own request parsing, CSRF, page-level authorization, generic messages, and
 rendering.
+
+## Focused Order read contracts
+
+The focused read services accept the database connection and optional staff
+scope explicitly. They preserve prepared statements, current result fields and
+aliases, staff ownership filtering, all/sale/purchase filters, deterministic
+pagination ordering, and the existing failure defaults:
+
+- `orders_count()` returns an integer count and `0` for invalid staff scope or
+  database failure.
+- `orders_get_page()` returns a bounded array and `[]` for invalid staff scope
+  or database failure.
+- `orders_get_summary()` returns `total_orders`, `total_sales_amount`,
+  `total_purchases_amount`, `sales_count`, and `purchases_count`, using numeric
+  zero defaults on invalid scope or failure.
+- `orders_get_by_id()` returns one order array, or `null` for invalid, missing,
+  unauthorized, or failed lookup.
+- `orders_get_details()` returns detail rows, or `[]` for invalid, missing,
+  unauthorized, or failed lookup.
+
+`count_orders()`, `get_orders_page()`, `get_order_summary()`,
+`get_order_by_id()`, and `get_order_details()` remain delegation-only wrappers
+with their existing signatures. The order-history, order-detail, and invoice
+pages still call those wrappers in this batch. `get_orders()` and
+`get_orders_for_staff()` remain legacy unbounded loaders.
 
 ## Array-returning functions
 

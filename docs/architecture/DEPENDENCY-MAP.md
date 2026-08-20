@@ -128,19 +128,30 @@ page controllers.
 
 `includes/orders.php` has no dependency on `includes/functions.php`. It requires
 `inventory.php` for direct stock-movement writes and safe rollback diagnostics,
-and `audit.php` for explicit-actor order audit writes. It accepts `$conn`,
-`$staff_id`, and validated order inputs explicitly; it does not read session or
-global state.
+`audit.php` for explicit-actor order audit writes, and `pagination.php` for
+bounded page-size normalization. It accepts `$conn` and explicit staff scope
+or actor IDs; it does not read session or global state.
 
 | Focused function | Mutation and transaction behavior | Return contract |
 |---|---|---|
 | `orders_create` | Normalizes duplicate items, validates staff/party/order type, locks products, obtains server-side prices, inserts order/details, updates stock, writes movements and audit, then commits atomically; failures clean up, roll back, log, and attempt the failure audit | `int|false`; returns the created order ID only after commit, otherwise `false` |
+| `orders_count` | Applies optional staff scope and all/sale/purchase filtering with a bounded aggregate query | `int`; returns `0` for invalid scope or query failure |
+| `orders_get_page` | Applies optional staff scope and type filtering with prepared limit/offset values and deterministic newest-first ordering | `array`; returns `[]` for invalid scope or query failure |
+| `orders_get_summary` | Applies optional staff scope and type filtering to aggregate order counts and totals | `array`; returns numeric default fields on invalid scope or query failure |
+| `orders_get_by_id` | Loads one order with party/staff aliases and optional staff ownership scope | `?array`; returns `null` for invalid, missing, unauthorized, or failed lookups |
+| `orders_get_details` | Loads one order's product details with optional staff ownership scope | `array`; returns `[]` for invalid, missing/unauthorized, or failed lookups |
 
 `orders_create()` calls `inventory_log_stock_movement()` directly and uses
 `inventory_rollback_error()` for safe rollback diagnostics. The focused service
 preserves sale/purchase movement reasons, totals, role rules, and failure
 metadata. The legacy `create_order()` wrapper preserves the existing signature
 and delegates without duplicating SQL.
+
+The current `public/order_history.php`, `public/get_order_details.php`, and
+`public/print_invoice.php` callers remain on the five legacy read names, which
+are delegation-only wrappers in `functions.php`. A later caller-migration batch
+may move those pages to the focused names. `get_orders()` and
+`get_orders_for_staff()` remain unbounded legacy loaders and were not extracted.
 
 ## Inventory module boundary
 
@@ -220,13 +231,12 @@ errors and may depend on `$conn` or session scope.
 
 ### Order and reporting reads
 
-- `get_orders` (legacy unbounded loader)
-- `get_orders_for_staff`
-- `count_orders`
-- `get_order_summary`
-- `get_orders_page`
-- `get_order_by_id`
-- `get_order_details`
+- `orders_count` (`count_orders` compatibility wrapper)
+- `orders_get_page` (`get_orders_page` compatibility wrapper)
+- `orders_get_summary` (`get_order_summary` compatibility wrapper)
+- `orders_get_by_id` (`get_order_by_id` compatibility wrapper)
+- `orders_get_details` (`get_order_details` compatibility wrapper)
+- `get_orders` and `get_orders_for_staff` (legacy unbounded loaders)
 - `get_dashboard_stats`
 - `get_chart_data`
 - `get_inventory_valuation`
@@ -265,7 +275,10 @@ errors and may depend on `$conn` or session scope.
 | `create_product`, `update_product`, `delete_product` | Delegation-only compatibility wrappers for the focused Product module. |
 | `inventory_log_stock_movement` | Focused stock-movement insert used directly by product, order, and manual-adjustment services. |
 | `log_stock_movement` | Delegation-only compatibility wrapper for remaining callers. |
-| `create_order` | Creates orders/details, updates stock, logs movement/audit, and commits a transaction. |
+| `orders_create` | Creates orders/details, updates stock, logs movement/audit, and commits a transaction. |
+| `create_order` | Delegation-only compatibility wrapper for `orders_create`. |
+| `orders_count`, `orders_get_page`, `orders_get_summary`, `orders_get_by_id`, `orders_get_details` | Focused bounded and scoped order reads. |
+| `count_orders`, `get_orders_page`, `get_order_summary`, `get_order_by_id`, `get_order_details` | Delegation-only compatibility wrappers for focused order reads. |
 | `create_staff_member` | Inserts a staff account with a password hash. |
 | `update_staff_member` | Updates staff identity, role, active/password state subject to policy. |
 | `delete_staff_member` | Deactivates staff subject to account-integrity rules. |
