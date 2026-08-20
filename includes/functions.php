@@ -597,39 +597,7 @@ function get_low_stock_products($conn, $limit = 100)
 
 function log_stock_movement($conn, $product_id, $staff_id, $quantity, $movement_type, $reason = null)
 {
-    $stmt = null;
-    try {
-        $stmt = $conn->prepare(
-            "INSERT INTO `StockMovement`
-                (product_id, staff_id, quantity, movement_type, reason)
-             VALUES (?, ?, ?, ?, ?)"
-        );
-        if (!$stmt) {
-            error_log('Stock movement prepare failed: ' . $conn->error);
-            return false;
-        }
-
-        if (!$stmt->bind_param('iiiss', $product_id, $staff_id, $quantity, $movement_type, $reason)) {
-            error_log('Stock movement bind failed: ' . $stmt->error);
-            return false;
-        }
-        if (!$stmt->execute()) {
-            error_log('Stock movement insert failed: ' . $stmt->error);
-            return false;
-        }
-        if ($stmt->affected_rows !== 1) {
-            error_log('Stock movement insert affected an unexpected number of rows.');
-            return false;
-        }
-        return true;
-    } catch (Throwable $exception) {
-        error_log('Stock movement insert failed: ' . $exception->getMessage());
-        return false;
-    } finally {
-        if ($stmt instanceof mysqli_stmt) {
-            $stmt->close();
-        }
-    }
+    return inventory_log_stock_movement($conn, $product_id, $staff_id, $quantity, $movement_type, $reason);
 }
 
 function get_stock_movements($conn, $product_id = null)
