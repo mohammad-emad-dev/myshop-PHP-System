@@ -98,6 +98,7 @@ jobs:
           schema_password="$(openssl rand -hex 24)"
           root_password="$(openssl rand -hex 24)"
           {
+            printf 'APP_ENV=production\n'
             printf 'DB_NAME=myshop_ci\n'
             printf 'DB_USER=myshop_ci_runtime\n'
             printf 'DB_PASSWORD=%s\n' "$runtime_password"

@@ -48,6 +48,51 @@ function Invoke-Compose {
     return $commandExitCode
 }
 
+function ConvertTo-SafeDiagnosticLine {
+    param([AllowEmptyString()][string]$Line)
+
+    $sanitized = $Line
+    $sanitized = $sanitized -replace '(?i)(DB_PASSWORD|DB_SCHEMA_PASSWORD|MYSQL_ROOT_PASSWORD|TEST_DB_ROOT_PASSWORD)(?:\s*[:=]\s*|\s+)\S+', '$1=[REDACTED]'
+    $sanitized = $sanitized -replace '(?i)\b(password|passwd|pwd|secret|token|credential|authorization|cookie|csrf|session)(?:\s*[:=]\s*|\s+)\S+', '$1=[REDACTED]'
+    $sanitized = $sanitized -replace '\b[A-Fa-f0-9]{32,}\b', '[REDACTED]'
+    return $sanitized
+}
+
+function Write-SafeFailureDiagnostics {
+    param([Parameter(Mandatory = $true)][string]$Reason)
+
+    Write-Host "Production smoke failure diagnostics: $Reason"
+    $composeArguments = Get-ComposeArguments
+
+    try {
+        Write-Host 'Container status (sanitized):'
+        $statusLines = @(& docker compose @composeArguments ps --all 2>&1)
+        if ($statusLines.Count -eq 0) {
+            Write-Host 'No disposable containers were reported.'
+        } else {
+            $statusLines | Select-Object -Last 40 | ForEach-Object {
+                Write-Host (ConvertTo-SafeDiagnosticLine -Line ([string]$_))
+            }
+        }
+    } catch {
+        Write-Host 'Container status was unavailable.'
+    }
+
+    try {
+        Write-Host 'Application/database log tail (sanitized, max 80 lines):'
+        $logLines = @(& docker compose @composeArguments logs --no-color --no-log-prefix --tail 80 app db 2>&1)
+        if ($logLines.Count -eq 0) {
+            Write-Host 'No application/database logs were reported.'
+        } else {
+            $logLines | Select-Object -Last 80 | ForEach-Object {
+                Write-Host (ConvertTo-SafeDiagnosticLine -Line ([string]$_))
+            }
+        }
+    } catch {
+        Write-Host 'Application/database logs were unavailable.'
+    }
+}
+
 function Get-ComposeContainerId {
     param([Parameter(Mandatory = $true)][string]$Service)
 
@@ -238,6 +283,7 @@ services:
     Write-Host 'PASS: disposable production runtime smoke and isolation checks passed.'
     $exitCode = 0
 } catch {
+    Write-SafeFailureDiagnostics -Reason 'the disposable production smoke command failed.'
     Write-Error 'Disposable production runtime smoke failed.'
     $exitCode = 1
 } finally {

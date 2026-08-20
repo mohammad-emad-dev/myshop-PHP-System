@@ -47,6 +47,7 @@ function run_deployment_unit_tests(): int
     $supplyChainScript = file_get_contents($repository . '/scripts/ci-supply-chain-check.php');
     $releaseIntegrityScript = file_get_contents($repository . '/scripts/release-integrity-check.php');
     $productionSmokeScript = file_get_contents($repository . '/scripts/run-production-smoke.ps1');
+    $browserQaScript = file_get_contents($repository . '/scripts/run-browser-qa.ps1');
     $productionRunbook = file_get_contents($repository . '/docs/PRODUCTION-DEPLOYMENT.md');
 
     foreach ([
@@ -66,6 +67,7 @@ function run_deployment_unit_tests(): int
         $supplyChainScript,
         $releaseIntegrityScript,
         $productionSmokeScript,
+        $browserQaScript,
         $productionRunbook,
     ] as $fixture) {
         $tests->assertTrue(is_string($fixture), 'Deployment fixture could not be read.');
@@ -104,6 +106,7 @@ function run_deployment_unit_tests(): int
     $tests->assertContains('HSTS_ENABLED=false', $environmentExample, 'HSTS must default off for local HTTP development.');
     $tests->assertContains('cancel-in-progress: true', $qualityWorkflow, 'Obsolete Quality Gate runs must be cancelled.');
     $tests->assertContains('contents: read', $qualityWorkflow, 'Quality Gate jobs need read-only repository permissions.');
+    $tests->assertContains("printf 'APP_ENV=production\\n'", $qualityWorkflow, 'Production CI configuration must set APP_ENV=production.');
     $tests->assertContains('mysql:8.4.3@sha256:106d5197fd8e4892980469ad42eb20f7a336bd81509aae4ee175d852f5cc4565', $qualityWorkflow, 'CI MySQL must use the reviewed immutable digest.');
     $tests->assertContains('scripts/repository-security-check.php', $qualityWorkflow, 'Quality Gate must run the dependency-free repository security check.');
     $tests->assertContains('scripts/ci-supply-chain-check.php', $qualityWorkflow, 'Quality Gate must run the dependency-free CI supply-chain policy check.');
@@ -133,6 +136,11 @@ function run_deployment_unit_tests(): int
     $tests->assertContains('no-new-privileges:true', $productionSmokeScript, 'Production smoke must inspect no-new-privileges.');
     $tests->assertContains('command -v git', $productionSmokeScript, 'Production smoke must verify Git is absent from the production image.');
     $tests->assertContains('display_errors', $productionSmokeScript, 'Production smoke must verify PHP error display is disabled.');
+    foreach ([$productionSmokeScript, $browserQaScript] as $runnerScript) {
+        $tests->assertContains('Write-SafeFailureDiagnostics', $runnerScript, 'Disposable runner failures must print bounded safe diagnostics.');
+        $tests->assertContains('--tail 80', $runnerScript, 'Disposable runner diagnostics must keep log output bounded.');
+        $tests->assertContains('[REDACTED]', $runnerScript, 'Disposable runner diagnostics must redact sensitive values.');
+    }
     $tests->assertContains('back up the database', strtolower($productionRunbook), 'Production runbook must require a database backup before migrations.');
     $tests->assertContains('rollback', strtolower($productionRunbook), 'Production runbook must document rollback behavior.');
 
