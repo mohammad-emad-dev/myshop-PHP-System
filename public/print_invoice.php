@@ -13,14 +13,14 @@ if ($order_id <= 0) {
 
 $is_admin_user = auth_is_admin($conn);
 $staff_scope = $is_admin_user ? null : (int)$_SESSION['staff_id'];
-$order = get_order_by_id($conn, $order_id, $staff_scope);
+$order = orders_get_by_id($conn, $order_id, $staff_scope);
 if (!$order) {
     http_response_code(404);
     audit_log_current_actor($conn, 'invoice_view', 'Order', $order_id, false, ['reason' => 'not_found_or_not_authorized']);
     exit("Invoice not found.");
 }
 
-$items = get_order_details($conn, $order_id, $staff_scope);
+$items = orders_get_details($conn, $order_id, $staff_scope);
 
 $is_sale = ($order['order_type'] === 'sale');
 $party_title = $is_sale ? "Customer:" : "Supplier:";

@@ -17,14 +17,14 @@ $page_size_options = [10, 25, 50, 100];
 $page_size = normalize_page_size($_GET['page_size'] ?? 25, 25, $page_size_options);
 $page = normalize_page_number($_GET['page'] ?? 1);
 $order_scope_staff_id = $is_admin_user ? null : (int)$_SESSION['staff_id'];
-$total_orders = count_orders($conn, $order_scope_staff_id, $filter_type);
+$total_orders = orders_count($conn, $order_scope_staff_id, $filter_type);
 $total_pages = max(1, (int)ceil($total_orders / $page_size));
 if ($page > $total_pages) {
     $page = $total_pages;
 }
 $offset = ($page - 1) * $page_size;
-$orders = get_orders_page($conn, $order_scope_staff_id, $filter_type, $page_size, $offset);
-$order_summary = get_order_summary($conn, $order_scope_staff_id, $filter_type);
+$orders = orders_get_page($conn, $order_scope_staff_id, $filter_type, $page_size, $offset);
+$order_summary = orders_get_summary($conn, $order_scope_staff_id, $filter_type);
 $range_start = $total_orders > 0 ? $offset + 1 : 0;
 $range_end = $total_orders > 0 ? min($offset + count($orders), $total_orders) : 0;
 $order_history_url = static function ($target_page) use ($filter_type, $page_size) {

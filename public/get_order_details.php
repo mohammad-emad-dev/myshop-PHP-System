@@ -16,7 +16,7 @@ if (isset($_GET['id'])) {
     $is_admin_user = auth_is_admin($conn);
     $staff_scope = $is_admin_user ? null : (int)$_SESSION['staff_id'];
     // Administrators can view every order. Cashiers can view only orders they created.
-    $order = get_order_by_id($conn, $order_id, $staff_scope);
+    $order = orders_get_by_id($conn, $order_id, $staff_scope);
     
     if (!$order) {
         http_response_code(404);
@@ -43,7 +43,7 @@ if (isset($_GET['id'])) {
         'supplier_address' => (string)($order['supplier_address'] ?? '')
     ];
     
-    $details = get_order_details($conn, $order_id, $staff_scope);
+    $details = orders_get_details($conn, $order_id, $staff_scope);
     $response_items = [];
     foreach ($details as $row) {
         $row['product_name'] = (string)($row['product_name'] ?? '');
