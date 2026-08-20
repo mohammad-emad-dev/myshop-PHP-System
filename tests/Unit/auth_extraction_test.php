@@ -119,6 +119,76 @@ function run_auth_extraction_unit_tests(): int
         );
     }
 
+    $explicitReadOnlyCallers = [
+        'public/index.php' => [
+            'auth_verify_login($conn);' => 1,
+            'auth_is_admin($conn)' => 2,
+        ],
+        'public/audit_log.php' => [
+            'auth_verify_login($conn);' => 1,
+            'auth_require_admin($conn);' => 1,
+        ],
+        'public/order_history.php' => [
+            'auth_verify_login($conn);' => 1,
+            'auth_is_admin($conn)' => 3,
+        ],
+        'public/get_order_details.php' => [
+            'auth_verify_login($conn, false)' => 1,
+            'auth_is_admin($conn)' => 1,
+        ],
+        'public/print_invoice.php' => [
+            'auth_verify_login($conn);' => 1,
+            'auth_is_admin($conn)' => 1,
+        ],
+        'public/export_report.php' => [
+            'auth_verify_login($conn);' => 1,
+            'auth_require_admin($conn);' => 1,
+        ],
+        'public/pos_product_lookup.php' => [
+            'auth_verify_login($conn);' => 1,
+        ],
+    ];
+    foreach ($explicitReadOnlyCallers as $relativePath => $expectedCalls) {
+        $source = file_get_contents($repository . '/' . $relativePath);
+        $tests->assertTrue(is_string($source), 'Authentication caller source could not be read: ' . $relativePath);
+        if (!is_string($source)) {
+            continue;
+        }
+
+        foreach ($expectedCalls as $call => $expectedCount) {
+            $tests->assertSame(
+                $expectedCount,
+                substr_count($source, $call),
+                'Explicit authentication caller count changed for ' . $relativePath . ': ' . $call
+            );
+        }
+        foreach (['verify_login', 'is_admin', 'require_admin'] as $legacyCall) {
+            $tests->assertFalse(
+                preg_match('/(?<!auth_)\\b' . $legacyCall . '\\s*\\(/', $source) === 1,
+                'Read-only caller still uses a legacy authentication wrapper: ' . $relativePath . ' -> ' . $legacyCall
+            );
+        }
+    }
+
+    foreach ([
+        'public/login.php' => 'verify_login(false)',
+        'public/products.php' => 'verify_login();',
+        'public/categories.php' => 'verify_login();',
+        'public/customers.php' => 'verify_login();',
+        'public/suppliers.php' => 'verify_login();',
+        'public/stock_movements.php' => 'verify_login();',
+        'public/orders.php' => 'verify_login();',
+        'public/settings.php' => 'verify_login();',
+        'public/backup_database.php' => 'verify_login(false)',
+        'includes/layouts/sidebar.php' => 'is_admin()',
+    ] as $relativePath => $legacyCall) {
+        $source = file_get_contents($repository . '/' . $relativePath);
+        $tests->assertTrue(is_string($source), 'Legacy authentication caller source could not be read: ' . $relativePath);
+        if (is_string($source)) {
+            $tests->assertContains($legacyCall, $source, 'Out-of-scope authentication caller changed: ' . $relativePath);
+        }
+    }
+
     foreach ([
         'auth_staff_record_is_active_with_supported_role',
         'auth_verify_login',

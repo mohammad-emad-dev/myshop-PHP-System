@@ -3,9 +3,9 @@ require_once '../includes/functions.php';
 start_secure_session();
 require_once '../config/db.php';
 
-verify_login();
+auth_verify_login($conn);
 
-$is_admin_user = is_admin();
+$is_admin_user = auth_is_admin($conn);
 $filter_type = isset($_GET['type']) && is_scalar($_GET['type']) ? sanitize_input((string)$_GET['type']) : 'all';
 if (!in_array($filter_type, ['all', 'sale', 'purchase'], true)) {
     $filter_type = 'all';
@@ -116,7 +116,7 @@ require_once '../includes/layouts/header.php';
                                     <a href="<?php echo htmlspecialchars('order_history.php?' . http_build_query(['type' => 'purchase', 'page_size' => $page_size, 'page' => 1]), ENT_QUOTES, 'UTF-8'); ?>" class="btn btn-outline-primary <?php echo $filter_type === 'purchase' ? 'active' : ''; ?>">Purchases</a>
                                 <?php endif; ?>
                             </div>
-                            <?php if (is_admin()): ?>
+                            <?php if (auth_is_admin($conn)): ?>
                             <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#exportReportModal">
                                 <i class="fas fa-file-excel me-1"></i> Export CSV
                             </button>
@@ -283,7 +283,7 @@ require_once '../includes/layouts/header.php';
         </div>
     </div>
 
-    <?php if (is_admin()): ?>
+    <?php if (auth_is_admin($conn)): ?>
     <!-- Export Report Modal -->
     <div class="modal fade" id="exportReportModal" tabindex="-1" aria-labelledby="exportReportModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">

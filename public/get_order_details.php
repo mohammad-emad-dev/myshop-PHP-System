@@ -5,7 +5,7 @@ require_once '../config/db.php';
 
 header('Content-Type: application/json');
 
-if (!verify_login(false)) {
+if (!auth_verify_login($conn, false)) {
     http_response_code(401);
     echo json_encode(['error' => 'Unauthorized. Please log in.']);
     exit();
@@ -13,7 +13,7 @@ if (!verify_login(false)) {
 
 if (isset($_GET['id'])) {
     $order_id = intval($_GET['id']);
-    $is_admin_user = is_admin();
+    $is_admin_user = auth_is_admin($conn);
     $staff_scope = $is_admin_user ? null : (int)$_SESSION['staff_id'];
     // Administrators can view every order. Cashiers can view only orders they created.
     $order = get_order_by_id($conn, $order_id, $staff_scope);

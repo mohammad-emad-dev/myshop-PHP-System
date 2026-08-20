@@ -3,8 +3,8 @@ require_once '../includes/functions.php';
 start_secure_session();
 require_once '../config/db.php';
 
-verify_login();
-require_admin();
+auth_verify_login($conn);
+auth_require_admin($conn);
 
 $page_size = normalize_page_size($_GET['page_size'] ?? 25, 25, [10, 25, 50, 100]);
 $page = normalize_page_number($_GET['page'] ?? 1);

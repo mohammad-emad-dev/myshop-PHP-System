@@ -5,8 +5,8 @@ start_secure_session();
 require_once '../config/db.php';
 
 // Verify user authentication and administrator privileges.
-verify_login();
-require_admin();
+auth_verify_login($conn);
+auth_require_admin($conn);
 
 $requested_entity = $_GET['entity'] ?? 'orders';
 try {

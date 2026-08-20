@@ -3,7 +3,7 @@ require_once '../includes/functions.php';
 start_secure_session();
 require_once '../config/db.php';
 
-verify_login();
+auth_verify_login($conn);
 
 $order_id = isset($_GET['id']) ? sanitize_id($_GET['id']) : 0;
 
@@ -11,7 +11,7 @@ if ($order_id <= 0) {
     die("Invalid Order ID.");
 }
 
-$is_admin_user = is_admin();
+$is_admin_user = auth_is_admin($conn);
 $staff_scope = $is_admin_user ? null : (int)$_SESSION['staff_id'];
 $order = get_order_by_id($conn, $order_id, $staff_scope);
 if (!$order) {

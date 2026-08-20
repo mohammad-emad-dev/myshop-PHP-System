@@ -12,11 +12,11 @@ require_once '../includes/functions.php';
 start_secure_session();
 require_once '../config/db.php';
 
-verify_login();
+auth_verify_login($conn);
 
 // Scope order-derived dashboard analytics to the current cashier. Product and
 // stock inventory totals remain global because they do not identify staff.
-$dashboard_staff_id = is_admin() ? null : (int)$_SESSION['staff_id'];
+$dashboard_staff_id = auth_is_admin($conn) ? null : (int)$_SESSION['staff_id'];
 
 /* ──────────────────────────────────────────────
  * DATA LAYER — Fetch all analytics in one pass.
@@ -240,7 +240,7 @@ require_once '../includes/layouts/header.php';
                                                 </td>
                                                 <td class="text-center fw-bold text-secondary"><?php echo (int)$p['alert_threshold']; ?></td>
                                                 <td class="text-end">
-                                                    <?php if (is_admin()): ?>
+                                                    <?php if (auth_is_admin($conn)): ?>
                                                     <a href="orders.php?purchase_product_id=<?php echo (int)$p['id']; ?>"
                                                        class="btn btn-sm btn-success rounded-3 fw-bold">
                                                         <i class="fas fa-plus me-1"></i> Restock

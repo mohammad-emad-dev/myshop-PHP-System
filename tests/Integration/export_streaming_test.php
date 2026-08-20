@@ -52,7 +52,7 @@ function run_export_streaming_tests(): int
         foreach (['get_all_products(', 'get_stock_movements(', 'get_customers(', 'get_suppliers('] as $removedLoader) {
             $tests->assertFalse(strpos($endpointSource, $removedLoader) !== false, 'The export endpoint must not load a complete dataset with ' . $removedLoader);
         }
-        foreach (['verify_login();', 'require_admin();', '\\xEF\\xBB\\xBF'] as $fixture) {
+        foreach (['auth_verify_login($conn);', 'auth_require_admin($conn);', '\\xEF\\xBB\\xBF'] as $fixture) {
             $tests->assertContains($fixture, $endpointSource, 'The export response contract is incomplete.');
         }
         foreach (['myshop-products.csv', 'myshop-stock-movements.csv', 'myshop-customers.csv', 'myshop-suppliers.csv', 'myshop-orders.csv'] as $fixture) {
