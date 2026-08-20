@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/pagination.php';
+require_once __DIR__ . '/security.php';
+require_once __DIR__ . '/audit.php';
 
 /**
  * Count stock movements, optionally scoped to one product.
@@ -158,5 +160,140 @@ function inventory_log_stock_movement($conn, $product_id, $staff_id, $quantity, 
         if ($stmt instanceof mysqli_stmt) {
             $stmt->close();
         }
+    }
+}
+
+/**
+ * Atomically adjust one product's stock and record its movement and audit
+ * events. The caller owns request validation and authorization; this service
+ * owns the database transaction and receives the actor explicitly.
+ */
+function inventory_adjust_stock($conn, $product_id, $staff_id, $quantity, $reason): bool
+{
+    $product_id = filter_var($product_id, FILTER_VALIDATE_INT, [
+        'options' => ['min_range' => 1, 'max_range' => 2147483647]
+    ]);
+    $staff_id = filter_var($staff_id, FILTER_VALIDATE_INT, [
+        'options' => ['min_range' => 1, 'max_range' => 2147483647]
+    ]);
+    $quantity = filter_var($quantity, FILTER_VALIDATE_INT, [
+        'options' => ['min_range' => -2147483647, 'max_range' => 2147483647]
+    ]);
+
+    if ($product_id === false || $staff_id === false || $quantity === false || $quantity === 0 || !is_string($reason)) {
+        error_log('Stock adjustment failed: invalid adjustment arguments.');
+        return false;
+    }
+
+    $product_id = (int)$product_id;
+    $staff_id = (int)$staff_id;
+    $quantity = (int)$quantity;
+
+    $transaction_started = false;
+    try {
+        $transaction_started = $conn->begin_transaction();
+    } catch (Throwable $exception) {
+        $transaction_started = false;
+    }
+
+    if (!$transaction_started) {
+        error_log('Stock adjustment failed: unable to start transaction.');
+        audit_log($conn, $staff_id, 'stock_adjustment', 'Product', $product_id, false, ['reason' => 'transaction_start_failed']);
+        return false;
+    }
+
+    $product_stmt = null;
+    $update_stmt = null;
+    try {
+        $product_stmt = $conn->prepare("SELECT stock FROM Product WHERE id = ? FOR UPDATE");
+        if (!$product_stmt) {
+            throw new Exception("Failed to prepare product lock statement.");
+        }
+        if (!$product_stmt->bind_param("i", $product_id)) {
+            throw new Exception("Failed to bind product lock statement.");
+        }
+        if (!$product_stmt->execute()) {
+            throw new Exception("Failed to lock product.");
+        }
+
+        $product_result = $product_stmt->get_result();
+        if (!$product_result) {
+            throw new Exception("Failed to read locked product.");
+        }
+        $product = $product_result->fetch_assoc();
+        $product_stmt->close();
+        $product_stmt = null;
+
+        if (!$product) {
+            throw new Exception("Product not found.");
+        }
+
+        $current_stock = filter_var($product['stock'], FILTER_VALIDATE_INT, [
+            'options' => ['min_range' => 0, 'max_range' => 2147483647]
+        ]);
+        if ($current_stock === false) {
+            throw new Exception("Product has invalid stock.");
+        }
+
+        $new_stock = $current_stock + $quantity;
+        if ($new_stock < 0 || $new_stock > 2147483647) {
+            throw new Exception("Stock adjustment would exceed the supported range.");
+        }
+
+        $update_stmt = $conn->prepare(
+            "UPDATE Product SET stock = ? WHERE id = ? AND stock = ?"
+        );
+        if (!$update_stmt) {
+            throw new Exception("Failed to prepare stock update.");
+        }
+        if (!$update_stmt->bind_param("iii", $new_stock, $product_id, $current_stock)) {
+            throw new Exception("Failed to bind stock update.");
+        }
+        if (!$update_stmt->execute()) {
+            throw new Exception("Failed to update stock.");
+        }
+        if ($update_stmt->affected_rows !== 1) {
+            throw new Exception("Stock update affected an unexpected number of rows.");
+        }
+        $update_stmt->close();
+        $update_stmt = null;
+
+        if (!inventory_log_stock_movement($conn, $product_id, $staff_id, $quantity, 'manual_adjustment', $reason)) {
+            throw new Exception("Failed to log stock movement.");
+        }
+
+        if (!audit_log($conn, $staff_id, 'stock_adjustment', 'Product', $product_id, true, [
+            'quantity' => $quantity,
+            'new_stock' => (int)$new_stock,
+        ])) {
+            throw new Exception('Failed to log stock adjustment audit event.');
+        }
+
+        if (!$conn->commit()) {
+            throw new Exception("Failed to commit stock adjustment.");
+        }
+        return true;
+    } catch (Throwable $exception) {
+        if ($product_stmt instanceof mysqli_stmt) {
+            $product_stmt->close();
+        }
+        if ($update_stmt instanceof mysqli_stmt) {
+            $update_stmt->close();
+        }
+
+        $rollback_succeeded = false;
+        try {
+            $rollback_succeeded = $conn->rollback();
+        } catch (Throwable $rollback_exception) {
+            $rollback_succeeded = false;
+        }
+        if (!$rollback_succeeded) {
+            error_log('Stock adjustment rollback failed: ' . $conn->error);
+        }
+        error_log('Stock adjustment failed: ' . $exception->getMessage());
+        audit_log($conn, $staff_id, 'stock_adjustment', 'Product', $product_id, false, [
+            'reason' => 'database_operation_failed',
+        ]);
+        return false;
     }
 }

@@ -32,98 +32,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         } elseif (empty($adj_reason)) {
             $error = 'Please provide a reason for the adjustment.';
         } else {
-            if (!$conn->begin_transaction()) {
-                error_log('Stock adjustment failed: unable to start transaction.');
-                audit_log_current_actor($conn, 'stock_adjustment', 'Product', $adj_product_id, false, ['reason' => 'transaction_start_failed']);
+            if (!inventory_adjust_stock($conn, (int)$adj_product_id, (int)($_SESSION['staff_id'] ?? 0), (int)$adj_quantity, $adj_reason)) {
                 $error = 'Unable to complete the stock adjustment right now.';
             } else {
-                $product_stmt = null;
-                $update_stmt = null;
-                try {
-                    $product_stmt = $conn->prepare("SELECT stock FROM Product WHERE id = ? FOR UPDATE");
-                    if (!$product_stmt) {
-                        throw new Exception("Failed to prepare product lock statement.");
-                    }
-                    if (!$product_stmt->bind_param("i", $adj_product_id)) {
-                        throw new Exception("Failed to bind product lock statement.");
-                    }
-                    if (!$product_stmt->execute()) {
-                        throw new Exception("Failed to lock product.");
-                    }
-
-                    $product_result = $product_stmt->get_result();
-                    if (!$product_result) {
-                        throw new Exception("Failed to read locked product.");
-                    }
-                    $product = $product_result->fetch_assoc();
-                    $product_stmt->close();
-                    $product_stmt = null;
-
-                    if (!$product) {
-                        throw new Exception("Product not found.");
-                    }
-
-                    $current_stock = filter_var($product['stock'], FILTER_VALIDATE_INT, [
-                        'options' => ['min_range' => 0, 'max_range' => 2147483647]
-                    ]);
-                    if ($current_stock === false) {
-                        throw new Exception("Product has invalid stock.");
-                    }
-
-                    $new_stock = $current_stock + $adj_quantity;
-                    if ($new_stock < 0 || $new_stock > 2147483647) {
-                        throw new Exception("Stock adjustment would exceed the supported range.");
-                    }
-
-                    $update_stmt = $conn->prepare(
-                        "UPDATE Product SET stock = ? WHERE id = ? AND stock = ?"
-                    );
-                    if (!$update_stmt) {
-                        throw new Exception("Failed to prepare stock update.");
-                    }
-                    if (!$update_stmt->bind_param("iii", $new_stock, $adj_product_id, $current_stock)) {
-                        throw new Exception("Failed to bind stock update.");
-                    }
-                    if (!$update_stmt->execute()) {
-                        throw new Exception("Failed to update stock.");
-                    }
-                    if ($update_stmt->affected_rows !== 1) {
-                        throw new Exception("Stock update affected an unexpected number of rows.");
-                    }
-                    $update_stmt->close();
-                    $update_stmt = null;
-
-                    if (!log_stock_movement($conn, $adj_product_id, $_SESSION['staff_id'], $adj_quantity, 'manual_adjustment', $adj_reason)) {
-                        throw new Exception("Failed to log stock movement.");
-                    }
-
-                    if (!audit_log_current_actor($conn, 'stock_adjustment', 'Product', $adj_product_id, true, [
-                        'quantity' => (int)$adj_quantity,
-                        'new_stock' => (int)$new_stock,
-                    ])) {
-                        throw new Exception('Failed to log stock adjustment audit event.');
-                    }
-
-                    if (!$conn->commit()) {
-                        throw new Exception("Failed to commit stock adjustment.");
-                    }
-                    $success = 'Stock adjusted successfully.';
-                } catch (Throwable $e) {
-                    if ($product_stmt instanceof mysqli_stmt) {
-                        $product_stmt->close();
-                    }
-                    if ($update_stmt instanceof mysqli_stmt) {
-                        $update_stmt->close();
-                    }
-                    if (!$conn->rollback()) {
-                        error_log('Stock adjustment rollback failed: ' . $conn->error);
-                    }
-                    error_log('Stock adjustment failed: ' . $e->getMessage());
-                    audit_log_current_actor($conn, 'stock_adjustment', 'Product', $adj_product_id, false, [
-                        'reason' => 'database_operation_failed',
-                    ]);
-                    $error = 'Unable to complete the stock adjustment right now.';
-                }
+                $success = 'Stock adjusted successfully.';
             }
         }
     }

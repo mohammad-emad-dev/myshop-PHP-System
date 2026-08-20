@@ -465,17 +465,13 @@ function run_auth_extraction_unit_tests(): int
         );
         foreach ([
             'audit_log_denied($conn, \'stock_adjustment\'',
-            '$conn->begin_transaction()',
-            'SELECT stock FROM Product WHERE id = ? FOR UPDATE',
-            'log_stock_movement($conn',
-            '$conn->commit()',
-            '$conn->rollback()',
-            "audit_log_current_actor(\$conn, 'stock_adjustment'",
+            'audit_log_current_actor($conn, \'stock_adjustment\', \'Product\', null, false',
+            'inventory_adjust_stock($conn, (int)$adj_product_id',
         ] as $stockInvariant) {
             $tests->assertContains(
                 $stockInvariant,
                 $stockMovements,
-                'Stock movement invariant disappeared during auth caller migration: ' . $stockInvariant
+                'Stock movement authentication or delegation invariant disappeared: ' . $stockInvariant
             );
         }
     }

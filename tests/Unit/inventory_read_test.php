@@ -90,7 +90,7 @@ function run_inventory_read_unit_tests(): int
         $tests->assertContains($writeContract, $module, 'Stock movement write contract changed during extraction: ' . $writeContract);
     }
     foreach ([
-        'public/stock_movements.php' => 'log_stock_movement($conn, $adj_product_id',
+        'public/stock_movements.php' => 'inventory_adjust_stock($conn, (int)$adj_product_id',
         'includes/functions.php' => 'log_stock_movement($conn, $product_id, $staff_id',
     ] as $callerPath => $callerContract) {
         $callerSource = $callerPath === 'public/stock_movements.php' ? $stockPage : $facade;
@@ -117,17 +117,26 @@ function run_inventory_read_unit_tests(): int
         'auth_verify_login($conn)',
         'verify_csrf_token($csrf_token)',
         'auth_is_admin($conn)',
-        '$conn->begin_transaction()',
-        'SELECT stock FROM Product WHERE id = ? FOR UPDATE',
-        'log_stock_movement($conn',
-        '$conn->commit()',
-        '$conn->rollback()',
-        "audit_log_current_actor(\$conn, 'stock_adjustment'",
+        'inventory_adjust_stock($conn, (int)$adj_product_id',
     ] as $stockInvariant) {
         $tests->assertContains(
             $stockInvariant,
             $stockPage,
-            'Stock movement mutation or authorization invariant disappeared during read extraction: ' . $stockInvariant
+            'Stock movement read or authorization invariant disappeared during adjustment extraction: ' . $stockInvariant
+        );
+    }
+    foreach ([
+        '$conn->begin_transaction()',
+        'SELECT stock FROM Product WHERE id = ? FOR UPDATE',
+        'UPDATE Product SET stock = ? WHERE id = ? AND stock = ?',
+        'log_stock_movement($conn',
+        '$conn->commit()',
+        '$conn->rollback()',
+        'audit_log_current_actor($conn, \'stock_adjustment\', \'Product\', $adj_product_id',
+    ] as $removedMutation) {
+        $tests->assertFalse(
+            strpos($stockPage, $removedMutation) !== false,
+            'Stock movement page still owns the extracted adjustment operation: ' . $removedMutation
         );
     }
 

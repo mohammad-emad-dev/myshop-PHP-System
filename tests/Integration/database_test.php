@@ -1221,6 +1221,177 @@ function run_integration_tests(): int
             test_load_sql_file($schema, dirname(__DIR__, 2) . '/database/batch22_audit_log.sql');
         }
 
+        $serviceReason = 'Batch 7C explicit service adjustment';
+        $serviceStockBefore = (int)test_scalar($conn, 'SELECT stock FROM Product WHERE id = ?', 'i', [$orderProductId]);
+        $serviceMovementBefore = (int)test_scalar(
+            $conn,
+            'SELECT COUNT(*) FROM StockMovement WHERE product_id = ? AND staff_id = ? AND movement_type = ? AND quantity = ? AND reason = ?',
+            'iisis',
+            [$orderProductId, $adminId, 'manual_adjustment', 1, $serviceReason]
+        );
+        $serviceAuditBefore = (int)test_scalar(
+            $conn,
+            "SELECT COUNT(*) FROM AuditLog
+             WHERE actor_staff_id = ? AND action = 'stock_adjustment'
+               AND entity_type = 'Product' AND entity_id = ? AND outcome = 'success'",
+            'ii',
+            [$adminId, $orderProductId]
+        );
+        $tests->assertTrue(
+            inventory_adjust_stock($conn, $orderProductId, $adminId, 1, $serviceReason),
+            'The explicit stock adjustment service must commit a valid adjustment.'
+        );
+        $tests->assertSame($serviceStockBefore + 1, (int)test_scalar($conn, 'SELECT stock FROM Product WHERE id = ?', 'i', [$orderProductId]), 'The explicit stock adjustment service changed the wrong quantity.');
+        $tests->assertSame(
+            $serviceMovementBefore + 1,
+            (int)test_scalar(
+                $conn,
+                'SELECT COUNT(*) FROM StockMovement WHERE product_id = ? AND staff_id = ? AND movement_type = ? AND quantity = ? AND reason = ?',
+                'iisis',
+                [$orderProductId, $adminId, 'manual_adjustment', 1, $serviceReason]
+            ),
+            'The explicit stock adjustment service did not commit its movement record.'
+        );
+        $tests->assertSame(
+            $serviceAuditBefore + 1,
+            (int)test_scalar(
+                $conn,
+                "SELECT COUNT(*) FROM AuditLog
+                 WHERE actor_staff_id = ? AND action = 'stock_adjustment'
+                   AND entity_type = 'Product' AND entity_id = ? AND outcome = 'success'",
+                'ii',
+                [$adminId, $orderProductId]
+            ),
+            'The explicit stock adjustment service did not commit its success audit.'
+        );
+
+        $missingProductFailureBefore = (int)test_scalar(
+            $conn,
+            "SELECT COUNT(*) FROM AuditLog
+             WHERE actor_staff_id = ? AND action = 'stock_adjustment'
+               AND entity_type = 'Product' AND entity_id = 2147483647 AND outcome = 'failure'",
+            'i',
+            [$adminId]
+        );
+        $tests->assertFalse(
+            inventory_adjust_stock($conn, 2147483647, $adminId, 1, 'Batch 7C missing product'),
+            'A missing product must fail the explicit stock adjustment service.'
+        );
+        $tests->assertSame(
+            $missingProductFailureBefore + 1,
+            (int)test_scalar(
+                $conn,
+                "SELECT COUNT(*) FROM AuditLog
+                 WHERE actor_staff_id = ? AND action = 'stock_adjustment'
+                   AND entity_type = 'Product' AND entity_id = 2147483647 AND outcome = 'failure'",
+                'i',
+                [$adminId]
+            ),
+            'A missing product must create a failure audit after rollback.'
+        );
+
+        $underflowStockBefore = (int)test_scalar($conn, 'SELECT stock FROM Product WHERE id = ?', 'i', [$orderProductId]);
+        $underflowMovementBefore = (int)test_scalar(
+            $conn,
+            'SELECT COUNT(*) FROM StockMovement WHERE product_id = ? AND reason = ?',
+            'is',
+            [$orderProductId, 'Batch 7C underflow']
+        );
+        $tests->assertFalse(
+            inventory_adjust_stock($conn, $orderProductId, $adminId, -($underflowStockBefore + 1), 'Batch 7C underflow'),
+            'An underflowing adjustment must fail.'
+        );
+        $tests->assertSame($underflowStockBefore, (int)test_scalar($conn, 'SELECT stock FROM Product WHERE id = ?', 'i', [$orderProductId]), 'An underflow attempt changed stock.');
+        $tests->assertSame(
+            $underflowMovementBefore,
+            (int)test_scalar(
+                $conn,
+                'SELECT COUNT(*) FROM StockMovement WHERE product_id = ? AND reason = ?',
+                'is',
+                [$orderProductId, 'Batch 7C underflow']
+            ),
+            'An underflow attempt left a movement record.'
+        );
+
+        $overflowStockBefore = (int)test_scalar($conn, 'SELECT stock FROM Product WHERE id = ?', 'i', [$orderProductId]);
+        test_execute($schema, 'UPDATE Product SET stock = 2147483647 WHERE id = ?', 'i', [$orderProductId]);
+        try {
+            $tests->assertFalse(
+                inventory_adjust_stock($conn, $orderProductId, $adminId, 1, 'Batch 7C overflow'),
+                'An overflowing adjustment must fail.'
+            );
+            $tests->assertSame(2147483647, (int)test_scalar($conn, 'SELECT stock FROM Product WHERE id = ?', 'i', [$orderProductId]), 'An overflow attempt changed stock.');
+        } finally {
+            test_execute($schema, 'UPDATE Product SET stock = ? WHERE id = ?', 'ii', [$overflowStockBefore, $orderProductId]);
+        }
+
+        $invalidStockBefore = (int)test_scalar($conn, 'SELECT stock FROM Product WHERE id = ?', 'i', [$orderProductId]);
+        $schema->query('ALTER TABLE Product DROP CHECK chk_product_stock_nonnegative');
+        try {
+            test_execute($schema, 'UPDATE Product SET stock = -1 WHERE id = ?', 'i', [$orderProductId]);
+            $tests->assertFalse(
+                inventory_adjust_stock($conn, $orderProductId, $adminId, 1, 'Batch 7C invalid current stock'),
+                'Invalid current stock must fail.'
+            );
+            $tests->assertSame(-1, (int)test_scalar($conn, 'SELECT stock FROM Product WHERE id = ?', 'i', [$orderProductId]), 'Invalid current stock was unexpectedly changed.');
+        } finally {
+            test_execute($schema, 'UPDATE Product SET stock = ? WHERE id = ?', 'ii', [$invalidStockBefore, $orderProductId]);
+            $schema->query('ALTER TABLE Product ADD CONSTRAINT chk_product_stock_nonnegative CHECK (stock >= 0)');
+        }
+
+        $movementFailureReason = 'Batch 7C movement insertion failure';
+        $movementFailureStockBefore = (int)test_scalar($conn, 'SELECT stock FROM Product WHERE id = ?', 'i', [$orderProductId]);
+        $movementFailureBefore = (int)test_scalar(
+            $conn,
+            'SELECT COUNT(*) FROM StockMovement WHERE product_id = ? AND reason = ?',
+            'is',
+            [$orderProductId, $movementFailureReason]
+        );
+        $movementFailureAuditBefore = (int)test_scalar(
+            $conn,
+            "SELECT COUNT(*) FROM AuditLog
+             WHERE actor_staff_id = ? AND action = 'stock_adjustment'
+               AND entity_type = 'Product' AND entity_id = ? AND outcome = 'failure'",
+            'ii',
+            [$adminId, $orderProductId]
+        );
+        $movementFailureTrigger = 'qa_batch7c_movement_failure_' . strtolower(bin2hex(random_bytes(4)));
+        $schema->query(
+            'CREATE TRIGGER ' . test_sql_identifier($movementFailureTrigger) .
+            " BEFORE INSERT ON StockMovement FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'QA movement failure'"
+        );
+        try {
+            $tests->assertFalse(
+                inventory_adjust_stock($conn, $orderProductId, $adminId, 1, $movementFailureReason),
+                'A movement insertion failure must fail the explicit stock adjustment service.'
+            );
+            $tests->assertSame($movementFailureStockBefore, (int)test_scalar($conn, 'SELECT stock FROM Product WHERE id = ?', 'i', [$orderProductId]), 'Movement insertion failure left a partial stock update.');
+            $tests->assertSame(
+                $movementFailureBefore,
+                (int)test_scalar(
+                    $conn,
+                    'SELECT COUNT(*) FROM StockMovement WHERE product_id = ? AND reason = ?',
+                    'is',
+                    [$orderProductId, $movementFailureReason]
+                ),
+                'Movement insertion failure left a partial movement record.'
+            );
+            $tests->assertSame(
+                $movementFailureAuditBefore + 1,
+                (int)test_scalar(
+                    $conn,
+                    "SELECT COUNT(*) FROM AuditLog
+                     WHERE actor_staff_id = ? AND action = 'stock_adjustment'
+                       AND entity_type = 'Product' AND entity_id = ? AND outcome = 'failure'",
+                    'ii',
+                    [$adminId, $orderProductId]
+                ),
+                'Movement insertion failure did not create its failure audit after rollback.'
+            );
+        } finally {
+            $schema->query('DROP TRIGGER IF EXISTS ' . test_sql_identifier($movementFailureTrigger));
+        }
+
         $tests->assertCount($cashierOrderCountBeforePageTests + 1, get_orders_for_staff($conn, $cashierId), 'Cashier order history scope is incorrect.');
         $tests->assertSame(null, get_order_by_id($conn, $tamperedSaleId, $adminId), 'A cashier order must not be visible to another staff scope.');
         $tests->assertCount(0, get_order_details($conn, $tamperedSaleId, $adminId), 'Unauthorized order details must be empty.');
