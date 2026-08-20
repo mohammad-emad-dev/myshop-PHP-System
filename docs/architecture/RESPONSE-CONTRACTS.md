@@ -6,7 +6,8 @@ modules must preserve these contracts until callers are migrated deliberately.
 Batch 6A places active-session authentication, administrator authorization, and
 redirect implementations in `includes/auth.php` and `includes/http.php`. Batch
 5 placed bounded Supplier reads in `includes/people.php`; earlier batches placed
-Customer and Catalog reads in their focused modules. Legacy names for moved
+Customer and Catalog reads in their focused modules. Batch 7A places bounded
+stock-movement count/page reads in `includes/inventory.php`. Legacy names for moved
 functions remain available from `includes/functions.php` as compatibility
 wrappers, while unmoved legacy functions retain their original contracts.
 
@@ -20,7 +21,7 @@ callers must not assume the distinction is currently available.
 - `get_all_products()` — complete product array; legacy unbounded query.
 - `get_pos_products()` — bounded product array.
 - `get_stock_movements()` — complete movement array; legacy unbounded query.
-- `get_stock_movements_page()` — bounded movement page.
+- `inventory_get_stock_movements_page()` / `get_stock_movements_page()` — bounded movement page.
 - `get_low_stock_products()` — bounded low-stock array.
 - `get_products_page()` — bounded product page.
 - `get_categories()` — complete legacy category array with product counts.
@@ -98,7 +99,7 @@ database failure:
 
 - `count_products()`
 - `count_categories()`
-- `count_stock_movements()`
+- `inventory_count_stock_movements()` / `count_stock_movements()`
 - `count_orders()`
 - `count_customers()`
 - `count_suppliers()`

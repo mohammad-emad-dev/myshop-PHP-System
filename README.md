@@ -57,7 +57,8 @@ Only public/ should be exposed as the web document root. The repository root, co
 - `includes/audit.php` owns bounded audit metadata handling, audit writes, filters, and paginated audit-log reads.
 - `includes/pagination.php` owns page/page-size normalization and bounded list-search normalization.
 - `includes/backup.php` remains separate because backup streaming has its own operational and authorization boundary.
-- Database/business workflows, including authentication rate limiting, products, inventory, orders, staff, and reference-data CRUD, remain in the facade until a future refactor establishes and tests their dependency boundaries.
+- `includes/catalog.php` owns bounded product and category reads; `includes/people.php` owns bounded customer and supplier reads; and `includes/inventory.php` owns bounded stock-movement count/page reads.
+- Database/business workflows, including authentication rate limiting, inventory mutations, orders, staff, and reference-data CRUD, remain in the facade or page controllers until a future refactor establishes and tests their dependency boundaries.
 
 Future features should place new code in the smallest cohesive module that owns its dependencies, then expose it through the facade only when existing callers require the compatibility surface. Modules must not require the facade back, and functions must not be duplicated across modules.
 

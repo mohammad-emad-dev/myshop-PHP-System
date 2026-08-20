@@ -1,7 +1,7 @@
 # MyShop dependency map
 
 This map records current call-site and dependency relationships after the
-Batch 6A authentication and authorization extraction. It remains a
+Batch 7A bounded inventory-read extraction. It remains a
 characterization artifact; the compatibility wrappers are still required.
 
 ## Public-page to shared-function map
@@ -27,7 +27,7 @@ names are grouped only for readability; the source remains the authority.
 | `products.php` | `start_secure_session`, `verify_login`, `is_admin`, `verify_csrf_token`, `generate_csrf_token`, `sanitize_input`, `normalize_page_number`, `normalize_page_size`, `truncate_list_search`, `catalog_get_categories_for_selector`, `catalog_get_products_page`, `catalog_count_products`, `create_product`, `update_product`, `delete_product`, `handle_image_upload`, `delete_newly_uploaded_image`, `audit_log_current_actor`, `audit_log_denied` |
 | `ready.php` | `initialize_request_context`, `log_application_error`; `config/db.php` performs the connection and readiness failure contract |
 | `settings.php` | `start_secure_session`, `verify_login`, `is_admin`, `require_admin`, `verify_csrf_token`, `generate_csrf_token`, `sanitize_input`, `password_meets_policy`, `create_staff_member`, `update_staff_member`, `delete_staff_member`, `set_staff_active`, `get_staff_members`, `audit_log_current_actor` |
-| `stock_movements.php` | `start_secure_session`, `verify_login`, `is_admin`, `verify_csrf_token`, `sanitize_input`, `normalize_page_number`, `normalize_page_size`, `get_pos_products`, `get_product_by_id`, `log_stock_movement`, `get_stock_movements_page`, `count_stock_movements`, `audit_log_current_actor`, `audit_log_denied` |
+| `stock_movements.php` | `start_secure_session`, `verify_login`, `is_admin`, `verify_csrf_token`, `sanitize_input`, `normalize_page_number`, `normalize_page_size`, `get_pos_products`, `get_product_by_id`, `log_stock_movement`, `inventory_get_stock_movements_page`, `inventory_count_stock_movements`, `audit_log_current_actor`, `audit_log_denied` |
 | `suppliers.php` | `start_secure_session`, `verify_login`, `is_admin`, `verify_csrf_token`, `generate_csrf_token`, `sanitize_input`, `normalize_page_number`, `normalize_page_size`, `truncate_list_search`, `create_supplier`, `update_supplier`, `delete_supplier`, `people_count_suppliers`, `people_get_suppliers_page`, `audit_log_current_actor`, `audit_log_denied` |
 
 ## Global and implicit dependencies
@@ -88,6 +88,26 @@ continue to use those wrappers. `get_categories()` remains an unbounded
 legacy loader and `get_category_by_id()` remains an uncalled legacy lookup;
 neither was moved without a verified caller.
 
+## Inventory module boundary
+
+`includes/inventory.php` has no dependency on `includes/functions.php`. It
+requires only `pagination.php` for page-size normalization and accepts `$conn`
+explicitly for each bounded stock-movement query.
+
+| Focused function | Read behavior | Side effects and security notes |
+|---|---|---|
+| `inventory_count_stock_movements` | Count all movements or movements for one product | Prepared optional product filter; returns `0` on invalid input or failure |
+| `inventory_get_stock_movements_page` | Bounded movement page with optional product filter and deterministic newest-first ordering | Prepared product/limit/offset values; returns `[]` on invalid input or failure |
+
+`public/stock_movements.php` calls these focused functions directly for its
+read path. The legacy `count_stock_movements` and
+`get_stock_movements_page` names remain delegation-only wrappers in
+`functions.php` for un-migrated callers. `get_stock_movements()` remains an
+unbounded legacy loader because the inventory-wide caller inventory found no
+verified runtime caller. `get_low_stock_products()` and
+`get_inventory_valuation()` remain in the facade for the dashboard and navbar
+callers.
+
 ## People module boundary
 
 `includes/people.php` has no dependency on `includes/functions.php`. It
@@ -133,8 +153,8 @@ errors and may depend on `$conn` or session scope.
 - `catalog_get_product_by_id` (`get_product_by_id` compatibility wrapper)
 - `get_low_stock_products`
 - `get_stock_movements` (legacy unbounded loader)
-- `count_stock_movements`
-- `get_stock_movements_page`
+- `inventory_count_stock_movements` (`count_stock_movements` compatibility wrapper)
+- `inventory_get_stock_movements_page` (`get_stock_movements_page` compatibility wrapper)
 
 ### Order and reporting reads
 
