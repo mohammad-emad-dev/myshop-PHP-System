@@ -39,6 +39,15 @@ scope decision. `get_dashboard_stats()` remains a delegation-only compatibility
 wrapper in `includes/functions.php` with its original signature and return
 contract.
 
+`dashboard_get_chart_data($conn, $days = 7, $staff_id = null)` preserves the
+same complete chronological date series and `{label, sales, purchases}` point
+shape. Days are normalized to 1–31, missing days remain numeric zeroes, sales
+and purchases remain separate float totals, and an optional staff ID scopes the
+Order aggregate. Prepared bindings, failure logging, statement cleanup, and
+closed-connection fallback are unchanged. `public/index.php` calls this
+focused service directly; `get_chart_data()` remains a delegation-only
+compatibility wrapper.
+
 ## Focused Product mutation contracts
 
 The focused product services accept explicit database and actor dependencies
@@ -144,7 +153,8 @@ callers must not assume the distinction is currently available.
 - `dashboard_get_stats()` / `get_dashboard_stats()` — fixed dashboard KPI
   array with zero defaults on query failure; the legacy name is a compatibility
   wrapper.
-- `get_chart_data()` — padded chart array with zero values on failure.
+- `dashboard_get_chart_data()` / `get_chart_data()` — complete padded chart
+  array with zero values on failure; the legacy name is a compatibility wrapper.
 - `get_top_selling_products()` and `get_category_sales_distribution()` —
   report arrays.
 
@@ -218,8 +228,8 @@ extracting modules unless callers are migrated and tested together.
 
 - `dashboard_get_stats()` and its `get_dashboard_stats()` compatibility wrapper
   return zeroed KPI values when one or more queries fail.
-- `get_chart_data()` returns a complete date range padded with zero values when
-  the query fails.
+- `dashboard_get_chart_data()` and its `get_chart_data()` compatibility wrapper
+  return a complete date range padded with zero values when the query fails.
 - `get_order_summary()` returns default numeric summary fields on failure.
 - Paginated readers return empty arrays when the query fails.
 
