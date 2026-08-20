@@ -1,7 +1,7 @@
 # MyShop dependency map
 
 This map records current call-site and dependency relationships after the
-Batch 4 Customer read extraction. It remains a characterization artifact; the
+Batch 5 Supplier read extraction. It remains a characterization artifact; the
 compatibility wrappers are still required.
 
 ## Public-page to shared-function map
@@ -21,14 +21,14 @@ names are grouped only for readability; the source remains the authority.
 | `index.php` | `start_secure_session`, `verify_login`, `is_admin`, `get_dashboard_stats`, `get_chart_data`, `get_inventory_valuation`, `get_top_selling_products`, `get_category_sales_distribution`, `get_low_stock_products` |
 | `login.php` | `start_secure_session`, `send_security_headers`, `verify_csrf_token`, `get_login_source_ip`, `build_login_rate_limit_key`, `login_rate_limit_check`, `login_rate_limit_record_failure`, `login_rate_limit_reset`, `audit_log`, `audit_log_current_actor`, `destroy_current_session`, `generate_csrf_token`, `redirect`, `verify_login`, `get_asset_integrity` |
 | `order_history.php` | `start_secure_session`, `verify_login`, `is_admin`, `sanitize_input`, `normalize_page_number`, `normalize_page_size`, `count_orders`, `get_order_summary`, `get_orders_page` |
-| `orders.php` | `start_secure_session`, `verify_login`, `is_admin`, `verify_csrf_token`, `generate_csrf_token`, `truncate_list_search`, `catalog_get_pos_products`, `catalog_get_categories_for_selector`, `people_get_customers_for_selector`, `get_suppliers_for_selector`, `catalog_get_product_by_id`, `create_order`, `audit_log_current_actor`, `audit_log_denied` |
+| `orders.php` | `start_secure_session`, `verify_login`, `is_admin`, `verify_csrf_token`, `generate_csrf_token`, `truncate_list_search`, `catalog_get_pos_products`, `catalog_get_categories_for_selector`, `people_get_customers_for_selector`, `people_get_suppliers_for_selector`, `catalog_get_product_by_id`, `create_order`, `audit_log_current_actor`, `audit_log_denied` |
 | `pos_product_lookup.php` | `start_secure_session`, `verify_login`, `truncate_list_search`, `catalog_get_pos_product_by_barcode` |
 | `print_invoice.php` | `start_secure_session`, `send_security_headers`, `verify_login`, `is_admin`, `sanitize_id`, `get_order_by_id`, `get_order_details`, `audit_log_current_actor` |
 | `products.php` | `start_secure_session`, `verify_login`, `is_admin`, `verify_csrf_token`, `generate_csrf_token`, `sanitize_input`, `normalize_page_number`, `normalize_page_size`, `truncate_list_search`, `catalog_get_categories_for_selector`, `catalog_get_products_page`, `catalog_count_products`, `create_product`, `update_product`, `delete_product`, `handle_image_upload`, `delete_newly_uploaded_image`, `audit_log_current_actor`, `audit_log_denied` |
 | `ready.php` | `initialize_request_context`, `log_application_error`; `config/db.php` performs the connection and readiness failure contract |
 | `settings.php` | `start_secure_session`, `verify_login`, `is_admin`, `require_admin`, `verify_csrf_token`, `generate_csrf_token`, `sanitize_input`, `password_meets_policy`, `create_staff_member`, `update_staff_member`, `delete_staff_member`, `set_staff_active`, `get_staff_members`, `audit_log_current_actor` |
 | `stock_movements.php` | `start_secure_session`, `verify_login`, `is_admin`, `verify_csrf_token`, `sanitize_input`, `normalize_page_number`, `normalize_page_size`, `get_pos_products`, `get_product_by_id`, `log_stock_movement`, `get_stock_movements_page`, `count_stock_movements`, `audit_log_current_actor`, `audit_log_denied` |
-| `suppliers.php` | `start_secure_session`, `verify_login`, `is_admin`, `verify_csrf_token`, `generate_csrf_token`, `sanitize_input`, `normalize_page_number`, `normalize_page_size`, `truncate_list_search`, `create_supplier`, `update_supplier`, `delete_supplier`, `count_suppliers`, `get_suppliers_page`, `audit_log_current_actor`, `audit_log_denied` |
+| `suppliers.php` | `start_secure_session`, `verify_login`, `is_admin`, `verify_csrf_token`, `generate_csrf_token`, `sanitize_input`, `normalize_page_number`, `normalize_page_size`, `truncate_list_search`, `create_supplier`, `update_supplier`, `delete_supplier`, `people_count_suppliers`, `people_get_suppliers_page`, `audit_log_current_actor`, `audit_log_denied` |
 
 ## Global and implicit dependencies
 
@@ -81,12 +81,16 @@ normalization helpers and accepts `$conn` explicitly for every query.
 | `people_count_customers` | Customer count using optional name, phone, or email search | Prepared values; returns `0` on failure |
 | `people_get_customers_page` | Bounded customer page with search and deterministic name/ID ordering | Prepared values; returns `[]` on failure |
 | `people_get_customers_for_selector` | Bounded POS customer selector with ID, name, and phone | Prepared limit; returns `[]` on failure |
+| `people_count_suppliers` | Supplier count using optional name, phone, or email search | Prepared values; returns `0` on failure |
+| `people_get_suppliers_page` | Bounded supplier page with search and deterministic name/ID ordering | Prepared values; returns `[]` on failure |
+| `people_get_suppliers_for_selector` | Bounded admin purchase selector with ID, name, and phone | Prepared limit; returns `[]` on failure |
 
-The legacy names `count_customers`, `get_customers_page`, and
-`get_customers_for_selector` remain in `functions.php` as delegation-only
-compatibility wrappers. `get_customers()` remains an unbounded legacy loader
-and `get_customer_by_id()` remains an uncalled legacy lookup; neither was
-moved without a verified caller.
+The legacy names `count_customers`, `get_customers_page`,
+`get_customers_for_selector`, `count_suppliers`, `get_suppliers_page`, and
+`get_suppliers_for_selector` remain in `functions.php` as delegation-only
+compatibility wrappers. `get_customers()` and `get_suppliers()` remain
+unbounded legacy loaders; `get_customer_by_id()` and `get_supplier_by_id()`
+remain uncalled legacy lookups. None was moved without a verified caller.
 
 ## Read-only functions
 
@@ -142,8 +146,11 @@ errors and may depend on `$conn` or session scope.
   `people_get_customers_page` (`get_customers_page` compatibility wrapper),
   `people_get_customers_for_selector` (`get_customers_for_selector`
   compatibility wrapper), `get_customer_by_id` (uncalled legacy lookup)
-- `get_suppliers`, `count_suppliers`, `get_suppliers_page`,
-  `get_suppliers_for_selector`, `get_supplier_by_id`
+- `get_suppliers` (legacy unbounded loader),
+  `people_count_suppliers` (`count_suppliers` compatibility wrapper),
+  `people_get_suppliers_page` (`get_suppliers_page` compatibility wrapper),
+  `people_get_suppliers_for_selector` (`get_suppliers_for_selector`
+  compatibility wrapper), `get_supplier_by_id` (uncalled legacy lookup)
 
 ## Mutating functions
 
@@ -212,14 +219,12 @@ of those invariants.
 
 ## Safe remaining extraction candidates
 
-The safest remaining candidates are read-side boundaries with existing bounded tests:
+The safest remaining candidate is the dashboard read model after its current
+query and default-value behavior is characterized.
 
-1. Supplier paginated reads.
-2. Dashboard read model after current query behavior is characterized.
-
-Batch 4 completed bounded customer count/page/selector extraction behind
-compatibility wrappers. It did not move the unbounded `get_customers()` loader
-or the uncalled `get_customer_by_id()` lookup, and it did not include customer
+Batch 5 completed bounded supplier count/page/selector extraction behind
+compatibility wrappers. It did not move the unbounded `get_suppliers()` loader
+or the uncalled `get_supplier_by_id()` lookup, and it did not include supplier
 writes, product writes, stock updates, uploads, or orders.
 
 ## Functions that must not move early

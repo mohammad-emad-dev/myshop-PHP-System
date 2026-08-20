@@ -1,7 +1,7 @@
 # MyShop refactoring contract
 
-This contract is the safety boundary for future modularization. Batch 4
-extracts only bounded Customer reads and preserves application behavior.
+This contract is the safety boundary for future modularization. Batch 5
+extracts only bounded Supplier reads and preserves application behavior.
 
 ## Behavior that must remain unchanged
 
@@ -31,6 +31,11 @@ extracts only bounded Customer reads and preserves application behavior.
 - Customer name, phone, and email search; pagination; deterministic name/ID
   ordering; selector ID/name/phone fields; bounded page sizes; and empty-result
   behavior remain unchanged.
+- Supplier name, phone, and email search; pagination; deterministic name/ID
+  ordering; selector ID/name/phone fields; bounded page sizes; and empty-result
+  behavior remain unchanged.
+- Purchase controls remain hidden for cashiers and server-side cashier purchase
+  rejection, audit behavior, and admin purchase behavior remain unchanged.
 
 ## URLs and routes that must remain unchanged
 
@@ -147,27 +152,27 @@ with the exact command and environment.
 
 ## Recommended next batch
 
-After Batch 4, the next candidate is a similarly bounded read-side extraction
-for supplier pagination. It must be planned separately and must not include
-supplier writes.
+After Batch 5, the next candidate is the dashboard read model after its query,
+default-value, and display contracts are characterized. It must not include
+dashboard mutations or presentation changes.
 
 Acceptance criteria:
 
-- Supplier search, pagination, ordering, selector behavior, and failure values
-  are unchanged.
+- Dashboard query results, default values, ordering, and failure values are
+  characterized before extraction.
 - Existing assertion count is unchanged or higher.
-- Browser QA supplier journeys remain passing.
-- No supplier read SQL remains in migrated page controllers.
+- Browser QA dashboard journeys remain passing.
+- No dashboard read SQL remains in migrated page controllers.
 - The old function names still work through wrappers.
 
 ## Rollback instructions
 
-Batch 4 can be rolled back without a schema or data rollback:
+Batch 5 can be rolled back without a schema or data rollback:
 
-1. Revert the local Batch 4 commit, or restore the previous local commit if it
+1. Revert the local Batch 5 commit, or restore the previous local commit if it
    is not shared.
-2. Confirm `public/customers.php` and `public/orders.php` use the legacy
-   customer read names again and that the customer wrappers still delegate
+2. Confirm `public/suppliers.php` and `public/orders.php` use the legacy
+   supplier read names again and that the supplier wrappers still delegate
    through `people.php`.
 3. Re-run `git diff --check` and the previously passing test suite.
 

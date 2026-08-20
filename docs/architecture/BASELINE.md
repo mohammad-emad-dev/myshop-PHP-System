@@ -1,6 +1,6 @@
 # MyShop architecture baseline
 
-Status: Batch 4 customer read extraction baseline
+Status: Batch 5 supplier read extraction baseline
 
 Captured from the `security-hardening-baseline` branch at starting revision
 `61e8128a66e0bd98c3bfa5470299c7cad40bcf68`.
@@ -116,7 +116,7 @@ application service module.
 | Role checks and staff administration functions | Authorization and staff administration |
 | Category read/mutation functions | Remaining category reads and category mutations |
 | Customer read/mutation functions | Remaining customer reads and customer mutations |
-| Supplier read/mutation functions | Supplier reads, selectors, and mutations |
+| Supplier read/mutation functions | Remaining supplier reads and supplier mutations |
 | Inventory valuation and sales aggregate functions | Inventory valuation and dashboard sales aggregates |
 
 Focused shared modules already extracted from the facade:
@@ -130,9 +130,9 @@ Focused shared modules already extracted from the facade:
 - `includes/catalog.php`: read-only product, POS, barcode, product-page, and
   category-selector, category-count, and category-page queries. The legacy
   public function names remain thin wrappers in `functions.php`.
-- `includes/people.php`: read-only bounded customer count, page, and selector
-  queries. The legacy public function names remain thin wrappers in
-  `functions.php`.
+- `includes/people.php`: read-only bounded customer and supplier count, page,
+  and selector queries. The legacy public function names remain thin wrappers
+  in `functions.php`.
 
 ## Public pages and responsibilities
 
@@ -143,12 +143,12 @@ Focused shared modules already extracted from the facade:
 | `public/products.php` | Product CRUD request dispatch, image upload handling, Catalog search/pagination, product table and forms |
 | `public/categories.php` | Category CRUD request dispatch, admin checks, Catalog search/pagination, category view |
 | `public/stock_movements.php` | Manual stock adjustment transaction, movement history filtering/pagination, stock ledger view |
-| `public/orders.php` | POS cart submission, Catalog product/category and People customer-selector reads, product revalidation, sale/purchase policy, order creation, POS view and JavaScript |
+| `public/orders.php` | POS cart submission, Catalog product/category and People customer/supplier-selector reads, product revalidation, sale/purchase policy, order creation, POS view and JavaScript |
 | `public/order_history.php` | Scoped order history filters, pagination, summaries, order-history view and interactions |
 | `public/get_order_details.php` | Scoped JSON order-detail endpoint |
 | `public/pos_product_lookup.php` | Authenticated barcode lookup endpoint backed by the Catalog module |
 | `public/customers.php` | Customer CRUD request dispatch, People search/pagination, forms and table |
-| `public/suppliers.php` | Supplier CRUD, search/pagination, forms and table |
+| `public/suppliers.php` | Supplier CRUD request dispatch, People search/pagination, forms and table |
 | `public/audit_log.php` | Admin audit filtering, pagination, and audit table |
 | `public/export_report.php` | Admin CSV validation, headers, and delegation to streaming exporter |
 | `public/print_invoice.php` | Scoped order lookup, invoice rendering, print behavior |
@@ -180,7 +180,7 @@ Shared modules own most other application SQL:
 - `includes/catalog.php`: product/POS/barcode/product-page and bounded category
   count/page/selector reads; `includes/functions.php` retains compatibility
   wrappers.
-- `includes/people.php`: bounded customer count/page/selector reads;
+- `includes/people.php`: bounded customer and supplier count/page/selector reads;
   `includes/functions.php` retains compatibility wrappers.
 - `includes/functions.php`: legacy full product reads, inventory, order, staff,
   remaining reference-data, and dashboard queries, plus protected mutations.

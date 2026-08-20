@@ -85,13 +85,13 @@ $search = truncate_list_search($_GET['search'] ?? '');
 $page_size_options = [10, 25, 50, 100];
 $page_size = normalize_page_size($_GET['page_size'] ?? 25, 25, $page_size_options);
 $page = normalize_page_number($_GET['page'] ?? 1);
-$total_suppliers = count_suppliers($conn, $search);
+$total_suppliers = people_count_suppliers($conn, $search);
 $total_pages = max(1, (int)ceil($total_suppliers / $page_size));
 if ($page > $total_pages) {
     $page = $total_pages;
 }
 $offset = ($page - 1) * $page_size;
-$suppliers = get_suppliers_page($conn, $search, $page_size, $offset);
+$suppliers = people_get_suppliers_page($conn, $search, $page_size, $offset);
 $range_start = $total_suppliers > 0 ? $offset + 1 : 0;
 $range_end = $total_suppliers > 0 ? min($offset + count($suppliers), $total_suppliers) : 0;
 $supplier_page_url = static function ($target_page) use ($search, $page_size) {
