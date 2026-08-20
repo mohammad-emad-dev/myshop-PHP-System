@@ -3,11 +3,11 @@
 This inventory records current return and control-flow behavior. Future
 modules must preserve these contracts until callers are migrated deliberately.
 
-Batch 3 places the bounded Catalog category count/page implementations in
-`includes/catalog.php`; Batch 2 placed the product-side reads there. The
-legacy names listed below remain available from
-`includes/functions.php` as compatibility wrappers, so existing scripts and
-unmigrated pages retain the same return and failure contracts.
+Batch 4 places the bounded Customer count/page/selector implementations in
+`includes/people.php`; Batch 3 placed Catalog category reads and Batch 2
+placed product-side reads in `includes/catalog.php`. Legacy names for moved
+reads remain available from `includes/functions.php` as compatibility wrappers,
+while unmoved legacy reads retain their original contracts.
 
 ## Array-returning functions
 
@@ -24,7 +24,9 @@ callers must not assume the distinction is currently available.
 - `get_products_page()` — bounded product page.
 - `get_categories()` — complete legacy category array with product counts.
 - `get_categories_page()` — bounded category page with product counts.
-- `get_customers()` and `get_customers_page()` — customer arrays.
+- `get_customers()` — complete legacy customer array.
+- `get_customers_page()` — bounded customer page.
+- `get_customers_for_selector()` — bounded customer selector array.
 - `get_suppliers()` and `get_suppliers_page()` — supplier arrays.
 - Selector functions — bounded arrays.
 

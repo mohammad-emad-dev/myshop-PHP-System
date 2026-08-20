@@ -1,8 +1,8 @@
 # MyShop dependency map
 
 This map records current call-site and dependency relationships after the
-Batch 3 Catalog category read extraction. It remains a characterization
-artifact; the compatibility wrappers are still required.
+Batch 4 Customer read extraction. It remains a characterization artifact; the
+compatibility wrappers are still required.
 
 ## Public-page to shared-function map
 
@@ -14,14 +14,14 @@ names are grouped only for readability; the source remains the authority.
 | `audit_log.php` | `start_secure_session`, `verify_login`, `require_admin`, `normalize_page_number`, `normalize_page_size`, `truncate_list_search`, `count_audit_logs`, `get_audit_logs_page` |
 | `backup_database.php` | `start_secure_session`, `verify_login`, `is_admin`, `verify_csrf_token`, `audit_log`, `get_backup_table_allowlist`, `quote_backup_table`, `stream_database_backup` |
 | `categories.php` | `start_secure_session`, `verify_login`, `is_admin`, `require_admin`, `verify_csrf_token`, `generate_csrf_token`, `sanitize_input`, `normalize_page_number`, `normalize_page_size`, `truncate_list_search`, `create_category`, `update_category`, `delete_category`, `catalog_count_categories`, `catalog_get_categories_page`, `audit_log_current_actor`, `audit_log_denied` |
-| `customers.php` | `start_secure_session`, `verify_login`, `is_admin`, `verify_csrf_token`, `generate_csrf_token`, `sanitize_input`, `normalize_page_number`, `normalize_page_size`, `truncate_list_search`, `create_customer`, `update_customer`, `delete_customer`, `count_customers`, `get_customers_page`, `audit_log_current_actor`, `audit_log_denied` |
+| `customers.php` | `start_secure_session`, `verify_login`, `is_admin`, `verify_csrf_token`, `generate_csrf_token`, `sanitize_input`, `normalize_page_number`, `normalize_page_size`, `truncate_list_search`, `create_customer`, `update_customer`, `delete_customer`, `people_count_customers`, `people_get_customers_page`, `audit_log_current_actor`, `audit_log_denied` |
 | `export_report.php` | `start_secure_session`, `verify_login`, `require_admin`, `export_report_definitions`, `export_validate_entity`, `export_validate_order_filters`, `export_csv_text`, `export_csv_write_row`, `export_csv_fail`, `export_stream_entity` |
 | `get_order_details.php` | `start_secure_session`, `verify_login`, `is_admin`, `get_order_by_id`, `get_order_details`, `audit_log_current_actor` |
 | `health.php` | `initialize_request_context` |
 | `index.php` | `start_secure_session`, `verify_login`, `is_admin`, `get_dashboard_stats`, `get_chart_data`, `get_inventory_valuation`, `get_top_selling_products`, `get_category_sales_distribution`, `get_low_stock_products` |
 | `login.php` | `start_secure_session`, `send_security_headers`, `verify_csrf_token`, `get_login_source_ip`, `build_login_rate_limit_key`, `login_rate_limit_check`, `login_rate_limit_record_failure`, `login_rate_limit_reset`, `audit_log`, `audit_log_current_actor`, `destroy_current_session`, `generate_csrf_token`, `redirect`, `verify_login`, `get_asset_integrity` |
 | `order_history.php` | `start_secure_session`, `verify_login`, `is_admin`, `sanitize_input`, `normalize_page_number`, `normalize_page_size`, `count_orders`, `get_order_summary`, `get_orders_page` |
-| `orders.php` | `start_secure_session`, `verify_login`, `is_admin`, `verify_csrf_token`, `generate_csrf_token`, `truncate_list_search`, `catalog_get_pos_products`, `catalog_get_categories_for_selector`, `get_customers_for_selector`, `get_suppliers_for_selector`, `catalog_get_product_by_id`, `create_order`, `audit_log_current_actor`, `audit_log_denied` |
+| `orders.php` | `start_secure_session`, `verify_login`, `is_admin`, `verify_csrf_token`, `generate_csrf_token`, `truncate_list_search`, `catalog_get_pos_products`, `catalog_get_categories_for_selector`, `people_get_customers_for_selector`, `get_suppliers_for_selector`, `catalog_get_product_by_id`, `create_order`, `audit_log_current_actor`, `audit_log_denied` |
 | `pos_product_lookup.php` | `start_secure_session`, `verify_login`, `truncate_list_search`, `catalog_get_pos_product_by_barcode` |
 | `print_invoice.php` | `start_secure_session`, `send_security_headers`, `verify_login`, `is_admin`, `sanitize_id`, `get_order_by_id`, `get_order_details`, `audit_log_current_actor` |
 | `products.php` | `start_secure_session`, `verify_login`, `is_admin`, `verify_csrf_token`, `generate_csrf_token`, `sanitize_input`, `normalize_page_number`, `normalize_page_size`, `truncate_list_search`, `catalog_get_categories_for_selector`, `catalog_get_products_page`, `catalog_count_products`, `create_product`, `update_product`, `delete_product`, `handle_image_upload`, `delete_newly_uploaded_image`, `audit_log_current_actor`, `audit_log_denied` |
@@ -69,6 +69,24 @@ Unmigrated callers, including `public/stock_movements.php` for product reads,
 continue to use those wrappers. `get_categories()` remains an unbounded
 legacy loader and `get_category_by_id()` remains an uncalled legacy lookup;
 neither was moved without a verified caller.
+
+## People module boundary
+
+`includes/people.php` has no dependency on `includes/functions.php`. It
+requires only `pagination.php` for the existing search and page-size
+normalization helpers and accepts `$conn` explicitly for every query.
+
+| Focused function | Read behavior | Side effects and security notes |
+|---|---|---|
+| `people_count_customers` | Customer count using optional name, phone, or email search | Prepared values; returns `0` on failure |
+| `people_get_customers_page` | Bounded customer page with search and deterministic name/ID ordering | Prepared values; returns `[]` on failure |
+| `people_get_customers_for_selector` | Bounded POS customer selector with ID, name, and phone | Prepared limit; returns `[]` on failure |
+
+The legacy names `count_customers`, `get_customers_page`, and
+`get_customers_for_selector` remain in `functions.php` as delegation-only
+compatibility wrappers. `get_customers()` remains an unbounded legacy loader
+and `get_customer_by_id()` remains an uncalled legacy lookup; neither was
+moved without a verified caller.
 
 ## Read-only functions
 
@@ -119,8 +137,11 @@ errors and may depend on `$conn` or session scope.
   `catalog_get_categories_page` (`get_categories_page` compatibility wrapper),
   `catalog_get_categories_for_selector` (`get_categories_for_selector` compatibility wrapper),
   `get_category_by_id` (uncalled legacy lookup)
-- `get_customers`, `count_customers`, `get_customers_page`,
-  `get_customers_for_selector`, `get_customer_by_id`
+- `get_customers` (legacy unbounded loader),
+  `people_count_customers` (`count_customers` compatibility wrapper),
+  `people_get_customers_page` (`get_customers_page` compatibility wrapper),
+  `people_get_customers_for_selector` (`get_customers_for_selector`
+  compatibility wrapper), `get_customer_by_id` (uncalled legacy lookup)
 - `get_suppliers`, `count_suppliers`, `get_suppliers_page`,
   `get_suppliers_for_selector`, `get_supplier_by_id`
 
@@ -193,13 +214,13 @@ of those invariants.
 
 The safest remaining candidates are read-side boundaries with existing bounded tests:
 
-1. Customer and supplier paginated reads.
+1. Supplier paginated reads.
 2. Dashboard read model after current query behavior is characterized.
 
-Batch 3 completed the bounded category count/page extraction behind
-compatibility wrappers. It did not move the unbounded `get_categories()`
-loader or the uncalled `get_category_by_id()` lookup, and it did not include
-category writes, product writes, stock updates, uploads, or orders.
+Batch 4 completed bounded customer count/page/selector extraction behind
+compatibility wrappers. It did not move the unbounded `get_customers()` loader
+or the uncalled `get_customer_by_id()` lookup, and it did not include customer
+writes, product writes, stock updates, uploads, or orders.
 
 ## Functions that must not move early
 

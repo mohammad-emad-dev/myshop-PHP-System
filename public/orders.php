@@ -122,7 +122,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['complete_order'])) {
 $pos_search = truncate_list_search($_GET['product_search'] ?? '');
 $products = catalog_get_pos_products($conn, $pos_search, 100);
 $categories = catalog_get_categories_for_selector($conn, 100);
-$customers = get_customers_for_selector($conn, 100);
+$customers = people_get_customers_for_selector($conn, 100);
 $suppliers = get_suppliers_for_selector($conn, 100);
 
 $page_title = 'POS System';

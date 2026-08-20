@@ -85,13 +85,13 @@ $search = truncate_list_search($_GET['search'] ?? '');
 $page_size_options = [10, 25, 50, 100];
 $page_size = normalize_page_size($_GET['page_size'] ?? 25, 25, $page_size_options);
 $page = normalize_page_number($_GET['page'] ?? 1);
-$total_customers = count_customers($conn, $search);
+$total_customers = people_count_customers($conn, $search);
 $total_pages = max(1, (int)ceil($total_customers / $page_size));
 if ($page > $total_pages) {
     $page = $total_pages;
 }
 $offset = ($page - 1) * $page_size;
-$customers = get_customers_page($conn, $search, $page_size, $offset);
+$customers = people_get_customers_page($conn, $search, $page_size, $offset);
 $range_start = $total_customers > 0 ? $offset + 1 : 0;
 $range_end = $total_customers > 0 ? min($offset + count($customers), $total_customers) : 0;
 $customer_page_url = static function ($target_page) use ($search, $page_size) {

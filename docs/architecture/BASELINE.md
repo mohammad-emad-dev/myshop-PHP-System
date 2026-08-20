@@ -1,6 +1,6 @@
 # MyShop architecture baseline
 
-Status: Batch 3 catalog category read extraction baseline
+Status: Batch 4 customer read extraction baseline
 
 Captured from the `security-hardening-baseline` branch at starting revision
 `61e8128a66e0bd98c3bfa5470299c7cad40bcf68`.
@@ -28,8 +28,8 @@ Browser QA is intentionally separate from the dependency-free PHP test harness.
 3. A page normally requires `includes/functions.php`, starts a secure session,
    loads `config/db.php`, and then performs request-specific work.
 4. `includes/functions.php` loads `security.php`, `pagination.php`, `audit.php`,
-   and `catalog.php` as a compatibility facade. Catalog page callers may use
-   the focused `catalog_*` functions directly.
+   `catalog.php`, and `people.php` as a compatibility facade. Catalog and
+   People page callers may use their focused read functions directly.
 5. `config/db.php` reads `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, and
    `DB_PASSWORD` from the process environment and creates the mysqli
    connection. It does not run schema creation or migrations.
@@ -115,7 +115,7 @@ application service module.
 | Dashboard, upload, chart, and report functions | Dashboard statistics, uploads, charts, and report aggregates |
 | Role checks and staff administration functions | Authorization and staff administration |
 | Category read/mutation functions | Remaining category reads and category mutations |
-| Customer read/mutation functions | Customer reads, selectors, and mutations |
+| Customer read/mutation functions | Remaining customer reads and customer mutations |
 | Supplier read/mutation functions | Supplier reads, selectors, and mutations |
 | Inventory valuation and sales aggregate functions | Inventory valuation and dashboard sales aggregates |
 
@@ -130,6 +130,9 @@ Focused shared modules already extracted from the facade:
 - `includes/catalog.php`: read-only product, POS, barcode, product-page, and
   category-selector, category-count, and category-page queries. The legacy
   public function names remain thin wrappers in `functions.php`.
+- `includes/people.php`: read-only bounded customer count, page, and selector
+  queries. The legacy public function names remain thin wrappers in
+  `functions.php`.
 
 ## Public pages and responsibilities
 
@@ -140,11 +143,11 @@ Focused shared modules already extracted from the facade:
 | `public/products.php` | Product CRUD request dispatch, image upload handling, Catalog search/pagination, product table and forms |
 | `public/categories.php` | Category CRUD request dispatch, admin checks, Catalog search/pagination, category view |
 | `public/stock_movements.php` | Manual stock adjustment transaction, movement history filtering/pagination, stock ledger view |
-| `public/orders.php` | POS cart submission, Catalog product/category reads, product revalidation, sale/purchase policy, order creation, POS view and JavaScript |
+| `public/orders.php` | POS cart submission, Catalog product/category and People customer-selector reads, product revalidation, sale/purchase policy, order creation, POS view and JavaScript |
 | `public/order_history.php` | Scoped order history filters, pagination, summaries, order-history view and interactions |
 | `public/get_order_details.php` | Scoped JSON order-detail endpoint |
 | `public/pos_product_lookup.php` | Authenticated barcode lookup endpoint backed by the Catalog module |
-| `public/customers.php` | Customer CRUD, search/pagination, forms and table |
+| `public/customers.php` | Customer CRUD request dispatch, People search/pagination, forms and table |
 | `public/suppliers.php` | Supplier CRUD, search/pagination, forms and table |
 | `public/audit_log.php` | Admin audit filtering, pagination, and audit table |
 | `public/export_report.php` | Admin CSV validation, headers, and delegation to streaming exporter |
@@ -177,6 +180,8 @@ Shared modules own most other application SQL:
 - `includes/catalog.php`: product/POS/barcode/product-page and bounded category
   count/page/selector reads; `includes/functions.php` retains compatibility
   wrappers.
+- `includes/people.php`: bounded customer count/page/selector reads;
+  `includes/functions.php` retains compatibility wrappers.
 - `includes/functions.php`: legacy full product reads, inventory, order, staff,
   remaining reference-data, and dashboard queries, plus protected mutations.
 - `includes/audit.php:62-300`: audit writes and reads.
@@ -233,6 +238,9 @@ behavior are all coordinated through this one stylesheet.
 The PHP harness is `tests/run.php`. It currently loads:
 
 - `tests/Unit/validation_test.php`
+- `tests/Unit/architecture_baseline_test.php`
+- `tests/Unit/catalog_read_test.php`
+- `tests/Unit/people_read_test.php`
 - `tests/Unit/deployment_test.php`
 - `tests/Unit/http_harness_test.php`
 - `tests/Unit/repository_security_scan_test.php`

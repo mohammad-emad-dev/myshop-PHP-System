@@ -1,8 +1,7 @@
 # MyShop refactoring contract
 
-This contract is the safety boundary for future modularization. Batch 3
-extracts only bounded Catalog category reads and preserves application
-behavior.
+This contract is the safety boundary for future modularization. Batch 4
+extracts only bounded Customer reads and preserves application behavior.
 
 ## Behavior that must remain unchanged
 
@@ -29,6 +28,9 @@ behavior.
   unchanged.
 - Category search, pagination, deterministic name/ID ordering, `product_count`,
   bounded page sizes, and empty-result behavior remain unchanged.
+- Customer name, phone, and email search; pagination; deterministic name/ID
+  ordering; selector ID/name/phone fields; bounded page sizes; and empty-result
+  behavior remain unchanged.
 
 ## URLs and routes that must remain unchanged
 
@@ -145,27 +147,28 @@ with the exact command and environment.
 
 ## Recommended next batch
 
-After Batch 3, the next candidate is a similarly bounded read-side extraction
-for customer and supplier pagination. It must be planned separately and must
-not include customer/supplier writes.
+After Batch 4, the next candidate is a similarly bounded read-side extraction
+for supplier pagination. It must be planned separately and must not include
+supplier writes.
 
 Acceptance criteria:
 
-- Customer/supplier search, pagination, ordering, selector behavior, and
-  failure values are unchanged.
+- Supplier search, pagination, ordering, selector behavior, and failure values
+  are unchanged.
 - Existing assertion count is unchanged or higher.
-- Browser QA customer/supplier journeys remain passing.
-- No customer/supplier read SQL remains in migrated page controllers.
+- Browser QA supplier journeys remain passing.
+- No supplier read SQL remains in migrated page controllers.
 - The old function names still work through wrappers.
 
 ## Rollback instructions
 
-Batch 3 can be rolled back without a schema or data rollback:
+Batch 4 can be rolled back without a schema or data rollback:
 
-1. Revert the local Batch 3 commit, or restore the previous local commit if it
+1. Revert the local Batch 4 commit, or restore the previous local commit if it
    is not shared.
-2. Confirm `public/categories.php` uses the legacy category read names again
-   and that the category wrappers still delegate through `catalog.php`.
+2. Confirm `public/customers.php` and `public/orders.php` use the legacy
+   customer read names again and that the customer wrappers still delegate
+   through `people.php`.
 3. Re-run `git diff --check` and the previously passing test suite.
 
 No database rollback, migration rollback, container rollback, or production
