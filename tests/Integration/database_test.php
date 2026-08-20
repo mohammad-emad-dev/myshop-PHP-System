@@ -1050,6 +1050,57 @@ function run_integration_tests(): int
         $tests->assertTrue(is_int($adminPurchaseId) && $adminPurchaseId > 0, 'Admin purchase creation failed.');
         $tests->assertSame(21, (int)test_scalar($conn, 'SELECT stock FROM Product WHERE id = ?', 'i', [$orderProductId]), 'Purchase stock update was incorrect.');
         $tests->assertFalse(create_order($conn, $adminId, [['product_id' => $orderProductId, 'quantity' => 1]], 'invalid', $customerId, null), 'Invalid order types must be rejected by the database-facing function.');
+
+        $orderMovementFailureBefore = [
+            'orders' => (int)test_scalar($conn, 'SELECT COUNT(*) FROM `Order`'),
+            'details' => (int)test_scalar($conn, 'SELECT COUNT(*) FROM OrderDetail'),
+            'stock' => (int)test_scalar($conn, 'SELECT stock FROM Product WHERE id = ?', 'i', [$orderProductId]),
+            'movements' => (int)test_scalar($conn, 'SELECT COUNT(*) FROM StockMovement'),
+        ];
+        $orderMovementFailureTrigger = 'qa_batch8a_order_movement_failure_' . strtolower(bin2hex(random_bytes(4)));
+        $schema->query(
+            'CREATE TRIGGER ' . test_sql_identifier($orderMovementFailureTrigger) .
+            " BEFORE INSERT ON StockMovement FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'QA order movement failure'"
+        );
+        try {
+            $tests->assertFalse(
+                orders_create($conn, $adminId, [['product_id' => $orderProductId, 'quantity' => 1]], 'sale', $customerId, null),
+                'Order movement insertion failure must return false.'
+            );
+            $tests->assertSame($orderMovementFailureBefore['orders'], (int)test_scalar($conn, 'SELECT COUNT(*) FROM `Order`'), 'Order movement failure left a partial order.');
+            $tests->assertSame($orderMovementFailureBefore['details'], (int)test_scalar($conn, 'SELECT COUNT(*) FROM OrderDetail'), 'Order movement failure left a partial order detail.');
+            $tests->assertSame($orderMovementFailureBefore['stock'], (int)test_scalar($conn, 'SELECT stock FROM Product WHERE id = ?', 'i', [$orderProductId]), 'Order movement failure changed stock.');
+            $tests->assertSame($orderMovementFailureBefore['movements'], (int)test_scalar($conn, 'SELECT COUNT(*) FROM StockMovement'), 'Order movement failure left a partial movement.');
+        } finally {
+            $schema->query('DROP TRIGGER IF EXISTS ' . test_sql_identifier($orderMovementFailureTrigger));
+        }
+
+        $orderAuditFailureBefore = [
+            'orders' => (int)test_scalar($conn, 'SELECT COUNT(*) FROM `Order`'),
+            'details' => (int)test_scalar($conn, 'SELECT COUNT(*) FROM OrderDetail'),
+            'stock' => (int)test_scalar($conn, 'SELECT stock FROM Product WHERE id = ?', 'i', [$orderProductId]),
+            'movements' => (int)test_scalar($conn, 'SELECT COUNT(*) FROM StockMovement'),
+            'audits' => (int)test_scalar($conn, 'SELECT COUNT(*) FROM AuditLog'),
+        ];
+        $orderAuditFailureTrigger = 'qa_batch8a_order_audit_failure_' . strtolower(bin2hex(random_bytes(4)));
+        $schema->query(
+            'CREATE TRIGGER ' . test_sql_identifier($orderAuditFailureTrigger) .
+            " BEFORE INSERT ON AuditLog FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'QA order audit failure'"
+        );
+        try {
+            $tests->assertFalse(
+                orders_create($conn, $adminId, [['product_id' => $orderProductId, 'quantity' => 1]], 'sale', $customerId, null),
+                'Order audit insertion failure must return false.'
+            );
+            $tests->assertSame($orderAuditFailureBefore['orders'], (int)test_scalar($conn, 'SELECT COUNT(*) FROM `Order`'), 'Order audit failure left a partial order.');
+            $tests->assertSame($orderAuditFailureBefore['details'], (int)test_scalar($conn, 'SELECT COUNT(*) FROM OrderDetail'), 'Order audit failure left a partial order detail.');
+            $tests->assertSame($orderAuditFailureBefore['stock'], (int)test_scalar($conn, 'SELECT stock FROM Product WHERE id = ?', 'i', [$orderProductId]), 'Order audit failure changed stock.');
+            $tests->assertSame($orderAuditFailureBefore['movements'], (int)test_scalar($conn, 'SELECT COUNT(*) FROM StockMovement'), 'Order audit failure left a partial movement.');
+            $tests->assertSame($orderAuditFailureBefore['audits'], (int)test_scalar($conn, 'SELECT COUNT(*) FROM AuditLog'), 'Order audit failure left a partial audit record.');
+        } finally {
+            $schema->query('DROP TRIGGER IF EXISTS ' . test_sql_identifier($orderAuditFailureTrigger));
+        }
+
         $tests->assertSame(2, count_orders($conn, null, 'all'), 'Admin order count is incorrect.');
         $tests->assertSame(1, count_orders($conn, null, 'sale'), 'Admin sales count is incorrect.');
         $tests->assertSame(1, count_orders($conn, $cashierId, 'sale'), 'Cashier sales count is incorrect.');
