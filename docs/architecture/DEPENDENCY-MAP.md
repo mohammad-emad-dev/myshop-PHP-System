@@ -27,7 +27,7 @@ names are grouped only for readability; the source remains the authority.
 | `products.php` | `start_secure_session`, `verify_login`, `is_admin`, `verify_csrf_token`, `generate_csrf_token`, `sanitize_input`, `normalize_page_number`, `normalize_page_size`, `truncate_list_search`, `catalog_get_categories_for_selector`, `catalog_get_products_page`, `catalog_count_products`, `products_create`, `products_update`, `products_delete`, `handle_image_upload`, `delete_newly_uploaded_image`, `audit_log_current_actor`, `audit_log_denied` |
 | `ready.php` | `initialize_request_context`, `log_application_error`; `config/db.php` performs the connection and readiness failure contract |
 | `settings.php` | `start_secure_session`, `verify_login`, `is_admin`, `require_admin`, `verify_csrf_token`, `generate_csrf_token`, `sanitize_input`, `password_meets_policy`, `create_staff_member`, `update_staff_member`, `delete_staff_member`, `set_staff_active`, `get_staff_members`, `audit_log_current_actor` |
-| `stock_movements.php` | `start_secure_session`, `verify_login`, `is_admin`, `verify_csrf_token`, `sanitize_input`, `normalize_page_number`, `normalize_page_size`, `get_pos_products`, `get_product_by_id`, `log_stock_movement`, `inventory_get_stock_movements_page`, `inventory_count_stock_movements`, `audit_log_current_actor`, `audit_log_denied` |
+| `stock_movements.php` | `start_secure_session`, `verify_login`, `is_admin`, `verify_csrf_token`, `sanitize_input`, `normalize_page_number`, `normalize_page_size`, `get_pos_products`, `get_product_by_id`, `inventory_adjust_stock`, `inventory_get_stock_movements_page`, `inventory_count_stock_movements`, `audit_log_current_actor`, `audit_log_denied` |
 | `suppliers.php` | `start_secure_session`, `verify_login`, `is_admin`, `verify_csrf_token`, `generate_csrf_token`, `sanitize_input`, `normalize_page_number`, `normalize_page_size`, `truncate_list_search`, `create_supplier`, `update_supplier`, `delete_supplier`, `people_count_suppliers`, `people_get_suppliers_page`, `audit_log_current_actor`, `audit_log_denied` |
 
 ## Global and implicit dependencies
@@ -161,8 +161,10 @@ read path and delegates validated manual adjustments to
 `inventory_adjust_stock()`. The legacy `count_stock_movements` and
 `get_stock_movements_page` names remain delegation-only wrappers in
 `functions.php` for un-migrated callers. The legacy `log_stock_movement()` name
-also remains a delegation-only wrapper; existing product and order callers
-intentionally remain on that wrapper during this batch.
+also remains a delegation-only wrapper for remaining un-migrated callers.
+`products_create()`, `products_update()`, and `orders_create()` call
+`inventory_log_stock_movement()` directly, and `inventory_adjust_stock()` calls
+it directly for manual adjustments.
 `get_stock_movements()` remains an unbounded legacy loader because the
 inventory-wide caller inventory found no verified runtime caller.
 `get_low_stock_products()` and `get_inventory_valuation()` remain in the facade
@@ -261,7 +263,8 @@ errors and may depend on `$conn` or session scope.
 | `products_update` | Focused atomic product update service; records non-zero stock deltas and success/failure audit events. |
 | `products_delete` | Focused atomic product deletion service; rejects historical order/stock use and records success/failure audit events. |
 | `create_product`, `update_product`, `delete_product` | Delegation-only compatibility wrappers for the focused Product module. |
-| `log_stock_movement` | Inserts stock movement history. |
+| `inventory_log_stock_movement` | Focused stock-movement insert used directly by product, order, and manual-adjustment services. |
+| `log_stock_movement` | Delegation-only compatibility wrapper for remaining callers. |
 | `create_order` | Creates orders/details, updates stock, logs movement/audit, and commits a transaction. |
 | `create_staff_member` | Inserts a staff account with a password hash. |
 | `update_staff_member` | Updates staff identity, role, active/password state subject to policy. |
