@@ -22,6 +22,81 @@ function test_open_authentication_session(array $values): void
     unset($GLOBALS['current_staff_record']);
 }
 
+function test_run_stock_movement_page_request(
+    string $repository,
+    int $staffId,
+    int $productId,
+    int $quantity,
+    bool $validCsrf
+): array {
+    $functionsPath = $repository . '/includes/functions.php';
+    $pagePath = $repository . '/public/stock_movements.php';
+    $csrfExpression = $validCsrf
+        ? 'generate_csrf_token()'
+        : var_export('invalid-stock-csrf-token', true);
+    $script = '$_SERVER[\'REQUEST_METHOD\'] = \'POST\';'
+        . '$_SERVER[\'REQUEST_URI\'] = \'/stock_movements.php\';'
+        . '$_SERVER[\'REMOTE_ADDR\'] = \'127.0.0.1\';'
+        . 'require ' . var_export($functionsPath, true) . ';'
+        . 'start_secure_session();'
+        . '$_SESSION = [\'staff_id\' => ' . $staffId . '];'
+        . '$stockPageCsrfToken = ' . $csrfExpression . ';'
+        . '$_POST = [\'action\' => \'adjust_stock\', \'csrf_token\' => $stockPageCsrfToken, '
+        . '\'product_id\' => ' . $productId . ', \'quantity\' => ' . $quantity . ', '
+        . '\'reason\' => \'Batch 6D page adjustment\'];'
+        . 'ob_start();'
+        . 'require ' . var_export($pagePath, true) . ';'
+        . 'ob_end_clean();'
+        . '$stockPageStatus = http_response_code();'
+        . 'echo \'RESULT_STATUS=\' . ($stockPageStatus === false ? \'default\' : (string)$stockPageStatus);';
+
+    $descriptors = [
+        0 => ['pipe', 'r'],
+        1 => ['pipe', 'w'],
+        2 => ['pipe', 'w'],
+    ];
+    $process = proc_open(
+        [PHP_BINARY, '-d', 'display_errors=1', '-d', 'log_errors=0', '-r', $script],
+        $descriptors,
+        $pipes,
+        $repository . '/public'
+    );
+    if (!is_resource($process)) {
+        throw new TestFailure('Stock movement page subprocess could not start.');
+    }
+
+    fclose($pipes[0]);
+    $stdout = stream_get_contents($pipes[1]);
+    fclose($pipes[1]);
+    $stderr = stream_get_contents($pipes[2]);
+    fclose($pipes[2]);
+    $exitCode = proc_close($process);
+    $output = (string)$stdout . (string)$stderr;
+
+    if ($exitCode !== 0) {
+        $diagnostics = [];
+        foreach (preg_split('/\R/', $output) ?: [] as $line) {
+            if (preg_match('/(?:Warning|Notice|Fatal error|Parse error|Uncaught)/i', $line) !== 1) {
+                continue;
+            }
+            $line = preg_replace('/(?i)(password|secret|token|cookie|authorization)[^\r\n]*/', '$1=[redacted]', $line);
+            $diagnostics[] = substr((string)$line, 0, 400);
+        }
+        throw new TestFailure(
+            'Stock movement page subprocess failed: ' . substr(implode(' | ', $diagnostics), 0, 800)
+        );
+    }
+
+    if (preg_match('/RESULT_STATUS=(default|[0-9]+)/', $output, $matches) !== 1) {
+        throw new TestFailure('Stock movement page subprocess did not return a safe status marker.');
+    }
+
+    return [
+        'status' => $matches[1],
+        'output' => $output,
+    ];
+}
+
 function run_integration_tests(): int
 {
     $tests = new TestContext();
@@ -402,6 +477,135 @@ function run_integration_tests(): int
         $tests->assertTrue(count(get_stock_movements_page($conn, null, 10, 0)) <= 10, 'Stock movement page is not bounded.');
         $tests->assertTrue(count(get_stock_movements_page($conn, null, 10, 10)) <= 10, 'Stock movement middle page is not bounded.');
         $tests->assertCount(0, get_stock_movements_page($conn, null, 10, 999999), 'Empty stock movement pages must return an empty list.');
+
+        $stockPageReason = 'Batch 6D page adjustment';
+        $stockPageBefore = (int)test_scalar($conn, 'SELECT stock FROM Product WHERE id = ?', 'i', [$orderProductId]);
+        $stockPageMovementBefore = (int)test_scalar(
+            $conn,
+            "SELECT COUNT(*) FROM StockMovement
+             WHERE product_id = ? AND staff_id = ? AND movement_type = 'manual_adjustment'
+               AND quantity = ? AND reason = ?",
+            'iiis',
+            [$orderProductId, $adminId, 2, $stockPageReason]
+        );
+        $stockPageSuccessAuditBefore = (int)test_scalar(
+            $conn,
+            "SELECT COUNT(*) FROM AuditLog
+             WHERE action = 'stock_adjustment' AND entity_type = 'Product'
+               AND entity_id = ? AND outcome = 'success'",
+            'i',
+            [$orderProductId]
+        );
+        $stockPageFailureAuditBefore = (int)test_scalar(
+            $conn,
+            "SELECT COUNT(*) FROM AuditLog
+             WHERE action = 'stock_adjustment' AND entity_type = 'Product'
+               AND outcome = 'failure'"
+        );
+
+        $adminStockRequest = test_run_stock_movement_page_request(
+            dirname(__DIR__, 2),
+            $adminId,
+            $orderProductId,
+            2,
+            true
+        );
+        $tests->assertSame('default', $adminStockRequest['status'], 'Admin stock adjustment should retain the normal success response status.');
+        $tests->assertFalse(
+            preg_match('/(?:Warning|Notice|Fatal error)/i', $adminStockRequest['output']) === 1,
+            'Admin stock adjustment emitted a PHP warning or fatal diagnostic.'
+        );
+        $tests->assertSame($stockPageBefore + 2, (int)test_scalar($conn, 'SELECT stock FROM Product WHERE id = ?', 'i', [$orderProductId]), 'Admin stock adjustment changed the wrong quantity.');
+        $tests->assertSame($stockPageMovementBefore + 1, (int)test_scalar(
+            $conn,
+            "SELECT COUNT(*) FROM StockMovement
+             WHERE product_id = ? AND staff_id = ? AND movement_type = 'manual_adjustment'
+               AND quantity = ? AND reason = ?",
+            'iiis',
+            [$orderProductId, $adminId, 2, $stockPageReason]
+        ), 'Admin stock adjustment did not create exactly one movement record.');
+        $tests->assertSame($stockPageSuccessAuditBefore + 1, (int)test_scalar(
+            $conn,
+            "SELECT COUNT(*) FROM AuditLog
+             WHERE action = 'stock_adjustment' AND entity_type = 'Product'
+               AND entity_id = ? AND outcome = 'success'",
+            'i',
+            [$orderProductId]
+        ), 'Admin stock adjustment did not create its success audit event.');
+
+        $cashierStockBefore = (int)test_scalar($conn, 'SELECT stock FROM Product WHERE id = ?', 'i', [$orderProductId]);
+        $cashierStockRequest = test_run_stock_movement_page_request(
+            dirname(__DIR__, 2),
+            $cashierId,
+            $orderProductId,
+            1,
+            true
+        );
+        $tests->assertSame('403', $cashierStockRequest['status'], 'Cashier stock adjustment must remain denied with HTTP 403.');
+        $tests->assertFalse(
+            preg_match('/(?:Warning|Notice|Fatal error)/i', $cashierStockRequest['output']) === 1,
+            'Cashier stock denial emitted a PHP warning or fatal diagnostic.'
+        );
+        $tests->assertSame($cashierStockBefore, (int)test_scalar($conn, 'SELECT stock FROM Product WHERE id = ?', 'i', [$orderProductId]), 'Cashier stock denial mutated inventory.');
+        $tests->assertSame($stockPageFailureAuditBefore + 1, (int)test_scalar(
+            $conn,
+            "SELECT COUNT(*) FROM AuditLog
+             WHERE action = 'stock_adjustment' AND entity_type = 'Product'
+               AND outcome = 'failure'"
+        ), 'Cashier stock denial did not create its denied audit event.');
+
+        $invalidCsrfStockBefore = (int)test_scalar($conn, 'SELECT stock FROM Product WHERE id = ?', 'i', [$orderProductId]);
+        $invalidCsrfStockRequest = test_run_stock_movement_page_request(
+            dirname(__DIR__, 2),
+            $adminId,
+            $orderProductId,
+            1,
+            false
+        );
+        $tests->assertSame('403', $invalidCsrfStockRequest['status'], 'Invalid stock adjustment CSRF must remain denied with HTTP 403.');
+        $tests->assertFalse(
+            preg_match('/(?:Warning|Notice|Fatal error)/i', $invalidCsrfStockRequest['output']) === 1,
+            'Invalid stock adjustment CSRF emitted a PHP warning or fatal diagnostic.'
+        );
+        $tests->assertSame($invalidCsrfStockBefore, (int)test_scalar($conn, 'SELECT stock FROM Product WHERE id = ?', 'i', [$orderProductId]), 'Invalid stock adjustment CSRF mutated inventory.');
+        $tests->assertSame($stockPageFailureAuditBefore + 2, (int)test_scalar(
+            $conn,
+            "SELECT COUNT(*) FROM AuditLog
+             WHERE action = 'stock_adjustment' AND entity_type = 'Product'
+               AND outcome = 'failure'"
+        ), 'Invalid stock adjustment CSRF did not create its failure audit event.');
+
+        $rollbackStockBefore = (int)test_scalar($conn, 'SELECT stock FROM Product WHERE id = ?', 'i', [$orderProductId]);
+        $rollbackMovementBefore = (int)test_scalar(
+            $conn,
+            "SELECT COUNT(*) FROM StockMovement WHERE product_id = ? AND reason = ?",
+            'is',
+            [$orderProductId, $stockPageReason]
+        );
+        $schema->query('DROP TABLE AuditLog');
+        try {
+            $rollbackStockRequest = test_run_stock_movement_page_request(
+                dirname(__DIR__, 2),
+                $adminId,
+                $orderProductId,
+                1,
+                true
+            );
+            $tests->assertSame('default', $rollbackStockRequest['status'], 'Stock adjustment rollback must retain the generic response status.');
+            $tests->assertFalse(
+                preg_match('/(?:Warning|Notice|Fatal error)/i', $rollbackStockRequest['output']) === 1,
+                'Stock adjustment rollback emitted a PHP warning or fatal diagnostic.'
+            );
+            $tests->assertSame($rollbackStockBefore, (int)test_scalar($conn, 'SELECT stock FROM Product WHERE id = ?', 'i', [$orderProductId]), 'Failed stock adjustment left a partial inventory update.');
+            $tests->assertSame($rollbackMovementBefore, (int)test_scalar(
+                $conn,
+                "SELECT COUNT(*) FROM StockMovement WHERE product_id = ? AND reason = ?",
+                'is',
+                [$orderProductId, $stockPageReason]
+            ), 'Failed stock adjustment left a partial stock movement record.');
+        } finally {
+            test_load_sql_file($schema, dirname(__DIR__, 2) . '/database/batch22_audit_log.sql');
+        }
 
         $tests->assertCount(1, get_orders_for_staff($conn, $cashierId), 'Cashier order history scope is incorrect.');
         $tests->assertSame(null, get_order_by_id($conn, $tamperedSaleId, $adminId), 'A cashier order must not be visible to another staff scope.');

@@ -218,6 +218,54 @@ function run_auth_extraction_unit_tests(): int
         }
     }
 
+    $stockMovements = file_get_contents($repository . '/public/stock_movements.php');
+    $tests->assertTrue(is_string($stockMovements), 'Stock movement authentication caller source could not be read.');
+    if (is_string($stockMovements)) {
+        preg_match_all(
+            '/\b(?:auth_verify_login|auth_is_admin)\s*\([^)]*\)/',
+            $stockMovements,
+            $stockAuthCalls
+        );
+        $tests->assertSame(
+            [
+                'auth_verify_login($conn)',
+                'auth_is_admin($conn)',
+                'auth_is_admin($conn)',
+                'auth_is_admin($conn)',
+            ],
+            $stockAuthCalls[0],
+            'Stock movement authentication call count or execution order changed.'
+        );
+        foreach (['verify_login', 'is_admin'] as $legacyCall) {
+            $tests->assertFalse(
+                preg_match('/(?<!auth_)\b' . $legacyCall . '\s*\(/', $stockMovements) === 1,
+                'Stock movement page still uses a legacy authentication wrapper: ' . $legacyCall
+            );
+        }
+
+        $csrfOffset = strpos($stockMovements, 'if (!verify_csrf_token($csrf_token))');
+        $authorizationOffset = strpos($stockMovements, '} elseif (!auth_is_admin($conn))');
+        $tests->assertTrue(
+            $csrfOffset !== false && $authorizationOffset !== false && $csrfOffset < $authorizationOffset,
+            'Stock movement CSRF validation must remain before authorization.'
+        );
+        foreach ([
+            'audit_log_denied($conn, \'stock_adjustment\'',
+            '$conn->begin_transaction()',
+            'SELECT stock FROM Product WHERE id = ? FOR UPDATE',
+            'log_stock_movement($conn',
+            '$conn->commit()',
+            '$conn->rollback()',
+            "audit_log_current_actor(\$conn, 'stock_adjustment'",
+        ] as $stockInvariant) {
+            $tests->assertContains(
+                $stockInvariant,
+                $stockMovements,
+                'Stock movement invariant disappeared during auth caller migration: ' . $stockInvariant
+            );
+        }
+    }
+
     foreach ([
         'public/products.php' => ['verify_csrf_token($csrf_token)', "audit_log_current_actor(\$conn, 'product_mutation'", "audit_log_denied(\$conn, 'product_mutation'", 'handle_image_upload('],
         'public/categories.php' => ['verify_csrf_token($csrf_token)', "audit_log_current_actor(\$conn, 'category_mutation'", "audit_log_denied(\$conn, 'category_mutation'"],
@@ -236,7 +284,6 @@ function run_auth_extraction_unit_tests(): int
 
     foreach ([
         'public/login.php' => 'verify_login(false)',
-        'public/stock_movements.php' => 'verify_login();',
         'public/orders.php' => 'verify_login();',
         'public/settings.php' => 'verify_login();',
         'public/backup_database.php' => 'verify_login(false)',
