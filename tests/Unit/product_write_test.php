@@ -144,12 +144,43 @@ function run_product_write_unit_tests(): int
         }
     }
 
-    $tests->assertContains('create_product($conn,', $page, 'Product page must retain the compatibility wrapper caller.');
-    $tests->assertFalse(strpos($page, 'products_create(') !== false, 'Product page must not call the new service directly yet.');
-    $tests->assertContains('update_product($conn,', $page, 'Product page must retain the update compatibility wrapper caller.');
-    $tests->assertFalse(strpos($page, 'products_update(') !== false, 'Product page must not call the update service directly yet.');
-    $tests->assertContains('delete_product($conn,', $page, 'Product page must retain the delete compatibility wrapper caller.');
-    $tests->assertFalse(strpos($page, 'products_delete(') !== false, 'Product page must not call the delete service directly yet.');
+    $tests->assertContains(
+        "products_create(\$conn, \$_SESSION['staff_id'], \$name, \$description, \$price, \$stock, \$image_path, \$alert_threshold, \$category_id, \$barcode)",
+        $page,
+        'Product page must call products_create with the established argument order and actor ID.'
+    );
+    $tests->assertContains(
+        "products_update(\$conn, \$_SESSION['staff_id'], \$id, \$name, \$description, \$price, \$stock, \$image_path, \$alert_threshold, \$category_id, \$barcode)",
+        $page,
+        'Product page must call products_update with the established argument order and actor ID.'
+    );
+    $tests->assertContains(
+        "products_delete(\$conn, \$id, \$_SESSION['staff_id'])",
+        $page,
+        'Product page must call products_delete with the established actor ID.'
+    );
+    foreach (['create_product', 'update_product', 'delete_product'] as $legacyMutation) {
+        $tests->assertFalse(
+            preg_match('/\\b' . $legacyMutation . '\\s*\\(/', $page) === 1,
+            'Product page must not call the legacy mutation wrapper: ' . $legacyMutation
+        );
+    }
+
+    $csrfPosition = strpos($page, 'verify_csrf_token($csrf_token)');
+    $authorizationPosition = strpos($page, 'auth_is_admin($conn)');
+    $firstMutationPosition = min(
+        strpos($page, 'products_create('),
+        strpos($page, 'products_update('),
+        strpos($page, 'products_delete(')
+    );
+    $tests->assertTrue(
+        $csrfPosition !== false && $csrfPosition < $firstMutationPosition,
+        'Product page must validate CSRF before dispatching any product mutation.'
+    );
+    $tests->assertTrue(
+        $authorizationPosition !== false && $authorizationPosition < $firstMutationPosition,
+        'Product page must authorize administrators before dispatching any product mutation.'
+    );
 
     $updateWrapperPattern = '/function update_product\s*\([^)]*\)\s*\{(?<body>.*?)\n\}/s';
     $updateWrapperMatched = preg_match($updateWrapperPattern, $facade, $updateMatches) === 1;
