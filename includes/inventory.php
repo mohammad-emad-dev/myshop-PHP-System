@@ -8,8 +8,9 @@ require_once __DIR__ . '/pagination.php';
  * Count stock movements, optionally scoped to one product.
  *
  * This bounded read remains independent from the compatibility facade. Stock
- * mutation and the legacy unbounded movement loader remain elsewhere until
- * their callers are separately characterized.
+ * quantity mutation and the legacy unbounded movement loader remain elsewhere;
+ * the history writer below preserves its existing insert seam without owning
+ * transaction boundaries.
  */
 function inventory_count_stock_movements($conn, $product_id = null)
 {

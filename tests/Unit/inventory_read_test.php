@@ -5,8 +5,8 @@ declare(strict_types=1);
 require_once __DIR__ . '/../bootstrap.php';
 
 /**
- * Protect the bounded stock-movement read seam while mutation logic remains in
- * the legacy compatibility facade and the page.
+ * Protect the bounded stock-movement read seam and compatibility writer while
+ * stock-mutation callers remain on the legacy facade and page.
  */
 function run_inventory_read_unit_tests(): int
 {
