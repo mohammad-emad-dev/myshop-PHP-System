@@ -446,7 +446,7 @@ require_once '../includes/layouts/header.php';
         </div>
 
         <!-- Add Staff Modal -->
-        <div class="modal fade" id="addStaffModal" tabindex="-1" aria-labelledby="addStaffModalLabel" aria-hidden="true">
+        <div class="modal fade" id="addStaffModal" tabindex="-1" data-bs-keyboard="true" data-bs-focus="true" aria-labelledby="addStaffModalLabel" aria-hidden="true">
             <div class="modal-dialog modal-dialog-centered">
                 <div class="modal-content border-0 rounded-4">
                     <div class="modal-header py-3">
@@ -487,7 +487,7 @@ require_once '../includes/layouts/header.php';
         </div>
 
         <!-- Edit Staff Modal -->
-        <div class="modal fade" id="editStaffModal" tabindex="-1" aria-labelledby="editStaffModalLabel" aria-hidden="true">
+        <div class="modal fade" id="editStaffModal" tabindex="-1" data-bs-keyboard="true" data-bs-focus="true" aria-labelledby="editStaffModalLabel" aria-hidden="true">
             <div class="modal-dialog modal-dialog-centered">
                 <div class="modal-content border-0 rounded-4">
                     <div class="modal-header py-3">
