@@ -202,10 +202,10 @@ function dashboard_get_inventory_valuation($conn)
 function dashboard_get_top_selling_products($conn, $limit = 5, $staff_id = null)
 {
     $limit = max(1, min((int)$limit, 50));
-    $sql = "SELECT p.name, SUM(od.quantity) as total_qty, SUM(od.subtotal) as total_sales 
-            FROM OrderDetail od 
-            JOIN `Order` o ON od.order_id = o.id 
-            JOIN Product p ON od.product_id = p.id 
+    $sql = "SELECT p.name, SUM(od.quantity) as total_qty, SUM(od.subtotal) as total_sales
+            FROM OrderDetail od
+            JOIN `Order` o ON od.order_id = o.id
+            JOIN Product p ON od.product_id = p.id
             WHERE o.order_type = 'sale'";
     if ($staff_id !== null) {
         $sql .= " AND o.staff_id = ?";
