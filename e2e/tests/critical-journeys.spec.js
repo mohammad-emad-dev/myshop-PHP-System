@@ -209,9 +209,40 @@ async function captureSanitizedScreenshot(page, name) {
     '.ui-notification-menu',
     '.ui-count-text',
     '.ui-count-text-lg',
+    '#modalOrderId',
+    '#modalOrderDate',
+    '#modalPartyDetails',
+    '#modalPartyName',
+    '#modalPartyPhone',
+    '#modalPartyEmail',
+    '#modalPartyAddress',
+    '#modalOrderTotal',
+    '#printInvoiceRef',
+    '#printInvoiceDate',
+    '#printInvoiceType',
+    '#printInvoiceCashier',
+    '#printInvoicePartyDetails',
+    '#printInvoiceSubtotal',
+    '#printInvoiceTotal',
     '.product-grid-container',
     '.pos-product-title',
     '[data-qa-sensitive]',
+  ].join(', '));
+  await page.screenshot({
+    path: path.join(process.env.E2E_OUTPUT_DIR || path.join(os.tmpdir(), 'myshop-browser-qa-output'), `${test.info().project.name}-${name}.png`),
+    fullPage: true,
+    animations: 'disabled',
+    mask: await mask.all(),
+    maskColor: '#000000',
+  });
+}
+
+async function captureSanitizedInvoiceScreenshot(page, name) {
+  const mask = page.locator([
+    '.invoice-box h2',
+    '.invoice-box p',
+    '.invoice-box td',
+    '.invoice-box .footer-note',
   ].join(', '));
   await page.screenshot({
     path: path.join(process.env.E2E_OUTPUT_DIR || path.join(os.tmpdir(), 'myshop-browser-qa-output'), `${test.info().project.name}-${name}.png`),
@@ -380,6 +411,8 @@ test('admin can review scoped order history, details, and invoice access while c
   expect(invoiceResult.body).toContain('Invoice #');
 
   const invoicePage = await page.context().newPage();
+  await invoicePage.setViewportSize({ width: 320, height: 800 });
+  await invoicePage.emulateMedia({ media: 'print' });
   await invoicePage.addInitScript(() => {
     window.__myshopPrintInvoked = false;
     window.print = () => {
@@ -391,13 +424,35 @@ test('admin can review scoped order history, details, and invoice access while c
   expect(invoicePageResponse.status()).toBe(200);
   await expect(invoicePage.locator('body.invoice-print-page')).toBeVisible();
   await expect(invoicePage.locator('.invoice-document .invoice-items-table')).toBeVisible();
+  await expect(invoicePage.locator('.invoice-items-table tbody tr')).not.toHaveCount(0);
+  await expect(invoicePage.locator('.invoice-document .grand-total')).toContainText('TOTAL:');
   expect(await invoicePage.evaluate(() => window.__myshopPrintInvoked)).toBe(true);
+  const thermalLayout = await invoicePage.evaluate(() => {
+    const body = document.body;
+    const documentElement = document.documentElement;
+    const invoice = document.querySelector('.invoice-box');
+    const bodyStyle = window.getComputedStyle(body);
+    return {
+      viewportWidth: window.innerWidth,
+      documentScrollWidth: documentElement.scrollWidth,
+      bodyWidth: body.getBoundingClientRect().width,
+      invoiceWidth: invoice ? invoice.getBoundingClientRect().width : 0,
+      bodyOverflowX: bodyStyle.overflowX,
+    };
+  });
+  expect(thermalLayout.documentScrollWidth).toBeLessThanOrEqual(thermalLayout.viewportWidth + 1);
+  expect(thermalLayout.bodyWidth).toBeLessThanOrEqual(thermalLayout.viewportWidth + 1);
+  expect(thermalLayout.invoiceWidth).toBeLessThanOrEqual(thermalLayout.viewportWidth + 1);
+  expect(thermalLayout.bodyOverflowX).toBe('hidden');
+  await captureSanitizedInvoiceScreenshot(invoicePage, 'admin-invoice-thermal');
   await invoicePage.close();
 
   await logout(page);
   await login(page, cashierCredentials);
   const crossStaffResponse = await page.request.get(`/get_order_details.php?id=${encodeURIComponent(orderId)}`);
   expect(crossStaffResponse.status()).toBe(404);
+  const crossStaffInvoiceResponse = await page.request.get(`/print_invoice.php?id=${encodeURIComponent(orderId)}`);
+  expect(crossStaffInvoiceResponse.status()).toBe(404);
 
   await loadPage(page, '/order_history.php?type=sale', /Transaction History/);
   await expect(page.locator('.order-history-page')).toBeVisible();

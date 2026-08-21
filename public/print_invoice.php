@@ -34,87 +34,141 @@ $csp_nonce = send_security_headers();
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Invoice #<?php echo str_pad($order_id, 6, '0', STR_PAD_LEFT); ?></title>
-    <!-- Use basic styling optimized for print, no external bloated CSS -->
+    <!-- Keep the standalone invoice as a thermal receipt by default. -->
     <style nonce="<?php echo htmlspecialchars($csp_nonce, ENT_QUOTES, 'UTF-8'); ?>">
-        body {
+        @page {
+            size: 80mm auto;
+            margin: 0;
+        }
+
+        html {
+            box-sizing: border-box;
+            width: 80mm;
+            max-width: 100vw;
+            min-width: 0;
+            overflow-x: hidden;
+        }
+
+        *, *::before, *::after {
+            box-sizing: inherit;
+        }
+
+        body.invoice-print-page {
             font-family: Arial, Helvetica, sans-serif;
-            background-color: #f2f6f5;
+            background-color: #fff;
             color: #173139;
             margin: 0;
-            padding: 20px;
-            font-size: 14px;
+            padding: 0;
+            width: 80mm;
+            max-width: 100vw;
+            min-width: 0;
+            overflow-x: hidden;
+            font-size: 11px;
+            line-height: 1.35;
         }
+
         .invoice-box {
-            max-width: 860px;
-            margin: auto;
-            padding: 40px;
+            width: 80mm;
+            max-width: 100%;
+            min-width: 0;
+            margin: 0;
+            padding: 8px;
             background: #fff;
-            border: 1px solid #d9e5e3;
-            border-radius: 12px;
-            box-shadow: 0 18px 45px rgba(23, 49, 57, 0.12);
+            border: 0;
+            border-radius: 0;
+            box-shadow: none;
+            overflow: hidden;
         }
+
         h1, h2, h3, h4, p {
             margin: 0;
             padding: 0;
             text-align: center;
+            overflow-wrap: anywhere;
         }
+
+        h2 { font-size: 17px; }
         .text-left { text-align: left; }
         .text-right { text-align: right; }
         .text-center { text-align: center; }
         .fw-bold { font-weight: bold; }
-        
+
         .divider {
             border-bottom: 1px solid #d9e5e3;
-            margin: 18px 0;
+            margin: 10px 0;
         }
-        
+
         table {
             width: 100%;
+            max-width: 100%;
             border-collapse: collapse;
-            margin: 24px 0;
+            table-layout: fixed;
+            margin: 10px 0;
         }
+
         th, td {
-            padding: 4px 0;
+            padding: 3px 0;
             vertical-align: top;
+            overflow-wrap: anywhere;
+            word-break: break-word;
         }
+
         th {
             border-bottom: 1px solid #d9e5e3;
             text-align: left;
             color: #4b6268;
             text-transform: uppercase;
-            font-size: 11px;
+            font-size: 9px;
             letter-spacing: 0.06em;
         }
-        .qty-col { width: 15%; text-align: center; }
+
+        .invoice-items-table th:first-child,
+        .invoice-items-table td:first-child { width: 38%; }
+        .qty-col { width: 12%; text-align: center; }
         .price-col { width: 25%; text-align: right; }
         .total-col { width: 25%; text-align: right; }
-        
+
         .totals-table {
             width: 100%;
-            margin-top: 10px;
+            margin-top: 6px;
         }
+
         .totals-table td {
             padding: 2px 0;
         }
+
         .grand-total {
-            font-size: 16px;
+            font-size: 13px;
             font-weight: bold;
             border-top: 1px solid #d9e5e3;
             border-bottom: 1px solid #d9e5e3;
-            padding: 5px 0;
+            padding: 4px 0;
         }
-        
+
         .footer-note {
             text-align: center;
-            font-size: 12px;
-            margin-top: 20px;
+            font-size: 9px;
+            margin-top: 10px;
             color: #4b6268;
         }
 
-        /* Adjustments for normal A4 printing (optional, it gracefully degrades) */
         @media print {
-            body { margin: 0; padding: 0; background: #fff; }
-            .invoice-box { width: 100%; max-width: 100%; border: none; border-radius: 0; box-shadow: none; padding: 0; }
+            html,
+            body.invoice-print-page {
+                width: 80mm;
+                max-width: 100vw;
+                min-width: 0;
+                margin: 0;
+                padding: 0;
+                background: #fff;
+                overflow-x: hidden;
+            }
+
+            .invoice-box {
+                width: 80mm;
+                max-width: 100%;
+                padding: 8px;
+            }
         }
     </style>
 </head>
