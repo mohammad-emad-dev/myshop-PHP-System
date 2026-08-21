@@ -90,12 +90,22 @@ function run_customer_mutation_integration_tests(): int
         $tests->assertSame('updated@example.test', $updated['email'] ?? null, 'Customer update must persist the sanitized email.');
         $tests->assertSame('Updated address', $updated['address'] ?? null, 'Customer update must persist the sanitized address.');
 
+        $tests->assertFalse(
+            customers_update($conn, $createdId, '   ', '555-301', 'failed@example.test', 'Failed update'),
+            'A failed customer update must return false.'
+        );
+        $unchangedAfterFailedUpdate = test_fetch_one($conn, 'SELECT name, phone, email, address FROM Customer WHERE id = ?', 'i', [$createdId]);
+        $tests->assertSame($updated, $unchangedAfterFailedUpdate, 'A failed customer update must not leave partial customer state.');
+
         $missingUpdateId = 999999998;
         $tests->assertTrue(
             customers_update($conn, $missingUpdateId, $prefix . '_MISSING', '555-400', 'missing@example.test', 'Missing'),
             'Missing customer updates must preserve execute-success behavior.'
         );
         $tests->assertSame(null, test_scalar($conn, 'SELECT id FROM Customer WHERE id = ?', 'i', [$missingUpdateId]), 'Missing customer update unexpectedly created a row.');
+
+        $tests->assertFalse(customers_delete($conn, 999999999), 'A failed customer deletion must return false.');
+        $tests->assertSame($createdId, test_scalar($conn, 'SELECT id FROM Customer WHERE id = ?', 'i', [$createdId]), 'A failed customer deletion must not remove another customer.');
 
         $wrapperName = $prefix . '_WRAPPER';
         $tests->assertTrue(create_customer($conn, $wrapperName, '555-500', 'wrapper@example.test', 'Wrapper'), 'Legacy customer create wrapper failed.');
