@@ -595,7 +595,7 @@ require_once '../includes/layouts/header.php';
                 var modal = bootstrap.Modal.getOrCreateInstance(modalElement);
                 modal.hide();
             }
-        });
+        }, true);
 
 </script>
         <?php endif; ?>
