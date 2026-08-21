@@ -32,7 +32,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 audit_log_current_actor($conn, 'category_create', 'Category', null, false, ['reason' => 'validation_failed']);
                 $error = 'Category name is required.';
             } else {
-                $operation_success = create_category($conn, $name, $description);
+                $operation_success = categories_create($conn, $name, $description);
                 audit_log_current_actor($conn, 'category_create', 'Category', null, $operation_success);
                 if ($operation_success) {
                     $success = 'Category created successfully.';
@@ -49,7 +49,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 audit_log_current_actor($conn, 'category_update', 'Category', $id, false, ['reason' => 'validation_failed']);
                 $error = 'Category ID and name are required.';
             } else {
-                $operation_success = update_category($conn, $id, $name, $description);
+                $operation_success = categories_update($conn, $id, $name, $description);
                 audit_log_current_actor($conn, 'category_update', 'Category', $id, $operation_success);
                 if ($operation_success) {
                     $success = 'Category updated successfully.';

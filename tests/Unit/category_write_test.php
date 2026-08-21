@@ -45,7 +45,7 @@ function run_category_write_unit_tests(): int
         '$stmt->bind_param(\'si\', $name, $id)',
         '$stmt->bind_param(\'ssi\', $name, $description, $id)',
         '$stmt->affected_rows !== 1',
-        "'General' && \\$name !== 'General'",
+        "'General' && \$name !== 'General'",
         'catch (Throwable $exception)',
         'finally',
         'return true;',
