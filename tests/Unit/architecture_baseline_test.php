@@ -75,7 +75,7 @@ function run_architecture_baseline_unit_tests(): int
         $tests->assertTrue(is_file($repository . '/' . $route), 'Documented public route is missing: ' . $route);
     }
 
-    foreach (['security.php', 'validation.php', 'pagination.php', 'audit.php', 'http.php', 'auth.php', 'catalog.php', 'people.php', 'inventory.php', 'uploads.php', 'customers.php'] as $module) {
+    foreach (['security.php', 'validation.php', 'pagination.php', 'audit.php', 'http.php', 'auth.php', 'catalog.php', 'people.php', 'inventory.php', 'uploads.php', 'customers.php', 'suppliers.php'] as $module) {
         $tests->assertContains(
             "require_once __DIR__ . '/{$module}'",
             $facade,
@@ -110,7 +110,7 @@ function run_architecture_baseline_unit_tests(): int
         $tests->assertContains($customerFunction . '(', file_get_contents($repository . '/public/customers.php'), 'Customers page dependency contract changed: ' . $customerFunction);
     }
     $tests->assertContains('people_get_customers_for_selector(', $orders, 'Orders page must retain the People customer selector boundary.');
-    foreach (['people_count_suppliers', 'people_get_suppliers_page', 'create_supplier', 'update_supplier', 'delete_supplier'] as $supplierFunction) {
+    foreach (['people_count_suppliers', 'people_get_suppliers_page', 'suppliers_create', 'suppliers_update', 'suppliers_delete'] as $supplierFunction) {
         $tests->assertContains($supplierFunction . '(', $suppliers, 'Suppliers page dependency contract changed: ' . $supplierFunction);
     }
     $tests->assertContains('people_get_suppliers_for_selector(', $orders, 'Orders page must retain the People supplier selector boundary.');
