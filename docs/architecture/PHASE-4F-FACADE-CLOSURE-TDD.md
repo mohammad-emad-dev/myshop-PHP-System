@@ -69,7 +69,7 @@ was found outside `includes/functions.php` itself.
 | `count_products` | `catalog.php` | none found | `database_test.php` | none found | candidate; retain until compatibility inventory is complete |
 | `get_products_page` | `catalog.php` | none found | `database_test.php` | none found | candidate; retain until compatibility inventory is complete |
 | `get_product_by_id` | `catalog.php` | none found after stock-page migration | `database_test.php` | none found | candidate; verify external callers first |
-| `get_low_stock_products` | `inventory.php` | none found | `inventory_read_test.php`, `inventory_read_test.php` | none found | candidate; retain for compatibility |
+| `get_low_stock_products` | `inventory.php` | none found | `tests/Unit/inventory_read_test.php`, `tests/Integration/inventory_read_test.php` | none found | candidate; retain for compatibility |
 | `log_stock_movement` | `inventory.php` | none found | `inventory_adjustment_test.php`, `database_test.php`, `inventory_read_test.php` | none found | candidate; retain for compatibility |
 | `count_stock_movements` | `inventory.php` | none found | `database_test.php` | none found | candidate; retain for compatibility |
 | `get_stock_movements_page` | `inventory.php` | none found | `database_test.php` | none found | candidate; retain for compatibility |
@@ -218,7 +218,24 @@ module dependency direction, direct public callers, and corrected current
 documentation. A separate documentation checkpoint records this file and the
 current architecture-document updates.
 
-The final report for the implementation records the exact focused assertion
-count, full disposable regression count, lint result, security scan, supply-
-chain scan, browser QA result at 375px/768px/1440px, worktree status, and
-commit hashes.
+## Verification results
+
+| Checkpoint | Result |
+|---|---|
+| RED source-contract checkpoint | `3fa3e383bb3ddc87459690a84f66fb41dfa863f89` — expected failure on the stale People boundary comment |
+| RED stock-page caller contract | `d7387eecc4e85e0b3d52074c1c8833099f41fe8e` — added the direct Catalog caller contract before the page correction |
+| GREEN architecture correction | `7cbe6e03347af90378185a0e90c17549ca5573ff` — focused architecture test passed; the later dependency-direction assertions pass as well |
+| Documentation checkpoint | `c682d497e6c069ea0ce0f1328e275ebcefe12cf8` — current architecture documents and this inventory |
+| Focused architecture tests | PASS — 360 assertions |
+| Full disposable PHP regression | PASS — 2,593 assertions (1,735 unit, 858 integration) |
+| PHP lint | PASS — all tracked PHP files under `includes/`, `public/`, `tests/`, `scripts/`, `database/`, and `config/` |
+| Repository security scan | PASS — zero findings |
+| Supply-chain scan | PASS — zero findings |
+| `git diff --check` | PASS |
+| Historical documents | PASS — Phase 3, Phase 4A, Phase 4B, Phase 4C, and Phase 4D unchanged from the Phase 4E baseline |
+| Browser QA | PASS — 18/18 at 375px, 768px, and 1440px; disposable containers, image, volume, and network were removed by the runner |
+| Final worktree | clean; no generated artifacts, dumps, or untracked disposable resources |
+
+The final documentation amendment is intentionally separate from the GREEN
+code checkpoint so the commit sequence preserves the RED → GREEN →
+documentation workflow.
