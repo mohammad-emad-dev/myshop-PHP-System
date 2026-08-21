@@ -400,11 +400,11 @@ test('cashier POS workspace supports search, categories, barcode, cart controls,
   await page.locator('#cartTableBody .btn.text-danger').last().click();
   await expect(page.locator('#cartTableBody .cart-item-row')).toHaveCount(1);
 
-  await page.locator('#typePurchase').check();
+  await page.locator('label[for="typePurchase"]').click();
   await expect(page.locator('#orderTypeInput')).toHaveValue('purchase');
   await expect(page.locator('#formCustomerGroup')).toBeHidden();
   await expect(page.locator('#formSupplierGroup')).toBeVisible();
-  await page.locator('#typeSale').check();
+  await page.locator('label[for="typeSale"]').click();
   await expect(page.locator('#orderTypeInput')).toHaveValue('sale');
   await expect(page.locator('#formCustomerGroup')).toBeVisible();
   await expect(page.locator('#formSupplierGroup')).toBeHidden();

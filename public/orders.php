@@ -138,152 +138,185 @@ require_once '../includes/layouts/header.php';
     <?php require_once '../includes/layouts/sidebar.php'; ?>
     <?php require_once '../includes/layouts/navbar.php'; ?>
 
-    <div class="container-fluid py-3 px-4 pos-container">
-        <div class="row h-100">
-            <!-- Left Column: Product Catalog -->
-            <div class="col-lg-8 h-100 d-flex flex-column">
-                <!-- Barcode Scanner Input -->
-                <div class="row mb-3">
-                    <div class="col-12">
-                        <div class="input-group input-group-lg shadow-sm border border-primary border-2 rounded-3 overflow-hidden">
-                            <span class="input-group-text bg-primary text-white border-0"><i class="fas fa-barcode"></i></span>
-                            <input type="text" id="barcodeInput" class="form-control border-0 fw-bold text-primary pos-barcode-input" placeholder="Scan barcode here... (Auto adds to cart)" aria-label="Scan product barcode" autofocus autocomplete="off">
-                        </div>
+    <div class="container-fluid py-3 px-4 pos-container pos-page">
+        <header class="pos-page-header">
+            <div>
+                <p class="pos-page-kicker mb-2">Sales workspace</p>
+                <h2 class="pos-page-title mb-2">POS Terminal</h2>
+                <p class="pos-page-context mb-0">Find a product, build the order, and complete checkout from one screen.</p>
+            </div>
+            <div class="pos-page-status" aria-label="POS workflow status">
+                <span class="pos-status-indicator" aria-hidden="true"></span>
+                <span>Ready for the next order</span>
+            </div>
+        </header>
+
+        <div class="pos-workbench">
+            <!-- Product catalog workspace -->
+            <section class="pos-catalog-zone" aria-labelledby="pos-catalog-title">
+                <div class="pos-zone-header">
+                    <div>
+                        <p class="pos-zone-kicker mb-1">Catalog</p>
+                        <h2 id="pos-catalog-title" class="pos-zone-title mb-1">Choose products</h2>
+                        <p class="pos-zone-description mb-0">Scan first, or search and filter the catalog.</p>
                     </div>
+                    <span class="pos-zone-hint"><i class="fas fa-keyboard me-1" aria-hidden="true"></i>Keyboard ready</span>
                 </div>
 
-                <!-- Search Bar -->
-                <form method="GET" action="orders.php" class="row mb-3">
-                    <div class="col-12">
-                        <div class="input-group shadow-sm border rounded-3 overflow-hidden">
-                            <span class="input-group-text bg-white border-0"><i class="fas fa-search text-muted"></i></span>
-                            <input type="search" id="searchProduct" name="product_search" value="<?php echo htmlspecialchars($pos_search, ENT_QUOTES, 'UTF-8'); ?>" class="form-control border-0 pos-search-input" placeholder="Search products by name or barcode..." aria-label="Search products by name or barcode">
+                <div class="pos-barcode-panel">
+                    <div class="pos-field-heading">
+                        <span class="pos-field-icon" aria-hidden="true"><i class="fas fa-barcode"></i></span>
+                        <div>
+                            <label for="barcodeInput" class="pos-field-label mb-0">Barcode scanner</label>
+                            <span class="pos-field-help">Press Enter after each scan</span>
                         </div>
                     </div>
+                    <input type="text" id="barcodeInput" class="form-control pos-barcode-input" placeholder="Scan barcode to add an item" aria-label="Scan product barcode" autofocus autocomplete="off">
+                </div>
+
+                <form method="GET" action="orders.php" class="pos-search-panel">
+                    <label for="searchProduct" class="visually-hidden">Search products by name or barcode</label>
+                    <span class="pos-search-icon" aria-hidden="true"><i class="fas fa-search"></i></span>
+                    <input type="search" id="searchProduct" name="product_search" value="<?php echo htmlspecialchars($pos_search, ENT_QUOTES, 'UTF-8'); ?>" class="form-control pos-search-input" placeholder="Search products by name or barcode..." aria-label="Search products by name or barcode">
+                    <span class="pos-search-hint" aria-hidden="true">/</span>
                 </form>
 
-                <!-- Category Navigation Pills -->
-                <div class="mb-3 d-flex overflow-x-auto pb-2 category-pill-list">
-                    <button type="button" class="btn btn-sm btn-primary category-pill rounded-pill px-3 fw-bold" data-category-id="all">
-                        All
-                    </button>
-                    <?php foreach ($categories as $cat): ?>
-                        <button type="button" class="btn btn-sm btn-outline-secondary category-pill rounded-pill px-3" data-category-id="<?php echo (int)$cat['id']; ?>">
-                            <?php echo htmlspecialchars($cat['name']); ?>
+                <nav class="pos-category-bar category-pill-list" aria-label="Product categories">
+                    <span class="pos-category-label">Filter</span>
+                    <div class="pos-category-scroll">
+                        <button type="button" class="btn btn-sm btn-primary category-pill" data-category-id="all">
+                            All
                         </button>
-                    <?php endforeach; ?>
-                </div>
+                        <?php foreach ($categories as $cat): ?>
+                            <button type="button" class="btn btn-sm btn-outline-secondary category-pill" data-category-id="<?php echo (int)$cat['id']; ?>">
+                                <?php echo htmlspecialchars($cat['name']); ?>
+                            </button>
+                        <?php endforeach; ?>
+                    </div>
+                </nav>
 
-                <!-- Product Grid -->
-                <h2 class="visually-hidden">Product catalog</h2>
-                <div class="product-grid-container" id="productGrid" role="region" aria-label="Product catalog" tabindex="0">
-                    <div class="row g-3">
+                <h2 id="pos-catalog-title-hidden" class="visually-hidden">Product catalog</h2>
+                <div class="product-grid-container pos-product-grid" id="productGrid" role="region" aria-label="Product catalog" tabindex="0">
+                    <div class="pos-product-grid__items">
                         <?php foreach ($products as $product): ?>
                             <?php
                             $hasStock = $product['stock'] > 0;
                             $cardClass = $hasStock ? 'product-card' : 'product-card disabled';
                             $badgeClass = $product['stock'] <= 5 ? 'bg-danger' : 'bg-success';
                             ?>
-                            <div class="col-md-4 col-sm-6 product-item"
+                            <div class="product-item pos-product-item"
                                  data-name="<?php echo htmlspecialchars(strtolower((string)$product['name']), ENT_QUOTES, 'UTF-8'); ?>"
                                  data-category-id="<?php echo (int)$product['category_id']; ?>"
                                  data-barcode="<?php echo htmlspecialchars($product['barcode'] ?? '', ENT_QUOTES, 'UTF-8'); ?>">
-                                <div class="card h-100 border-0 <?php echo $cardClass; ?>"
+                                <div class="card pos-product-card h-100 <?php echo $cardClass; ?>"
                                      <?php if ($hasStock): ?>
                                          data-product-id="<?php echo (int)$product['id']; ?>"
                                          data-product-name="<?php echo htmlspecialchars($product['name'] ?? '', ENT_QUOTES, 'UTF-8'); ?>"
                                          data-product-price="<?php echo htmlspecialchars((string)$product['price'], ENT_QUOTES, 'UTF-8'); ?>"
                                          data-product-stock="<?php echo (int)$product['stock']; ?>"
+                                         role="button"
+                                         tabindex="0"
+                                         aria-label="Add <?php echo htmlspecialchars($product['name'] ?? '', ENT_QUOTES, 'UTF-8'); ?> to cart"
+                                     <?php else: ?>
+                                         aria-disabled="true"
                                      <?php endif; ?>>
-                                
-                                    <div class="card-body text-center p-4 position-relative">
-                                        <span class="badge rounded-pill <?php echo $badgeClass; ?> stock-badge">
+                                    <div class="pos-product-card__body card-body position-relative">
+                                        <span class="badge stock-badge pos-product-stock <?php echo $badgeClass; ?>">
                                             Stock: <?php echo $product['stock']; ?>
                                         </span>
-                                    
-                                        <div class="mb-3 overflow-hidden rounded-circle mx-auto shadow-sm pos-product-image-wrapper">
+
+                                        <div class="pos-product-image-wrapper">
                                             <?php if ($product['image_path']): ?>
-                                                <img src="<?php echo htmlspecialchars($product['image_path']); ?>" 
-                                                     class="img-fluid w-100 h-100 pos-product-image">
+                                                <img src="<?php echo htmlspecialchars($product['image_path']); ?>" class="pos-product-image" alt="">
                                             <?php else: ?>
-                                                <div class="w-100 h-100 bg-light d-flex align-items-center justify-content-center text-muted">
-                                                    <i class="fas fa-box fa-2x"></i>
+                                                <div class="pos-product-image-placeholder" aria-hidden="true">
+                                                    <i class="fas fa-box"></i>
                                                 </div>
                                             <?php endif; ?>
                                         </div>
 
-                                        <h3 class="h5 card-title text-dark fw-bold mb-1 pos-product-title"><?php echo htmlspecialchars($product['name']); ?></h3>
-                                        <p class="card-text text-primary fs-5 fw-bold mb-0">$<?php echo number_format($product['price'], 2); ?></p>
+                                        <h3 class="pos-product-title mb-1"><?php echo htmlspecialchars($product['name']); ?></h3>
+                                        <p class="pos-product-price mb-0">$<?php echo number_format($product['price'], 2); ?></p>
                                     </div>
                                     <?php if (!$hasStock): ?>
-                                        <div class="card-footer bg-danger text-white text-center py-1 border-0 pos-out-of-stock">Out of Stock</div>
+                                        <div class="pos-out-of-stock">Out of Stock</div>
                                     <?php endif; ?>
                                 </div>
                             </div>
                         <?php endforeach; ?>
                     </div>
+                    <div id="productEmptyState" class="pos-empty-state product-empty-state" role="status" <?php echo !empty($products) ? 'hidden' : ''; ?>>
+                        <span class="pos-empty-state__icon" aria-hidden="true"><i class="fas fa-box-open"></i></span>
+                        <strong>No products match this view.</strong>
+                        <span>Try another search or category, or add products to the catalog.</span>
+                    </div>
                 </div>
-            </div>
+            </section>
 
-            <!-- Right Column: Cart -->
-            <div class="col-lg-4 h-100">
-                <div class="card shadow-sm border-0 rounded-4 cart-panel">
-                    <div class="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center border-bottom">
-                        <h2 class="h5 mb-0 text-secondary fw-bold pos-section-title"><i class="fas fa-shopping-cart me-2 text-primary"></i>Current Order</h2>
-                        <div class="d-flex align-items-center gap-2">
-                            <button type="button" class="btn btn-sm btn-outline-danger rounded-pill px-2 py-1 cart-clear-button" id="clearCartBtn">
-                                <i class="fas fa-times me-1"></i>Clear
+            <!-- Cart and checkout workspace -->
+            <aside class="pos-checkout-zone" aria-labelledby="pos-checkout-title">
+                <div class="card cart-panel pos-checkout-panel">
+                    <div class="pos-checkout-header">
+                        <div>
+                            <p class="pos-zone-kicker mb-1">Checkout</p>
+                            <h2 id="pos-checkout-title" class="pos-checkout-title mb-0"><i class="fas fa-shopping-cart me-2" aria-hidden="true"></i>Current Order</h2>
+                        </div>
+                        <div class="pos-checkout-header__actions">
+                            <button type="button" class="btn btn-sm btn-outline-danger cart-clear-button" id="clearCartBtn">
+                                <i class="fas fa-times me-1" aria-hidden="true"></i>Clear
                             </button>
-                            <span class="badge primary-bg primary-text rounded-pill px-2 py-1 cart-count-badge" id="cartCount">0 Items</span>
+                            <span class="badge cart-count-badge" id="cartCount" aria-live="polite">0 Items</span>
                         </div>
                     </div>
-                    
-                    <div class="card-body border-bottom py-3">
-                        <label class="form-label fw-bold mb-2"><i class="fas fa-exchange-alt me-2"></i>Transaction Type</label>
-                        <div class="btn-group w-100" role="group">
+
+                    <div class="pos-order-controls">
+                        <label class="pos-field-label mb-2"><i class="fas fa-exchange-alt me-2" aria-hidden="true"></i>Transaction type</label>
+                        <div class="btn-group w-100" role="group" aria-label="Transaction type">
                             <input type="radio" class="btn-check" name="orderType" id="typeSale" value="sale" checked>
-                            <label class="btn btn-outline-primary" for="typeSale"><i class="fas fa-cash-register me-1"></i> Sale</label>
-                            
+                            <label class="btn btn-outline-primary" for="typeSale"><i class="fas fa-cash-register me-1" aria-hidden="true"></i>Sale</label>
+
                             <?php if ($is_admin_user): ?>
                                 <input type="radio" class="btn-check" name="orderType" id="typePurchase" value="purchase">
-                                <label class="btn btn-outline-success" for="typePurchase"><i class="fas fa-box me-1"></i> Purchase</label>
+                                <label class="btn btn-outline-success" for="typePurchase"><i class="fas fa-box me-1" aria-hidden="true"></i>Purchase</label>
                             <?php endif; ?>
                         </div>
                     </div>
-                    
-                    <div class="cart-items-container p-3">
-                        <table class="table table-hover align-middle mb-0">
+
+                    <div class="cart-items-container pos-cart-items">
+                        <table class="table align-middle mb-0 pos-cart-table">
+                            <caption class="visually-hidden">Current order items</caption>
                             <tbody id="cartTableBody">
-                                <tr class="text-center text-muted" id="emptyCartMsg">
-                                    <td class="py-5">
-                                        <i class="fas fa-shopping-basket fa-3x mb-3 text-secondary opacity-50"></i>
-                                        <p>Select products from the left to start an order.</p>
+                                <tr class="pos-cart-empty text-center text-muted" id="emptyCartMsg">
+                                    <td>
+                                        <i class="fas fa-shopping-basket pos-empty-state__icon" aria-hidden="true"></i>
+                                        <strong>Select products to start an order.</strong>
+                                        <span>Items added from the catalog appear here.</span>
                                     </td>
                                 </tr>
                             </tbody>
                         </table>
                     </div>
 
-                    <div class="p-4 bg-white border-top">
-                        <div class="d-flex justify-content-between mb-2">
-                            <span class="text-muted">Subtotal</span>
-                            <span class="fw-bold" id="cartSubtotal">$0.00</span>
+                    <div class="pos-checkout-summary">
+                        <div class="pos-total-row">
+                            <span>Subtotal</span>
+                            <span class="pos-subtotal-value" id="cartSubtotal">$0.00</span>
                         </div>
-                        <div class="d-flex justify-content-between mb-4">
-                            <span class="fs-4 fw-bold text-dark">Total</span>
-                            <span class="fs-3 fw-bold text-success" id="cartTotal">$0.00</span>
+                        <div class="pos-total-row pos-total-row--grand">
+                            <span>Total</span>
+                            <span id="cartTotal">$0.00</span>
                         </div>
-                        
+
                         <form method="POST" id="orderForm">
                             <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(generate_csrf_token()); ?>">
                             <input type="hidden" name="cart_data" id="cartDataInput">
                             <input type="hidden" name="complete_order" value="1">
                             <input type="hidden" name="order_type" id="orderTypeInput" value="sale">
-                            
+
                             <!-- Customer Selection Dropdown -->
-                            <div class="mb-3" id="formCustomerGroup">
-                                <label for="customerSelect" class="form-label fw-bold mb-1 text-secondary"><i class="fas fa-user me-1 text-primary"></i> Customer</label>
-                                <select class="form-select rounded-3" name="customer_id" id="customerSelect">
+                            <div class="pos-selector-field" id="formCustomerGroup">
+                                <label for="customerSelect" class="form-label"><i class="fas fa-user me-1" aria-hidden="true"></i>Customer</label>
+                                <select class="form-select" name="customer_id" id="customerSelect">
                                     <?php foreach ($customers as $cust): ?>
                                         <option value="<?php echo $cust['id']; ?>"><?php echo htmlspecialchars($cust['name'] . ($cust['phone'] ? ' - ' . $cust['phone'] : '')); ?></option>
                                     <?php endforeach; ?>
@@ -292,9 +325,9 @@ require_once '../includes/layouts/header.php';
 
                             <?php if ($is_admin_user): ?>
                                 <!-- Supplier Selection Dropdown -->
-                                <div class="mb-3 supplier-form-hidden" id="formSupplierGroup">
-                                    <label for="supplierSelect" class="form-label fw-bold mb-1 text-secondary"><i class="fas fa-truck me-1 text-success"></i> Supplier</label>
-                                    <select class="form-select rounded-3" name="supplier_id" id="supplierSelect">
+                                <div class="pos-selector-field supplier-form-hidden" id="formSupplierGroup">
+                                    <label for="supplierSelect" class="form-label"><i class="fas fa-truck me-1" aria-hidden="true"></i>Supplier</label>
+                                    <select class="form-select" name="supplier_id" id="supplierSelect">
                                         <?php foreach ($suppliers as $supp): ?>
                                             <option value="<?php echo $supp['id']; ?>"><?php echo htmlspecialchars($supp['name'] . ($supp['phone'] ? ' - ' . $supp['phone'] : '')); ?></option>
                                         <?php endforeach; ?>
@@ -302,13 +335,13 @@ require_once '../includes/layouts/header.php';
                                 </div>
                             <?php endif; ?>
 
-                            <button type="button" class="btn btn-success w-100 py-3 fs-5 fw-bold shadow-sm" id="completeOrderBtn" disabled>
-                                <i class="fas fa-check-circle me-2"></i>Complete Order
+                            <button type="button" class="btn btn-success pos-complete-button" id="completeOrderBtn" disabled>
+                                <i class="fas fa-check-circle me-2" aria-hidden="true"></i>Complete Order
                             </button>
                         </form>
                     </div>
                 </div>
-            </div>
+            </aside>
         </div>
     </div>
 
@@ -353,6 +386,12 @@ $extra_js = [
                     price: parseFloat(card.dataset.productPrice),
                     stock: parseInt(card.dataset.productStock, 10)
                 });
+            });
+            card.addEventListener('keydown', function(event) {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    card.click();
+                }
             });
         });
 
@@ -572,16 +611,18 @@ $extra_js = [
 
         if (cart.length === 0) {
             const emptyRow = document.createElement('tr');
-            emptyRow.className = 'text-center text-muted';
+            emptyRow.className = 'pos-cart-empty text-center text-muted';
             emptyRow.id = 'emptyCartMsg';
             const emptyCell = document.createElement('td');
-            emptyCell.className = 'py-5';
+            emptyCell.className = 'pos-cart-empty__cell';
             const emptyIcon = document.createElement('i');
-            emptyIcon.className = 'fas fa-shopping-basket fa-3x mb-3 text-secondary opacity-50';
-            const emptyText = document.createElement('p');
-            emptyText.className = 'small mb-0';
-            emptyText.textContent = 'Select products from the left to start an order.';
-            emptyCell.append(emptyIcon, emptyText);
+            emptyIcon.className = 'fas fa-shopping-basket pos-empty-state__icon';
+            emptyIcon.setAttribute('aria-hidden', 'true');
+            const emptyTitle = document.createElement('strong');
+            emptyTitle.textContent = 'Select products to start an order.';
+            const emptyText = document.createElement('span');
+            emptyText.textContent = 'Items added from the catalog appear here.';
+            emptyCell.append(emptyIcon, emptyTitle, emptyText);
             emptyRow.append(emptyCell);
             tbody.append(emptyRow);
         } else {
@@ -595,21 +636,21 @@ $extra_js = [
 
                 const productCell = document.createElement('td');
                 const productName = document.createElement('div');
-                productName.className = 'fw-bold text-dark mb-0';
+                productName.className = 'pos-cart-item__name fw-bold text-dark mb-0';
                 productName.textContent = item.name;
                 const productPrice = document.createElement('small');
-                productPrice.className = 'text-muted';
+                productPrice.className = 'pos-cart-item__price text-muted';
                 productPrice.textContent = '$' + item.price.toFixed(2);
                 productCell.append(productName, productPrice);
 
                 const quantityCell = document.createElement('td');
                 quantityCell.width = 100;
                 const quantityControls = document.createElement('div');
-                quantityControls.className = 'd-flex align-items-center justify-content-center';
+                quantityControls.className = 'pos-quantity-controls d-flex align-items-center justify-content-center';
 
                 const decreaseButton = document.createElement('button');
                 decreaseButton.type = 'button';
-                decreaseButton.className = 'cart-qty-btn';
+                decreaseButton.className = 'cart-qty-btn pos-qty-button';
                 decreaseButton.textContent = '-';
                 decreaseButton.addEventListener('click', function() {
                     updateQty(index, -1);
@@ -617,13 +658,13 @@ $extra_js = [
 
                 const quantityInput = document.createElement('input');
                 quantityInput.type = 'text';
-                quantityInput.className = 'cart-qty-input';
+                quantityInput.className = 'cart-qty-input pos-qty-value';
                 quantityInput.value = String(item.qty);
                 quantityInput.readOnly = true;
 
                 const increaseButton = document.createElement('button');
                 increaseButton.type = 'button';
-                increaseButton.className = 'cart-qty-btn';
+                increaseButton.className = 'cart-qty-btn pos-qty-button';
                 increaseButton.textContent = '+';
                 increaseButton.addEventListener('click', function() {
                     updateQty(index, 1);
@@ -641,7 +682,7 @@ $extra_js = [
                 removeCell.width = 40;
                 const removeButton = document.createElement('button');
                 removeButton.type = 'button';
-                removeButton.className = 'btn btn-sm text-danger p-0';
+                removeButton.className = 'btn btn-sm text-danger p-0 pos-cart-remove';
                 removeButton.setAttribute('aria-label', 'Remove ' + item.name + ' from cart');
                 const removeIcon = document.createElement('i');
                 removeIcon.className = 'fas fa-trash-alt';
@@ -717,6 +758,7 @@ $extra_js = [
     function filterProducts() {
         const query = document.getElementById('searchProduct').value.toLowerCase();
         const items = document.querySelectorAll('.product-item');
+        let visibleCount = 0;
 
         items.forEach(item => {
             const name = item.dataset.name;
@@ -727,10 +769,16 @@ $extra_js = [
             
             if (matchesQuery && matchesCategory) {
                 item.classList.remove('product-filter-hidden');
+                visibleCount++;
             } else {
                 item.classList.add('product-filter-hidden');
             }
         });
+
+        const emptyState = document.getElementById('productEmptyState');
+        if (emptyState) {
+            emptyState.hidden = visibleCount > 0;
+        }
     }
 
     function submitOrder() {

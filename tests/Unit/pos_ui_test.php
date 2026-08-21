@@ -140,8 +140,8 @@ function run_pos_ui_unit_tests(): int
     foreach ([
         'height: calc(100vh - 90px);',
         '.category-pill.btn-primary, .category-pill.btn-primary:hover',
-        'transform: translateY(-6px)',
-        'transform: scale(1.1)',
+        'transform: translateY(-6px) !important;',
+        '.product-card:hover img { transform: scale(1.1); }',
     ] as $retiredStyle) {
         $tests->assertSame(0, substr_count($stylesheet, $retiredStyle), 'Legacy POS visual rule remains: ' . $retiredStyle);
     }
@@ -152,7 +152,7 @@ function run_pos_ui_unit_tests(): int
         'people_get_customers_for_selector($conn, 100)',
         'people_get_suppliers_for_selector($conn, 100)',
         'auth_verify_login($conn)',
-        "elseif ($order_type === 'purchase' && !auth_is_admin($conn))",
+        'elseif ($order_type === \'purchase\' && !auth_is_admin($conn))',
         'verify_csrf_token($csrf_token)',
         'orders_create($conn, $_SESSION[\'staff_id\'], $order_items, $order_type, $customer_id, $supplier_id)',
     ] as $serverContract) {
