@@ -55,11 +55,6 @@
     --shadow-lg: 0 20px 25px -5px rgba(15,23,42,0.1), 0 8px 10px -6px rgba(15,23,42,0.08);
     --shadow-xl: 0 25px 50px -12px rgba(15,23,42,0.18);
     
-    /* Legacy Compatibility */
-    --main-bg-color: var(--primary);
-    --main-text-color: var(--primary);
-    --second-text-color: var(--slate-400);
-    --second-bg-color: var(--primary-bg-subtle);
 }
 
 /* ============================
@@ -1121,16 +1116,6 @@ a { text-decoration: none; }
 /* ============================
    MOVEMENT TYPE BADGES
    ============================ */
-.badge-sale {
-    background: var(--primary-bg-subtle);
-    color: var(--primary);
-}
-
-.badge-purchase {
-    background: var(--success-bg-subtle);
-    color: var(--success);
-}
-
 .badge-adjustment {
     background: var(--warning-bg-subtle);
     color: var(--warning);
@@ -1291,7 +1276,6 @@ a { text-decoration: none; }
 .cart-count-badge { font-size: 0.75rem; font-weight: 700; }
 .supplier-form-hidden { display: none !important; }
 .product-filter-hidden { display: none !important; }
-.cart-row-hidden { display: none !important; }
 .table-row-hidden { display: none !important; }
 
 /* Invoice print layout */
