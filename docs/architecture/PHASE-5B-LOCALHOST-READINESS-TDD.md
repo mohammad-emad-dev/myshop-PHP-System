@@ -15,6 +15,13 @@ local credentials, and local backup files.
 
 The localhost operating model keeps cloud controls intentionally out of scope.
 
+## Localhost readiness score
+
+**92/100 — strong localhost baseline.** No local blocker was found. The
+remaining evidence gap is a real operator-run XAMPP installation and host-level
+backup retention/firewall state; those are explicitly documented operator
+responsibilities rather than application defects.
+
 ## Evidence-first audit
 
 ### Evidence checked
@@ -115,9 +122,9 @@ docker compose --env-file .env run --rm --no-deps app php -r "require 'tests/Uni
 FAIL: Localhost readiness fixture could not be read.
 ```
 
-The GREEN checkpoint is the first commit that makes the new source contracts,
-runbook, and current README pass. The final documentation checkpoint records
-the complete disposable verification results below.
+The GREEN checkpoint `b53551965334f438caf61ea46f29a92590d36365` makes the new
+source contracts, runbook, and current README pass. The final documentation
+checkpoint records the complete disposable verification results below.
 
 ## Verification record
 
@@ -126,21 +133,42 @@ actual results before closure:
 
 | Check | Result | Evidence |
 | --- | --- | --- |
-| Focused localhost source contracts | Pending at document creation | `tests/Unit/localhost_readiness_test.php` |
-| Full disposable regression | Pending at document creation | `docker compose ... app php tests/run.php` |
-| Backup/restore disposable test | Pending at document creation | `tests/Integration/backup_restore_test.php` |
-| Local stop/start readiness recovery | Pending at document creation | disposable runtime smoke and local restart check |
-| PHP lint | Pending at document creation | all tracked PHP files |
-| JavaScript syntax | Pending at document creation | all tracked JavaScript files |
-| Docker Compose validation | Pending at document creation | development and optional production-stage models |
-| Repository security and supply-chain scans | Pending at document creation | dependency-free repository checks |
-| Browser QA | Pending at document creation | 375px, 768px, and 1440px |
-| `git diff --check` and artifact review | Pending at document creation | final tracked diff and status |
+| Focused localhost source contracts | PASS — 51 assertions | `tests/Unit/localhost_readiness_test.php` |
+| Full disposable regression | PASS — 2,737 assertions (1,879 unit, 858 integration) | `docker compose ... app php tests/run.php` |
+| Backup/restore disposable test | PASS — 84 assertions | `tests/Integration/backup_restore_test.php` against a uniquely named restore target |
+| Local stop/start readiness recovery | PASS — liveness 200; readiness 503 with MySQL stopped; readiness 200 after recovery and app/database restart | Docker Compose local stack |
+| PHP lint | PASS — 88 tracked PHP files | Docker PHP 8.3 runtime |
+| JavaScript syntax | PASS — 4 tracked JavaScript files | `node --check` |
+| Docker Compose validation | PASS — development and optional production-stage models | `docker compose ... config --quiet` |
+| Repository security and supply-chain scans | PASS — 0 findings | `repository-security-check.php`; `ci-supply-chain-check.php` |
+| Release-integrity scan | PASS | `release-integrity-check.php` with local verification metadata |
+| Disposable production-stage smoke | PASS — isolation, generic health/readiness, DB stop/recovery, cleanup | `scripts/run-production-smoke.ps1` |
+| Browser QA | PASS — 18/18 at 375px, 768px, and 1440px | `scripts/run-browser-qa.ps1` |
+| `git diff --check` and artifact review | PASS | final tracked diff, secret/artifact review, and clean status |
 
 ## Local readiness assessment
 
-The target is a strong localhost baseline when all verification rows pass. A
+The target is a strong localhost baseline because all verification rows pass. A
 failure in local startup, loopback binding, health/readiness recovery, backup
-completeness, disposable restore, or restart persistence is a local blocker.
-Cloud deployment controls remain intentionally unavailable and are not counted
-as localhost blockers.
+completeness, disposable restore, or restart persistence would be a local
+blocker. Cloud deployment controls remain intentionally unavailable and are not
+counted as localhost blockers.
+
+### Local blockers
+
+None found in repository-local and disposable runtime evidence.
+
+### Accepted local responsibilities
+
+- Protect the developer/business computer, local `.env`, and downloaded backup
+  files.
+- Keep XAMPP/Apache/MySQL loopback-bound when using the manual workflow.
+- Retain and periodically verify local backups according to the operator's
+  recovery needs.
+
+### Evidence not available in this checkout
+
+- A separate real XAMPP installation was not available for execution in this
+  Docker-based verification environment.
+- Host firewall rules, physical disk health, antivirus behavior, and the local
+  operator's backup retention policy require machine-specific verification.
