@@ -201,7 +201,7 @@ async function captureSanitizedScreenshot(page, name) {
     'select',
     'td',
     'tbody',
-    '.dashboard-kpi-value',
+    '.dashboard-kpi-number',
     '.history-kpi-value',
     '.ui-account-name',
     '.ui-account-role',
