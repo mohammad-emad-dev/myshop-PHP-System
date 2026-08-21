@@ -373,7 +373,8 @@ test('admin can load critical pages, search and paginate products, and access ex
       await expect(page.locator('#sidebar-wrapper a[aria-current="page"]')).toHaveAttribute('href', 'settings.php');
       await page.getByRole('button', { name: /Add Staff/ }).click();
       await expect(page.locator('#addStaffModal')).toBeVisible();
-      await page.keyboard.press('Escape');
+      await expect(page.locator('#addStaffModal .modal-title')).toBeVisible();
+      await page.locator('#addStaffModal').press('Escape');
       await expect(page.locator('#addStaffModal')).toBeHidden();
       await captureSanitizedScreenshot(page, 'admin-settings-final');
     }

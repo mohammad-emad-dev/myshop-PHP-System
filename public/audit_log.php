@@ -146,7 +146,7 @@ require_once '../includes/layouts/header.php';
                 </form>
 
                 <p class="text-muted small data-table-summary audit-log-summary">Showing <?php echo $range_start; ?>-<?php echo $range_end; ?> of <?php echo $total_events; ?> events.</p>
-                <div class="data-table-shell audit-log-table-shell">
+                <div class="data-table-shell audit-log-table-shell" tabindex="0" role="region" aria-label="Scrollable security audit events">
                     <table class="table data-table audit-log-table">
                         <caption class="visually-hidden">Security audit events</caption>
                         <thead class="bg-light text-secondary">
