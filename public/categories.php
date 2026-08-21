@@ -59,7 +59,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             }
         } elseif ($action === 'delete') {
             $id = intval($_POST['id'] ?? 0);
-            $operation_success = $id > 0 && delete_category($conn, $id);
+            $operation_success = $id > 0 && categories_delete($conn, $id);
             audit_log_current_actor($conn, 'category_delete', 'Category', $id, $operation_success);
             if ($operation_success) {
                 $success = 'Category deleted successfully. Associated products have been moved to General.';
