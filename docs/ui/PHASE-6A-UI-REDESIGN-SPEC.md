@@ -229,8 +229,10 @@ and sensitive data selectors are masked. The baseline is stored under
 
 Each width includes `login-dashboard`, `admin-dashboard`, `admin-products`,
 `admin-settings`, and `cashier-orders`. These are review baselines, not pixel
-approval snapshots; the existing E2E runner explicitly reports that no visual
-comparison baseline is configured.
+approval snapshots; `login-dashboard` is the authenticated dashboard capture
+from the existing journey, while the pre-auth login state remains represented
+by the existing curated `screenshots/login.png`. The existing E2E runner
+explicitly reports that no visual comparison baseline is configured.
 
 ## Verification guardrails
 
@@ -256,3 +258,22 @@ routes, JavaScript behavior, customer/supplier/category contracts, or the
 localhost Docker/XAMPP workflow. It also does not claim that the complete
 redesign is finished: page migrations and visual regression comparison remain
 future work.
+
+## Phase 6A verification record
+
+The implementation followed a RED/GREEN checkpoint sequence:
+
+| Checkpoint | Evidence |
+| --- | --- |
+| RED | `11b7173` added the UI foundation source contracts; the focused runner failed because the Phase 6A specification was missing. |
+| GREEN | `e5e018d` added the shared tokens, shell ownership classes, responsive rules, sanitized baselines, and passing contracts. |
+| Focused UI contracts | 45 assertions passed in `tests/Unit/ui_redesign_test.php`. |
+| Full disposable regression | 3,632 assertions passed: 2,005 unit and 1,627 integration. |
+| Browser QA | 18/18 journeys passed at 375px, 768px, and 1440px. No overflow failures, role/form regressions, or serious automated contrast findings remained. |
+| Static checks | 91 tracked PHP files linted; 74 JavaScript files passed `node --check`; Docker Compose config and `git diff --check` passed. |
+| Security and release checks | Tracked-file security scan: 188 files, 0 findings. Supply-chain scan: 23 policy files, 0 findings. Release-integrity evidence and disposable production preflight passed. |
+
+The shared shell and stylesheet are the only application UI surfaces changed in
+Phase 6A. Dashboard, POS, products, inventory, customers, suppliers,
+categories, order history/details, and login page-specific markup and behavior
+remain queued for the migration order above.
