@@ -3664,3 +3664,149 @@ a {
         margin-inline-start: 0;
     }
 }
+
+/* Phase 6E: Customers, Suppliers, and Categories visual migration */
+.customers-page .customers-table,
+.suppliers-page .suppliers-table {
+    min-width: 72rem;
+}
+
+.customers-page .customers-table th:nth-child(1),
+.suppliers-page .suppliers-table th:nth-child(1) {
+    width: 4.5rem;
+}
+
+.customers-page .customers-table th:nth-child(2),
+.suppliers-page .suppliers-table th:nth-child(2) {
+    min-width: 13rem;
+}
+
+.customers-page .customers-table th:nth-child(3),
+.suppliers-page .suppliers-table th:nth-child(3) {
+    width: 10rem;
+}
+
+.customers-page .customers-table th:nth-child(4),
+.suppliers-page .suppliers-table th:nth-child(4) {
+    width: 15rem;
+}
+
+.customers-page .customers-table th:nth-child(6),
+.suppliers-page .suppliers-table th:nth-child(6) {
+    width: 10rem;
+}
+
+.customers-page .customers-table th:nth-child(7),
+.suppliers-page .suppliers-table th:nth-child(7) {
+    width: 9rem;
+}
+
+.customers-page .customer-row > td:first-child,
+.suppliers-page .supplier-row > td:first-child,
+.categories-page .category-row > td:first-child,
+.customers-page .customer-created,
+.suppliers-page .supplier-created,
+.categories-page .category-row > td:nth-child(5) {
+    color: var(--data-ink-soft);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.customers-page .customer-row > td:first-child,
+.suppliers-page .supplier-row > td:first-child,
+.categories-page .category-row > td:first-child {
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+.customers-page .customer-name,
+.suppliers-page .supplier-name {
+    color: var(--color-ink-strong) !important;
+    font-size: 0.88rem;
+}
+
+.customers-page .customer-contact,
+.suppliers-page .supplier-contact {
+    max-width: 20rem;
+    overflow-wrap: anywhere;
+}
+
+.customers-page .customer-actions,
+.suppliers-page .supplier-actions,
+.categories-page .category-actions {
+    white-space: nowrap;
+}
+
+.customers-page .customer-row .badge,
+.suppliers-page .supplier-row .badge {
+    font-size: 0.64rem;
+    letter-spacing: 0.02em;
+}
+
+.categories-page .categories-table {
+    min-width: 62rem;
+}
+
+.categories-page .categories-table th:nth-child(1) { width: 4.5rem; }
+.categories-page .categories-table th:nth-child(2) { min-width: 14rem; }
+.categories-page .categories-table th:nth-child(3) { min-width: 22rem; }
+.categories-page .categories-table th:nth-child(4) { width: 10rem; }
+.categories-page .categories-table th:nth-child(5) { width: 11rem; }
+.categories-page .categories-table th:nth-child(6) { width: 9rem; }
+
+.categories-page .category-name {
+    color: var(--color-ink-strong);
+    font-size: 0.88rem;
+}
+
+.categories-page .category-row > td:nth-child(3) {
+    color: var(--data-ink-soft);
+    max-width: 24rem;
+}
+
+.categories-page .category-count {
+    font-size: 0.68rem;
+    min-width: 6.5rem;
+    padding: 0.4rem 0.6rem !important;
+}
+
+.categories-page .default-category-state {
+    background: var(--color-surface-muted);
+}
+
+.categories-page .default-category-state .category-name {
+    color: var(--data-ink-soft);
+}
+
+.customers-page .data-modal,
+.suppliers-page .data-modal,
+.categories-page .data-modal {
+    box-shadow: var(--shadow-lg);
+}
+
+@media (max-width: 991.98px) {
+    .customers-page .customers-table,
+    .suppliers-page .suppliers-table {
+        min-width: 64rem;
+    }
+
+    .categories-page .categories-table {
+        min-width: 56rem;
+    }
+}
+
+@media (max-width: 767.98px) {
+    .customers-page .data-table-summary,
+    .suppliers-page .data-table-summary,
+    .categories-page .data-table-summary {
+        margin-top: var(--space-4);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .customers-page .data-table tbody tr,
+    .suppliers-page .data-table tbody tr,
+    .categories-page .data-table tbody tr {
+        transition: none !important;
+    }
+}

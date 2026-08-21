@@ -208,14 +208,12 @@ function run_customers_suppliers_categories_ui_unit_tests(): int
     }
 
     foreach ([
-        'admin-customers-after',
-        'admin-suppliers-after',
+        'admin-${surface.entity}s-after',
         'admin-categories-after',
         'customers.php?page_size=10',
         'suppliers.php?page_size=10',
         'categories.php?page_size=10',
-        'getByLabel(\'Search customers\')',
-        'getByLabel(\'Search suppliers\')',
+        'getByLabel(surface.search)',
         'getByLabel(\'Search categories\')',
         'addCustomerModal',
         'editCustomerModal',

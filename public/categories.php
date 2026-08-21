@@ -115,30 +115,38 @@ require_once '../includes/layouts/header.php';
     <?php require_once '../includes/layouts/sidebar.php'; ?>
     <?php require_once '../includes/layouts/navbar.php'; ?>
 
-    <div class="container-fluid px-4 py-4">
+    <div class="container-fluid px-4 py-5 categories-page data-page">
 
         <div class="row my-2">
             <div class="col-md-12">
-                <div class="card shadow-sm border-0 rounded-4">
-                    <div class="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center">
-                        <h2 class="h4 mb-0 fw-bold ui-page-heading">
-                            <i class="fas fa-tags me-2 text-primary"></i>Product Categories
-                            <span class="badge bg-primary rounded-pill ms-2 ui-count-text"><?php echo number_format($total_categories); ?></span>
-                        </h2>
-                        <button class="btn btn-primary shadow-sm fw-bold px-4 rounded-pill pulse-btn ui-transition" data-bs-toggle="modal" data-bs-target="#addCategoryModal">
-                            <i class="fas fa-plus-circle me-2 fs-5 align-middle"></i>Add Category
-                        </button>
+                <div class="card shadow-sm border-0 rounded-4 data-surface categories-surface">
+                    <div class="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center flex-wrap gap-2 data-page-header">
+                        <div class="data-page-header__content">
+                            <p class="data-page-kicker mb-2">Catalog structure</p>
+                            <div class="data-page-header__title-row">
+                                <h2 class="h4 mb-0 fw-bold ui-page-heading">
+                                    <i class="fas fa-tags me-2 text-primary"></i>Product Categories
+                                    <span class="badge bg-primary rounded-pill ms-2 ui-count-text"><?php echo number_format($total_categories); ?></span>
+                                </h2>
+                            </div>
+                            <p class="data-page-context mb-0 mt-2">Organize products while keeping the General category protected.</p>
+                        </div>
+                        <div class="d-flex gap-2 data-page-actions">
+                            <button class="btn btn-primary shadow-sm fw-bold px-4 rounded-pill pulse-btn ui-transition data-page-action" data-bs-toggle="modal" data-bs-target="#addCategoryModal">
+                                <i class="fas fa-plus-circle me-2 fs-5 align-middle"></i>Add Category
+                            </button>
+                        </div>
                     </div>
-                    <div class="card-body">
-                        <form method="GET" action="categories.php" class="row mb-3 g-2 align-items-end">
-                            <div class="col-md-4">
+                    <div class="card-body data-surface__body">
+                        <form method="GET" action="categories.php" class="row mb-3 g-2 align-items-end data-toolbar">
+                            <div class="col-md-4 data-toolbar__field">
                                 <label for="searchCategory" class="form-label">Search categories</label>
                                 <div class="input-group shadow-sm rounded-3 overflow-hidden border">
                                     <span class="input-group-text bg-white border-0"><i class="fas fa-search text-muted"></i></span>
                                     <input type="search" id="searchCategory" name="search" value="<?php echo htmlspecialchars($search, ENT_QUOTES, 'UTF-8'); ?>" placeholder="Search categories by name..." class="form-control border-0 px-2 ui-search-input">
                                 </div>
                             </div>
-                            <div class="col-sm-4 col-md-2">
+                            <div class="col-sm-4 col-md-2 data-toolbar__field">
                                 <label for="categoryPageSize" class="form-label">Items per page</label>
                                 <select id="categoryPageSize" name="page_size" class="form-select">
                                     <?php foreach ($page_size_options as $option): ?>
@@ -147,11 +155,11 @@ require_once '../includes/layouts/header.php';
                                 </select>
                             </div>
                             <input type="hidden" name="page" value="1">
-                            <div class="col-auto"><button type="submit" class="btn btn-outline-primary">Apply</button></div>
+                            <div class="col-auto data-toolbar__submit"><button type="submit" class="btn btn-outline-primary data-control-button">Apply</button></div>
                         </form>
-                        <p class="text-muted small mb-3">Showing <?php echo $range_start; ?>-<?php echo $range_end; ?> of <?php echo $total_categories; ?> categories.</p>
-                        <div class="table-responsive">
-                            <table class="table table-hover table-striped align-middle" id="categoriesTable">
+                        <p class="text-muted small mb-3 data-table-summary"><i class="fas fa-tags me-1" aria-hidden="true"></i>Showing <?php echo $range_start; ?>-<?php echo $range_end; ?> of <?php echo $total_categories; ?> categories.</p>
+                        <div class="table-responsive data-table-shell">
+                            <table class="table table-hover table-striped align-middle data-table categories-table" id="categoriesTable">
                                 <thead class="bg-light text-secondary">
                                     <tr>
                                         <th scope="col">ID</th>
@@ -165,9 +173,9 @@ require_once '../includes/layouts/header.php';
                                 <tbody>
                                     <?php foreach ($categories as $category): ?>
                                         <?php $is_default = ($category['name'] === 'General'); ?>
-                                        <tr>
+                                        <tr class="category-row <?php echo $is_default ? 'default-category-state' : ''; ?>">
                                             <td><?php echo $category['id']; ?></td>
-                                            <td class="fw-bold">
+                                            <td class="fw-bold category-name">
                                                 <?php echo htmlspecialchars($category['name']); ?>
                                                 <?php if ($is_default): ?>
                                                     <span class="badge bg-secondary ms-1">Default</span>
@@ -176,24 +184,24 @@ require_once '../includes/layouts/header.php';
                                             <td class="text-muted">
                                                 <?php echo htmlspecialchars($category['description'] ?: 'No description provided'); ?>
                                             </td>
-                                            <td>
-                                                <span class="badge bg-info-subtle text-info fw-bold rounded-pill px-3">
+                                            <td class="category-count-cell">
+                                                <span class="badge bg-info-subtle text-info fw-bold rounded-pill px-3 category-count">
                                                     <?php echo $category['product_count']; ?> products
                                                 </span>
                                             </td>
                                             <td class="small text-secondary">
                                                 <?php echo date('Y-m-d H:i', strtotime($category['created_at'])); ?>
                                             </td>
-                                            <td>
+                                            <td class="category-actions data-action-group">
                                                 <?php if ($is_default): ?>
-                                                    <button class="btn btn-sm btn-outline-secondary me-1" disabled title="Default category cannot be edited">
+                                                    <button class="btn btn-sm btn-outline-secondary me-1 data-action-button" disabled title="Default category cannot be edited">
                                                         <i class="fas fa-edit"></i>
                                                     </button>
-                                                    <button class="btn btn-sm btn-outline-secondary" disabled title="Default category cannot be deleted">
+                                                    <button class="btn btn-sm btn-outline-secondary data-action-button" disabled title="Default category cannot be deleted">
                                                         <i class="fas fa-trash"></i>
                                                     </button>
                                                 <?php else: ?>
-                                                     <button type="button" class="btn btn-sm btn-outline-info me-1 edit-category-btn"
+                                                     <button type="button" class="btn btn-sm btn-outline-info me-1 edit-category-btn data-action-button"
                                                              aria-label="Edit category" title="Edit category"
                                                              data-category-id="<?php echo (int)$category['id']; ?>"
                                                              data-category-name="<?php echo htmlspecialchars($category['name'] ?? '', ENT_QUOTES, 'UTF-8'); ?>"
@@ -204,7 +212,7 @@ require_once '../includes/layouts/header.php';
                                                         <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(generate_csrf_token()); ?>">
                                                         <input type="hidden" name="action" value="delete">
                                                         <input type="hidden" name="id" value="<?php echo (int)$category['id']; ?>">
-                                                    <button type="submit" class="btn btn-sm btn-outline-danger" aria-label="Delete category" title="Delete category">
+                                                    <button type="submit" class="btn btn-sm btn-outline-danger data-action-button" aria-label="Delete category" title="Delete category">
                                                             <i class="fas fa-trash"></i>
                                                         </button>
                                                     </form>
@@ -214,9 +222,10 @@ require_once '../includes/layouts/header.php';
                                     <?php endforeach; ?>
                                     <?php if (empty($categories)): ?>
                                         <tr>
-                                            <td colspan="6" class="text-center text-muted py-5">
-                                                <i class="fas fa-tags fa-3x mb-3 text-secondary opacity-25 d-block"></i>
-                                                <p class="mb-0">No categories found. Click "Add Category" to create one.</p>
+                                            <td colspan="6" class="text-center text-muted py-5 data-empty-state category-empty-state">
+                                                <span class="data-empty-state__icon" aria-hidden="true"><i class="fas fa-tags"></i></span>
+                                                <strong>No categories matched this view.</strong>
+                                                <span>Try another search or add a new category.</span>
                                             </td>
                                         </tr>
                                     <?php endif; ?>
@@ -224,7 +233,7 @@ require_once '../includes/layouts/header.php';
                             </table>
                         </div>
                         <?php if ($total_pages > 1): ?>
-                            <nav class="mt-4" aria-label="Category pagination">
+                            <nav class="mt-4 data-pagination" aria-label="Category pagination">
                                 <ul class="pagination justify-content-center flex-wrap mb-0">
                                     <li class="page-item <?php echo $page <= 1 ? 'disabled' : ''; ?>"><a class="page-link" aria-label="Previous page" href="<?php echo $page > 1 ? htmlspecialchars($category_page_url($page - 1), ENT_QUOTES, 'UTF-8') : '#'; ?>">Previous</a></li>
                                     <?php foreach ($pagination_pages as $pagination_page): ?>
@@ -242,16 +251,16 @@ require_once '../includes/layouts/header.php';
 
 <!-- Add Category Modal -->
 <div class="modal fade" id="addCategoryModal" tabindex="-1" aria-labelledby="addCategoryModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 rounded-4">
-            <div class="modal-header py-3">
+    <div class="modal-dialog modal-dialog-centered data-modal-dialog">
+        <div class="modal-content border-0 rounded-4 data-modal">
+            <div class="modal-header py-3 data-modal__header">
                 <h5 class="modal-title fw-bold ui-modal-title" id="addCategoryModalLabel"><i class="fas fa-plus me-2 text-primary"></i>Add Category</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form action="categories.php" method="POST">
                 <input type="hidden" name="action" value="create">
                 <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token'] ?? ''); ?>">
-                <div class="modal-body py-4">
+                <div class="modal-body py-4 data-modal__body">
                     <div class="mb-3">
                         <label for="add_name" class="form-label fw-bold">Category Name</label>
                         <input type="text" class="form-control rounded-3" id="add_name" name="name" required placeholder="e.g. Beverages">
@@ -261,7 +270,7 @@ require_once '../includes/layouts/header.php';
                         <textarea class="form-control rounded-3" id="add_description" name="description" rows="3" placeholder="Category description details..."></textarea>
                     </div>
                 </div>
-                <div class="modal-footer">
+                <div class="modal-footer data-modal__footer">
                     <button type="button" class="btn btn-secondary rounded-3" data-bs-dismiss="modal">Cancel</button>
                     <button type="submit" class="btn btn-primary rounded-3 px-4">Create Category</button>
                 </div>
@@ -272,9 +281,9 @@ require_once '../includes/layouts/header.php';
 
 <!-- Edit Category Modal -->
 <div class="modal fade" id="editCategoryModal" tabindex="-1" aria-labelledby="editCategoryModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 rounded-4">
-            <div class="modal-header py-3">
+    <div class="modal-dialog modal-dialog-centered data-modal-dialog">
+        <div class="modal-content border-0 rounded-4 data-modal">
+            <div class="modal-header py-3 data-modal__header">
                 <h5 class="modal-title fw-bold ui-modal-title" id="editCategoryModalLabel"><i class="fas fa-edit me-2 text-primary"></i>Edit Category Details</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
@@ -282,7 +291,7 @@ require_once '../includes/layouts/header.php';
                 <input type="hidden" name="action" value="update">
                 <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token'] ?? ''); ?>">
                 <input type="hidden" id="edit_id" name="id">
-                <div class="modal-body py-4">
+                <div class="modal-body py-4 data-modal__body">
                     <div class="mb-3">
                         <label for="edit_name" class="form-label fw-bold">Category Name</label>
                         <input type="text" class="form-control rounded-3" id="edit_name" name="name" required>
@@ -292,7 +301,7 @@ require_once '../includes/layouts/header.php';
                         <textarea class="form-control rounded-3" id="edit_description" name="description" rows="3"></textarea>
                     </div>
                 </div>
-                <div class="modal-footer">
+                <div class="modal-footer data-modal__footer">
                     <button type="button" class="btn btn-secondary rounded-3" data-bs-dismiss="modal">Cancel</button>
                     <button type="submit" class="btn btn-primary rounded-3 px-4">Save Changes</button>
                 </div>

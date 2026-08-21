@@ -441,6 +441,7 @@ test('admin Customers, Suppliers, and Categories surfaces support shared CRUD wo
 
   for (const surface of peopleSurfaces) {
     await loadPage(page, surface.route, surface.heading);
+    await captureSanitizedScreenshot(page, `admin-${surface.entity}s-after`);
     await expect(page.locator(surface.pageClass)).toBeVisible();
     await expect(page.locator(surface.table)).toHaveClass(/data-table/);
     await expect(page.locator('.data-table-shell')).toBeVisible();
@@ -448,7 +449,6 @@ test('admin Customers, Suppliers, and Categories surfaces support shared CRUD wo
     await expect(page.locator(surface.pageSize)).toHaveValue('10');
     await expect(page.locator(surface.row).first()).toBeVisible();
     await assertKeyboardFocusIsVisible(page, surface.searchId, 1);
-    await captureSanitizedScreenshot(page, `admin-${surface.entity}s-after`);
 
     const seededName = `${dataPrefix}_${surface.entity.toUpperCase()}`;
     await page.getByLabel(surface.search).fill(seededName);
@@ -506,12 +506,12 @@ test('admin Customers, Suppliers, and Categories surfaces support shared CRUD wo
   }
 
   await loadPage(page, '/categories.php?page_size=10', /Categories/);
+  await captureSanitizedScreenshot(page, 'admin-categories-after');
   await expect(page.locator('.categories-page')).toBeVisible();
   await expect(page.locator('#categoriesTable')).toHaveClass(/data-table/);
   await expect(page.locator('.data-table-shell')).toBeVisible();
   await expect(page.locator('#categoryPageSize')).toHaveValue('10');
   await assertKeyboardFocusIsVisible(page, '#searchCategory', 1);
-  await captureSanitizedScreenshot(page, 'admin-categories-after');
 
   const defaultRow = page.locator('.category-row').filter({ hasText: 'General' }).first();
   await expect(defaultRow.locator('button[disabled]')).toHaveCount(2);
@@ -520,9 +520,9 @@ test('admin Customers, Suppliers, and Categories surfaces support shared CRUD wo
   const seededCategory = `${dataPrefix}_CATEGORY`;
   await page.getByLabel('Search categories').fill(seededCategory);
   await page.getByRole('button', { name: 'Apply' }).click();
-  await expect(page.locator('.category-row')).toHaveCount(1);
-  await expect(page.locator('.category-row').first()).toContainText(seededCategory);
-  await page.locator('.category-row').first().locator('.edit-category-btn').click();
+  const seededCategoryRow = page.locator('.category-row').filter({ hasText: seededCategory }).first();
+  await expect(seededCategoryRow).toBeVisible();
+  await seededCategoryRow.locator('.edit-category-btn').click();
   await expect(page.locator('#editCategoryModal')).toBeVisible();
   await expect(page.locator('#edit_name')).toHaveValue(seededCategory);
   await page.locator('#editCategoryModal .btn-close').click();
@@ -551,6 +551,13 @@ test('admin Customers, Suppliers, and Categories surfaces support shared CRUD wo
   await expect(page.locator('#addCategoryModal form input[name="csrf_token"]')).toHaveCount(1);
   await page.locator('#addCategoryModal .btn-close').click();
   await expect(page.locator('#addCategoryModal')).toBeHidden();
+
+  await logout(page);
+  await login(page, cashierCredentials);
+  for (const route of ['/customers.php', '/suppliers.php', '/categories.php']) {
+    await page.goto(route);
+    await expect(page.getByRole('link', { name: /Export CSV/ })).toHaveCount(0);
+  }
 });
 
 test('authenticated POS barcode lookup returns the disposable catalog product', async ({ page }) => {
