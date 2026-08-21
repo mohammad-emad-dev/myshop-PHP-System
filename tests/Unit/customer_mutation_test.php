@@ -146,9 +146,9 @@ function run_customer_mutation_unit_tests(): int
         'Customer deleted successfully. Past orders for this customer will show as walk-in orders.',
         'Modifying the default Walk-in Customer is prohibited.',
         'Deleting the default Walk-in Customer is prohibited.',
-        "audit_log_current_actor($conn, 'customer_create'",
-        "audit_log_current_actor($conn, 'customer_update'",
-        "audit_log_current_actor($conn, 'customer_delete'",
+        "audit_log_current_actor(\$conn, 'customer_create'",
+        "audit_log_current_actor(\$conn, 'customer_update'",
+        "audit_log_current_actor(\$conn, 'customer_delete'",
     ] as $pageContract) {
         $tests->assertContains($pageContract, $page, 'Customers page contract is missing: ' . $pageContract);
     }

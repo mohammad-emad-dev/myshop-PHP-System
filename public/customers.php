@@ -33,7 +33,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 audit_log_current_actor($conn, 'customer_create', 'Customer', null, false, ['reason' => 'validation_failed']);
                 $error = 'Customer name is required.';
             } else {
-                $operation_success = create_customer($conn, $name, $phone, $email, $address);
+                $operation_success = customers_create($conn, $name, $phone, $email, $address);
                 audit_log_current_actor($conn, 'customer_create', 'Customer', null, $operation_success);
                 if ($operation_success) {
                     $success = 'Customer added successfully.';
@@ -55,7 +55,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 audit_log_current_actor($conn, 'customer_update', 'Customer', $id, false, ['reason' => 'validation_failed']);
                 $error = 'Customer name is required.';
             } else {
-                $operation_success = update_customer($conn, $id, $name, $phone, $email, $address);
+                $operation_success = customers_update($conn, $id, $name, $phone, $email, $address);
                 audit_log_current_actor($conn, 'customer_update', 'Customer', $id, $operation_success);
                 if ($operation_success) {
                     $success = 'Customer updated successfully.';
@@ -69,7 +69,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 audit_log_current_actor($conn, 'customer_delete', 'Customer', $id, false, ['reason' => 'protected_record']);
                 $error = 'Deleting the default Walk-in Customer is prohibited.';
             } else {
-                $operation_success = delete_customer($conn, $id);
+                $operation_success = customers_delete($conn, $id);
                 audit_log_current_actor($conn, 'customer_delete', 'Customer', $id, $operation_success);
                 if ($operation_success) {
                     $success = 'Customer deleted successfully. Past orders for this customer will show as walk-in orders.';

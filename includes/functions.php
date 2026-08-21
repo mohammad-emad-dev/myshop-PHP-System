@@ -3,51 +3,20 @@
 // Compatibility facade: legacy pages continue to require this file while
 // cohesive shared services live in dedicated modules.
 require_once __DIR__ . '/security.php';
+require_once __DIR__ . '/validation.php';
 require_once __DIR__ . '/pagination.php';
 require_once __DIR__ . '/audit.php';
 require_once __DIR__ . '/http.php';
 require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/catalog.php';
 require_once __DIR__ . '/categories.php';
+require_once __DIR__ . '/customers.php';
 require_once __DIR__ . '/people.php';
 require_once __DIR__ . '/inventory.php';
 require_once __DIR__ . '/products.php';
 require_once __DIR__ . '/orders.php';
 require_once __DIR__ . '/dashboard.php';
 require_once __DIR__ . '/uploads.php';
-
-/**
- * Basic sanitization for general text inputs.
- */
-function sanitize_input($data)
-{
-    return htmlspecialchars(strip_tags(trim($data)), ENT_QUOTES, 'UTF-8');
-}
-
-/**
- * Strict sanitization for email addresses.
- */
-function sanitize_email($email)
-{
-    $email = trim($email);
-    return filter_var($email, FILTER_SANITIZE_EMAIL);
-}
-
-/**
- * Strict sanitization for phone numbers (keeps only digits, +, and spaces).
- */
-function sanitize_phone($phone)
-{
-    return preg_replace('/[^0-9+\s-]/', '', trim($phone));
-}
-
-/**
- * Strict sanitization for numeric IDs.
- */
-function sanitize_id($id)
-{
-    return filter_var($id, FILTER_VALIDATE_INT) !== false ? (int)$id : 0;
-}
 
 /**
  * Applies the single password policy used by every password-changing flow.
@@ -1440,128 +1409,27 @@ function get_customer_by_id($conn, $id)
 }
 
 /**
- * Creates a new customer record securely.
+ * Backward-compatible customer creation wrapper.
  */
 function create_customer($conn, $name, $phone, $email, $address)
 {
-    $name = sanitize_input($name);
-    $phone = sanitize_phone($phone);
-    $email = sanitize_email($email);
-    $address = sanitize_input($address);
-
-    if (empty($name)) {
-        return false;
-    }
-
-    $stmt = null;
-    try {
-        $stmt = $conn->prepare("INSERT INTO Customer (name, phone, email, address) VALUES (?, ?, ?, ?)");
-        if (!$stmt) {
-            error_log('Customer insert prepare failed: ' . $conn->error);
-            return false;
-        }
-        if (!$stmt->bind_param('ssss', $name, $phone, $email, $address)) {
-            error_log('Customer insert bind failed: ' . $stmt->error);
-            return false;
-        }
-        if (!$stmt->execute()) {
-            error_log('Customer insert execute failed: ' . $stmt->error);
-            return false;
-        }
-        if ($stmt->affected_rows !== 1) {
-            error_log('Customer insert affected an unexpected number of rows.');
-            return false;
-        }
-        return true;
-    } catch (Throwable $exception) {
-        error_log('Customer creation failed: ' . $exception->getMessage());
-        return false;
-    } finally {
-        if ($stmt instanceof mysqli_stmt) {
-            $stmt->close();
-        }
-    }
+    return customers_create($conn, $name, $phone, $email, $address);
 }
 
 /**
- * Updates customer details, preventing changes to default Walk-in Customer (ID = 1).
+ * Backward-compatible customer update wrapper.
  */
 function update_customer($conn, $id, $name, $phone, $email, $address)
 {
-    $id = sanitize_id($id);
-    $name = sanitize_input($name);
-    $phone = sanitize_phone($phone);
-    $email = sanitize_email($email);
-    $address = sanitize_input($address);
-
-    if ($id <= 1 || empty($name)) {
-        return false;
-    }
-
-    $stmt = null;
-    try {
-        $stmt = $conn->prepare("UPDATE Customer SET name = ?, phone = ?, email = ?, address = ? WHERE id = ?");
-        if (!$stmt) {
-            error_log('Customer update prepare failed: ' . $conn->error);
-            return false;
-        }
-        if (!$stmt->bind_param('ssssi', $name, $phone, $email, $address, $id)) {
-            error_log('Customer update bind failed: ' . $stmt->error);
-            return false;
-        }
-        if (!$stmt->execute()) {
-            error_log('Customer update execute failed: ' . $stmt->error);
-            return false;
-        }
-        return true;
-    } catch (Throwable $exception) {
-        error_log('Customer update failed: ' . $exception->getMessage());
-        return false;
-    } finally {
-        if ($stmt instanceof mysqli_stmt) {
-            $stmt->close();
-        }
-    }
+    return customers_update($conn, $id, $name, $phone, $email, $address);
 }
 
 /**
- * Deletes a customer, preventing deletion of default Walk-in Customer (ID = 1).
+ * Backward-compatible customer deletion wrapper.
  */
 function delete_customer($conn, $id)
 {
-    $id = (int)$id;
-    if ($id <= 1) {
-        return false;
-    }
-
-    $stmt = null;
-    try {
-        $stmt = $conn->prepare("DELETE FROM Customer WHERE id = ?");
-        if (!$stmt) {
-            error_log('Customer deletion prepare failed: ' . $conn->error);
-            return false;
-        }
-        if (!$stmt->bind_param('i', $id)) {
-            error_log('Customer deletion bind failed: ' . $stmt->error);
-            return false;
-        }
-        if (!$stmt->execute()) {
-            error_log('Customer deletion execute failed: ' . $stmt->error);
-            return false;
-        }
-        if ($stmt->affected_rows !== 1) {
-            error_log('Customer deletion affected an unexpected number of rows.');
-            return false;
-        }
-        return true;
-    } catch (Throwable $exception) {
-        error_log('Customer deletion failed: ' . $exception->getMessage());
-        return false;
-    } finally {
-        if ($stmt instanceof mysqli_stmt) {
-            $stmt->close();
-        }
-    }
+    return customers_delete($conn, $id);
 }
 
 /**
