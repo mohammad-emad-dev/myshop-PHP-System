@@ -66,6 +66,8 @@ function run_final_ui_closure_unit_tests(): int
         'id="editStaffModal"',
         'data-bs-keyboard="true"',
         'data-bs-focus="true"',
+        "event.key === 'Escape'",
+        'modal.hide()',
         'aria-labelledby="addStaffModalLabel"',
         'aria-labelledby="editStaffModalLabel"',
     ] as $contract) {
