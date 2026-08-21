@@ -1,6 +1,6 @@
 # MyShop architecture baseline
 
-Status: Phase 3D dashboard inventory-valuation extraction baseline
+Status: Phase 3E dashboard top-selling extraction baseline
 
 Captured from the `security-hardening-baseline` branch at starting revision
 `70d1ad64a5c639b93897c1c1abd2ab28063cef90`.
@@ -119,12 +119,12 @@ application service module.
 | `create_product()`, `update_product()`, `delete_product()` | Delegation-only compatibility wrappers to `includes/products.php`; upload validation remains page-owned |
 | `create_order()` | Delegation-only compatibility wrapper to `includes/orders.php`; the wrapper preserves the existing order-ID-or-false return contract |
 | `orders_count()`, `orders_get_page()`, `orders_get_summary()`, `orders_get_by_id()`, `orders_get_details()` | Focused bounded and single-record order reads; the legacy names remain delegation-only wrappers for remaining callers |
-| `get_dashboard_stats()`, `get_chart_data()`, `get_inventory_valuation()` | Delegation-only compatibility wrappers to `includes/dashboard.php`; uploads and remaining report functions remain in the facade |
+| `get_dashboard_stats()`, `get_chart_data()`, `get_inventory_valuation()`, `get_top_selling_products()` | Delegation-only compatibility wrappers to `includes/dashboard.php`; uploads and remaining report functions remain in the facade |
 | Role checks and staff administration functions | Authorization and staff administration |
 | Category read/mutation functions | Remaining category reads and category mutations |
 | Customer read/mutation functions | Remaining customer reads and customer mutations |
 | Supplier read/mutation functions | Remaining supplier reads and supplier mutations |
-| Sales aggregate functions | Remaining dashboard sales aggregates |
+| Category sales aggregate functions | Remaining dashboard sales aggregates |
 
 Focused shared modules already extracted from the facade:
 
@@ -160,18 +160,19 @@ Focused shared modules already extracted from the facade:
   focused services directly. `get_orders()` and `get_orders_for_staff()` remain
   legacy unbounded loaders.
 - `includes/dashboard.php`: explicit dashboard KPI aggregation, bounded
-  sales/purchase chart data, and Product inventory valuation with explicit
-  optional staff scope where applicable, complete chart date series, and fixed
-  zero defaults on database failure. `get_dashboard_stats()`, `get_chart_data()`,
-  and `get_inventory_valuation()` remain delegation-only compatibility wrappers
-  in `functions.php`.
+  sales/purchase chart data, Product inventory valuation, and bounded top-selling
+  product reads with explicit optional staff scope where applicable, complete
+  chart date series, and preserved zero/empty failure contracts. The
+  `get_dashboard_stats()`, `get_chart_data()`, `get_inventory_valuation()`, and
+  `get_top_selling_products()` names remain delegation-only compatibility
+  wrappers in `functions.php`.
 
 ## Public pages and responsibilities
 
 | Page | Current responsibility |
 |---|---|
 | `public/login.php` | Login, logout, rate-limit interaction, session changes, authentication audit, login view |
-| `public/index.php` | Dashboard authorization, direct `dashboard_get_stats()`, `dashboard_get_chart_data()`, and `dashboard_get_inventory_valuation()` calls, remaining report data preparation, dashboard view |
+| `public/index.php` | Dashboard authorization, direct `dashboard_get_stats()`, `dashboard_get_chart_data()`, `dashboard_get_inventory_valuation()`, and `dashboard_get_top_selling_products()` calls, remaining report data preparation, dashboard view |
 | `public/products.php` | Product CRUD request dispatch, request validation, authorization, CSRF, image upload handling, generic messages, Catalog search/pagination, product table, forms, and rendering; delegates product database mutations directly to `products_create()`, `products_update()`, and `products_delete()` |
 | `public/categories.php` | Category CRUD request dispatch, admin checks, Catalog search/pagination, category view |
 | `public/stock_movements.php` | Manual stock adjustment request validation, CSRF and authorization boundary, delegation to the Inventory service, movement history filtering/pagination, and stock ledger view |
@@ -225,8 +226,8 @@ Shared modules own most other application SQL:
 - `includes/functions.php`: legacy full product reads, remaining inventory,
   order, staff, reference-data, remaining report queries, and protected
   mutations that have not yet been extracted; `get_dashboard_stats()`,
-  `get_chart_data()`, and `get_inventory_valuation()` are compatibility wrappers
-  for `includes/dashboard.php`.
+  `get_chart_data()`, `get_inventory_valuation()`, and `get_top_selling_products()`
+  are compatibility wrappers for `includes/dashboard.php`.
 - `includes/audit.php:62-300`: audit writes and reads.
 - `includes/export.php:115-392`: bounded export queries.
 - `includes/backup.php:114-168`: table definition and streamed data queries.

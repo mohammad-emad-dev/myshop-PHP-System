@@ -1,7 +1,7 @@
 # MyShop dependency map
 
 This map records current call-site and dependency relationships after the
-Phase 3D dashboard inventory-valuation service extraction. It remains a
+Phase 3E dashboard top-selling service extraction. It remains a
 characterization artifact; the compatibility wrappers are still required.
 
 ## Public-page to shared-function map
@@ -18,7 +18,7 @@ names are grouped only for readability; the source remains the authority.
 | `export_report.php` | `start_secure_session`, `verify_login`, `require_admin`, `export_report_definitions`, `export_validate_entity`, `export_validate_order_filters`, `export_csv_text`, `export_csv_write_row`, `export_csv_fail`, `export_stream_entity` |
 | `get_order_details.php` | `start_secure_session`, `verify_login`, `is_admin`, `orders_get_by_id`, `orders_get_details`, `audit_log_current_actor` |
 | `health.php` | `initialize_request_context` |
-| `index.php` | `start_secure_session`, `verify_login`, `is_admin`, `dashboard_get_stats`, `dashboard_get_chart_data`, `dashboard_get_inventory_valuation`, `get_top_selling_products`, `get_category_sales_distribution`, `get_low_stock_products` |
+| `index.php` | `start_secure_session`, `verify_login`, `is_admin`, `dashboard_get_stats`, `dashboard_get_chart_data`, `dashboard_get_inventory_valuation`, `dashboard_get_top_selling_products`, `get_category_sales_distribution`, `get_low_stock_products` |
 | `login.php` | `start_secure_session`, `send_security_headers`, `verify_csrf_token`, `get_login_source_ip`, `build_login_rate_limit_key`, `login_rate_limit_check`, `login_rate_limit_record_failure`, `login_rate_limit_reset`, `audit_log`, `audit_log_current_actor`, `destroy_current_session`, `generate_csrf_token`, `redirect`, `verify_login`, `get_asset_integrity` |
 | `order_history.php` | `start_secure_session`, `verify_login`, `is_admin`, `sanitize_input`, `normalize_page_number`, `normalize_page_size`, `orders_count`, `orders_get_summary`, `orders_get_page` |
 | `orders.php` | `start_secure_session`, `verify_login`, `is_admin`, `verify_csrf_token`, `generate_csrf_token`, `truncate_list_search`, `catalog_get_pos_products`, `catalog_get_categories_for_selector`, `people_get_customers_for_selector`, `people_get_suppliers_for_selector`, `catalog_get_product_by_id`, `orders_create`, `audit_log_current_actor`, `audit_log_denied` |
@@ -157,20 +157,22 @@ remaining callers and compatibility tests. `get_orders()` and
 
 `includes/dashboard.php` has no dependency on `includes/functions.php`. It
 accepts the database connection and optional staff scope explicitly, reads no
-session or global state, and owns only bounded dashboard KPI, chart, and
-inventory-valuation reads.
+session or global state, and owns only bounded dashboard KPI, chart,
+inventory-valuation, and top-selling reads.
 
 | Focused function | Read behavior | Return contract |
 |---|---|---|
 | `dashboard_get_stats` | Global Product count and stock totals; global or optional staff-scoped Order count and sale-only totals | Fixed associative array with `total_products`, `total_orders`, `total_sales`, and `total_stock`; numeric zero defaults on query or connection failure |
 | `dashboard_get_chart_data` | Bounded sales/purchase aggregation with complete chronological date labels, optional staff scope, and separate order-type totals | Array of `{label, sales, purchases}` points; days normalize to 1–31 and failed queries preserve the zero-filled requested shape |
 | `dashboard_get_inventory_valuation` | `SUM(stock * price)` over current Product rows | Float valuation; returns `0.0` when no rows, the query fails, or the connection is closed |
+| `dashboard_get_top_selling_products` | Sale-only Product/OrderDetail aggregation with optional staff scope, normalized limit, and quantity-descending ordering | Array of `name`, `total_qty`, and `total_sales` rows; returns `[]` for explicit statement failures and preserves the existing thrown mysqli failure for a closed connection |
 
 `public/index.php` calls `dashboard_get_stats()`, `dashboard_get_chart_data()`,
-and `dashboard_get_inventory_valuation()` directly after its existing
-authentication and authorization scope decision. The legacy
-`get_dashboard_stats()`, `get_chart_data()`, and `get_inventory_valuation()`
-remain delegation-only compatibility wrappers in `functions.php`; other
+`dashboard_get_inventory_valuation()`, and `dashboard_get_top_selling_products()`
+directly after its existing authentication and authorization scope decision.
+The legacy `get_dashboard_stats()`, `get_chart_data()`,
+`get_inventory_valuation()`, and `get_top_selling_products()` remain
+delegation-only compatibility wrappers in `functions.php`; other
 dashboard/report reads remain in the facade and were not moved in this batch.
 
 ## Inventory module boundary
@@ -261,7 +263,7 @@ errors and may depend on `$conn` or session scope.
 - `dashboard_get_stats` (`get_dashboard_stats` compatibility wrapper)
 - `dashboard_get_chart_data` (`get_chart_data` compatibility wrapper)
 - `dashboard_get_inventory_valuation` (`get_inventory_valuation` compatibility wrapper)
-- `get_top_selling_products`
+- `dashboard_get_top_selling_products` (`get_top_selling_products` compatibility wrapper)
 - `get_category_sales_distribution`
 
 ### Reference and staff reads
@@ -359,9 +361,10 @@ the compatibility wrapper remains available for un-migrated callers and tests.
 
 ## Safe remaining extraction candidates
 
-Dashboard KPI aggregation, chart data, and inventory valuation are now extracted
-and characterized in `includes/dashboard.php`. Remaining dashboard/report
-functions, including product/category sales aggregates, remain in the facade
+Dashboard KPI aggregation, chart data, inventory valuation, and top-selling
+products are now extracted and characterized in `includes/dashboard.php`.
+Remaining dashboard/report functions, including category sales aggregates,
+remain in the facade
 and require separate caller and contract audits before any move.
 
 Batch 6A moved only active-session verification, the administrator role check,

@@ -22,6 +22,8 @@ places bounded and scoped order reads in the same module, and Batch 8D migrates
 the order-history, order-detail, and invoice pages to those focused services.
 Phase 3D places the inventory valuation read in `includes/dashboard.php`; the
 legacy name remains a delegation-only compatibility wrapper.
+Phase 3E places the top-selling product read in the same module; its legacy name
+also remains a delegation-only compatibility wrapper.
 
 ## Focused Dashboard statistics contract
 
@@ -58,6 +60,16 @@ details. It has no session or global dependency. `public/index.php` calls the
 focused service directly; `get_inventory_valuation()` remains a
 delegation-only compatibility wrapper in `includes/functions.php` with the
 original signature and return contract.
+
+`dashboard_get_top_selling_products($conn, $limit = 5, $staff_id = null)`
+preserves the sale-only `name`, `total_qty`, and `total_sales` result fields,
+quantity-descending grouping/order, optional staff scope, and limit normalization
+to 1–50. It returns `[]` for the existing prepare, bind, execute, or result
+failure branches and preserves the existing thrown mysqli failure when the
+connection is already closed. It does not read session or global state.
+`public/index.php` calls the focused service directly;
+`get_top_selling_products()` remains a delegation-only compatibility wrapper in
+`includes/functions.php`.
 
 ## Focused Product mutation contracts
 
@@ -169,8 +181,9 @@ callers must not assume the distinction is currently available.
 - `dashboard_get_inventory_valuation()` / `get_inventory_valuation()` — float
   Product valuation, with `0.0` on empty results or database failure; the legacy
   name is a compatibility wrapper.
-- `get_top_selling_products()` and `get_category_sales_distribution()` —
-  report arrays.
+- `dashboard_get_top_selling_products()` / `get_top_selling_products()` —
+  bounded sale-only report rows; the legacy name is a compatibility wrapper.
+- `get_category_sales_distribution()` — remaining report array.
 
 ### Staff and audit
 
@@ -247,6 +260,9 @@ extracting modules unless callers are migrated and tested together.
 - `dashboard_get_inventory_valuation()` and its `get_inventory_valuation()`
   compatibility wrapper return `0.0` when the valuation result is empty or the
   database operation fails.
+- `dashboard_get_top_selling_products()` and its `get_top_selling_products()`
+  compatibility wrapper return `[]` for explicit statement failures; a closed
+  connection preserves the existing thrown mysqli failure.
 - `get_order_summary()` returns default numeric summary fields on failure.
 - Paginated readers return empty arrays when the query fails.
 
