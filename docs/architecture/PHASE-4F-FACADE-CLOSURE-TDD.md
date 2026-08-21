@@ -56,7 +56,8 @@ changed. No push was performed.
 The facade contains 73 functions. The following inventory is exhaustive. The
 caller columns report the production search (`includes/` and `public/`), test
 search (`tests/`), and script search (`scripts/`). “None found” means no call
-was found outside `includes/functions.php` itself.
+was found outside `includes/functions.php` itself; internal calls within the
+facade are called out where they are part of an active request path.
 
 ### Delegation-only compatibility wrappers
 
@@ -116,10 +117,10 @@ bodies.
 
 | Function | Owner in current state | Production callers | Test callers | Script callers | Phase 4G decision |
 |---|---|---|---|---|---|
-| `login_rate_limit_log_failure` | `functions.php` login rate-limit service | none found | none found | none found | do not retire without a separate auth characterization |
-| `login_rate_limit_begin_transaction` | `functions.php` login rate-limit service | none found | none found | none found | retain; transaction helper is part of the rate-limit contract |
-| `login_rate_limit_rollback` | `functions.php` login rate-limit service | none found | none found | none found | retain with rate-limit service |
-| `login_rate_limit_cleanup_expired` | `functions.php` login rate-limit service | none found | none found | none found | retain with rate-limit service |
+| `login_rate_limit_log_failure` | `functions.php` login rate-limit service | internal rate-limit calls reachable from `public/login.php` | none found | none found | do not retire without a separate auth characterization |
+| `login_rate_limit_begin_transaction` | `functions.php` login rate-limit service | internal calls from check/record/reset reachable from `public/login.php` | none found | none found | retain; transaction helper is part of the rate-limit contract |
+| `login_rate_limit_rollback` | `functions.php` login rate-limit service | internal calls from check/record/reset reachable from `public/login.php` | none found | none found | retain with rate-limit service |
+| `login_rate_limit_cleanup_expired` | `functions.php` login rate-limit service | internal calls from check/record reachable from `public/login.php` | none found | none found | retain with rate-limit service |
 | `login_rate_limit_check` | `functions.php` login rate-limit service | `public/login.php` | `auth_extraction_test.php`, `database_test.php` | none found | do not retire; production security boundary |
 | `login_rate_limit_record_failure` | `functions.php` login rate-limit service | `public/login.php` | `auth_extraction_test.php`, `database_test.php`, `backup_restore_test.php` | none found | do not retire; production security boundary |
 | `login_rate_limit_reset` | `functions.php` login rate-limit service | `public/login.php` | `auth_extraction_test.php`, `database_test.php` | none found | do not retire; production security boundary |
