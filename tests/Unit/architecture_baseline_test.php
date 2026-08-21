@@ -106,7 +106,7 @@ function run_architecture_baseline_unit_tests(): int
     foreach (['catalog_count_categories', 'catalog_get_categories_page', 'categories_create', 'categories_update', 'categories_delete'] as $categoryFunction) {
         $tests->assertContains($categoryFunction . '(', $categories, 'Categories page dependency contract changed: ' . $categoryFunction);
     }
-    foreach (['people_count_customers', 'people_get_customers_page', 'create_customer', 'update_customer', 'delete_customer'] as $customerFunction) {
+    foreach (['people_count_customers', 'people_get_customers_page', 'customers_create', 'customers_update', 'customers_delete'] as $customerFunction) {
         $tests->assertContains($customerFunction . '(', file_get_contents($repository . '/public/customers.php'), 'Customers page dependency contract changed: ' . $customerFunction);
     }
     $tests->assertContains('people_get_customers_for_selector(', $orders, 'Orders page must retain the People customer selector boundary.');
