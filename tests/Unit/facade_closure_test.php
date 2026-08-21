@@ -195,7 +195,10 @@ function run_facade_closure_unit_tests(): int
         'public/get_order_details.php' => ['orders_get_by_id', 'orders_get_details'],
         'public/print_invoice.php' => ['orders_get_by_id', 'orders_get_details'],
         'public/pos_product_lookup.php' => ['catalog_get_pos_product_by_barcode'],
-        'public/stock_movements.php' => ['inventory_adjust_stock', 'inventory_count_stock_movements', 'inventory_get_stock_movements_page'],
+        'public/stock_movements.php' => [
+            'catalog_get_product_by_id', 'catalog_get_pos_products',
+            'inventory_adjust_stock', 'inventory_count_stock_movements', 'inventory_get_stock_movements_page',
+        ],
     ];
     foreach ($directCallContracts as $relativePath => $focusedFunctions) {
         $page = file_get_contents($repository . '/' . $relativePath);
@@ -215,6 +218,13 @@ function run_facade_closure_unit_tests(): int
         foreach ($legacyFunctions as $legacyFunction) {
             $tests->assertFalse(preg_match('/\b' . $legacyFunction . '\s*\(/', $page) === 1, 'Migrated page still calls the facade: ' . $relativePath . ' -> ' . $legacyFunction);
         }
+    }
+    foreach (['get_product_by_id', 'get_pos_products'] as $legacyFunction) {
+        $stockPage = file_get_contents($repository . '/public/stock_movements.php');
+        $tests->assertFalse(
+            preg_match('/(?<!catalog_)\b' . $legacyFunction . '\s*\(/', $stockPage) === 1,
+            'Stock movements page still calls the Catalog facade: ' . $legacyFunction
+        );
     }
 
     $tests->assertContains('Phase 4F', $baseline, 'Current baseline must identify the Phase 4F closure review.');
