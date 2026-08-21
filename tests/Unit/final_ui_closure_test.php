@@ -64,6 +64,8 @@ function run_final_ui_closure_unit_tests(): int
         'class="table data-table settings-staff-table"',
         'id="addStaffModal"',
         'id="editStaffModal"',
+        'data-bs-keyboard="true"',
+        'data-bs-focus="true"',
         'aria-labelledby="addStaffModalLabel"',
         'aria-labelledby="editStaffModalLabel"',
     ] as $contract) {
