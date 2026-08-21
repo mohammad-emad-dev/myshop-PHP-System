@@ -227,7 +227,7 @@ current architecture-document updates.
 | GREEN architecture correction | `7cbe6e03347af90378185a0e90c17549ca5573ff` — focused architecture test passed; the later dependency-direction assertions pass as well |
 | Documentation checkpoint | `c682d497e6c069ea0ce0f1328e275ebcefe12cf8` — current architecture documents and this inventory |
 | Focused architecture tests | PASS — 360 assertions |
-| Full disposable PHP regression | PASS — 2,593 assertions (1,735 unit, 858 integration) |
+| Full disposable PHP regression | PASS — 2,606 assertions (1,748 unit, 858 integration) |
 | PHP lint | PASS — all tracked PHP files under `includes/`, `public/`, `tests/`, `scripts/`, `database/`, and `config/` |
 | Repository security scan | PASS — zero findings |
 | Supply-chain scan | PASS — zero findings |
