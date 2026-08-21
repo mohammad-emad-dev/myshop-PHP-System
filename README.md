@@ -4,7 +4,11 @@ MyShop is a native PHP and MySQL inventory, point-of-sale, and order management 
 
 It is built as a portfolio-grade software engineering project with a focus on secure database access, role-based authorization, transactional stock updates, and practical deployment hygiene.
 
-> **Current status:** Security-hardened Release Candidate. This release candidate is published on the [security-hardening-baseline](https://github.com/mohammad-emad-dev/myshop-PHP-System/tree/security-hardening-baseline); `main` remains the previous published baseline until this branch is reviewed and merged. It is suitable for portfolio review and local evaluation; production deployment still requires the deployment checklist below.
+> **Current status:** Security-hardened Release Candidate. This release candidate is published on the [security-hardening-baseline](https://github.com/mohammad-emad-dev/myshop-PHP-System/tree/security-hardening-baseline); `main` remains the previous published baseline until this branch is reviewed and merged. MyShop is a **localhost-first application** for a developer or business computer. It is **not intended to be exposed directly to the public internet** or to a LAN by default.
+
+The recommended operating model is a protected local machine, a local `.env`, a loopback-only Docker or XAMPP web/database service, and administrator-managed local backup files. Cloud controls such as TLS termination, WAFs, secret managers, and external monitoring are intentionally out of scope. Local operators are responsible for protecting the machine, local credentials, and backup files.
+
+This localhost-first workflow keeps cloud controls intentionally out of scope.
 
 ## Highlights
 
@@ -71,12 +75,15 @@ Only public/ should be exposed as the web document root. The repository root, co
 
 Future features should place new code in the smallest cohesive module that owns its dependencies, then expose it through the facade only when existing callers require the compatibility surface. Modules must not require the facade back, and functions must not be duplicated across modules.
 
-## Run locally with Docker
+## Canonical localhost setup
+
+Use Docker Desktop with the Linux container engine for the recommended clean-checkout setup. XAMPP remains supported as the manual local alternative described below; do not expose either workflow beyond the local machine.
 
 ### Requirements
 
 - Docker Desktop with the Linux container engine.
 - Git.
+- XAMPP with Apache, PHP, and MySQL when using the manual alternative.
 
 ### 1. Clone the published baseline
 
@@ -94,7 +101,7 @@ notepad .env
 
 Replace every password placeholder with a separate, long, locally scoped value. Never commit .env.
 
-### 3. Validate and start the stack
+### 3. Validate and start the Docker stack
 
 ~~~powershell
 docker compose --env-file .env config --quiet
@@ -103,6 +110,10 @@ docker compose --env-file .env ps
 ~~~
 
 The application is available at http://127.0.0.1:8080 by default. The port can be changed through APP_PORT in .env.
+
+The Compose file binds both the web service and the optional host MySQL port to
+`127.0.0.1`. Do not change those host bindings to `0.0.0.0` for a normal local
+installation.
 
 The first initialization of a new MySQL volume imports database/schema.sql and applies the runtime privilege restriction. Initialization scripts do not run again for an already initialized volume.
 
@@ -132,32 +143,83 @@ docker compose --env-file .env down
 
 Do not use down --volumes unless the local database is disposable.
 
-## Production Compose baseline
+### 6. Recover after a local restart or port conflict
 
-`docker-compose.production.yml` is a deployment baseline, not an external deployment. It is selected explicitly and is never auto-merged with the development file:
+Check the local service state without printing `.env` values:
 
 ~~~powershell
-Copy-Item .env.example .env.production
-# Edit .env.production using the production secret manager. Replace the
-# example's mutable PRODUCTION_APP_IMAGE value with the reviewed immutable
-# image digest.
-docker compose --env-file .env.production -f docker-compose.production.yml config --quiet
-php scripts/production-preflight.php --env-file .env.production --compose-file docker-compose.production.yml
-docker compose --env-file .env.production -f docker-compose.production.yml up -d
-docker compose --env-file .env.production -f docker-compose.production.yml ps
+docker compose --env-file .env ps
+docker compose --env-file .env logs --tail 80 app db
 ~~~
 
-The production application image must be built and reviewed before deployment, then referenced by its immutable digest; the protected deployment environment is not a build environment. The image has no repository bind mount. Only a named `production_uploads` volume is writable by the application. The application root is read-only, Apache runtime/log paths use tmpfs, and both services restart unless stopped. MySQL has no published host port; a reverse proxy must be attached to the deployment network or use the platform’s internal service routing. The production Compose file does not run a browser-accessible schema or restore operation.
+If a host port is already in use, choose unused loopback ports in `.env` (for
+example `APP_PORT=8081` or `MYSQL_PORT=3308`), rerun `config --quiet`, and use
+the new local URL. Keep the `127.0.0.1` binding. After a computer, app, or
+database restart, the persistent MySQL volume and upload directory are reused:
+
+~~~powershell
+docker compose --env-file .env up -d
+docker compose --env-file .env restart
+docker compose --env-file .env ps
+~~~
+
+Wait for the database health check before retrying the application. `/health.php`
+may remain HTTP 200 while MySQL is stopped; `/ready.php` must return a generic
+HTTP 503 until MySQL is available again, then return HTTP 200.
+
+### 7. XAMPP local alternative
+
+For an existing XAMPP installation, start Apache and MySQL from the XAMPP
+control panel and configure the project using the current XAMPP Apache/PHP
+environment variables `DB_HOST=127.0.0.1`, `DB_PORT=3306`, `DB_NAME`,
+`DB_USER`, and `DB_PASSWORD`. Keep those values in the local machine's Apache
+or PHP environment; do not commit or print them. Configure Apache's document
+root or virtual host to `public/`, keep the repository root outside the web
+document root, and browse only to `http://127.0.0.1/` (or the local port
+configured by XAMPP). Initialize a new MySQL database with
+`database/schema.sql`, then apply the documented migrations in order. The
+Docker bootstrap profile is not used by XAMPP; create the first administrator
+through the existing local bootstrap/administration procedure.
+
+If Apache or MySQL reports a port conflict, stop the conflicting local service
+or select an unused localhost port in the XAMPP configuration and update the
+matching local URL/DB port. Never solve a local conflict by binding the service
+to every network interface.
+
+## Optional container hardening verification (not the local install)
+
+`docker-compose.production.yml` is retained for disposable image-isolation and
+release-integrity checks. It is not the canonical localhost setup, does not
+add a public-facing listener, and is not a cloud deployment configuration. Use
+the Docker or XAMPP setup above for normal local operation. The optional check
+is selected explicitly and is never auto-merged with the development file:
+
+~~~powershell
+$verificationEnv = Join-Path $env:TEMP 'myshop-local-image-check.env'
+Copy-Item .env.example $verificationEnv
+# Replace only with disposable local values; never use a real deployment file.
+docker compose --env-file $verificationEnv -f docker-compose.production.yml config --quiet
+php scripts/production-preflight.php --env-file $verificationEnv --compose-file docker-compose.production.yml
+Remove-Item -LiteralPath $verificationEnv -Force
+~~~
+
+The optional image check has no repository bind mount, keeps the application
+root read-only, uses a named uploads volume, and does not run a browser-accessible
+schema or restore operation. It is a local verification boundary, not a cloud
+hosting promise.
 
 Fresh-volume database initialization uses the canonical schema and the restricted runtime-account initializer. Existing databases still require the controlled schema-account migration process documented above; do not treat container startup as a migration mechanism. The CLI-only bootstrap can be run as a controlled one-shot using deployment-injected `BOOTSTRAP_ADMIN_*` variables; never put those values in the image, repository, command history, or logs.
 
-The fail-closed production preflight validates required production settings, rejects placeholder credentials and mutable image tags, checks HSTS and trusted-proxy configuration, and confirms that root/schema credentials are not passed to the normal app service:
+The optional fail-closed image preflight validates required production settings, rejects placeholder credentials and mutable image tags, checks HSTS and trusted-proxy configuration, and confirms that root/schema credentials are not passed to the normal app service. It is not required for the canonical localhost setup:
 
 ~~~powershell
-php scripts/production-preflight.php --env-file .env.production --compose-file docker-compose.production.yml
+php scripts/production-preflight.php --env-file $verificationEnv --compose-file docker-compose.production.yml
 ~~~
 
-See [docs/PRODUCTION-DEPLOYMENT.md](docs/PRODUCTION-DEPLOYMENT.md) for the complete deployment, backup, migration, readiness, rollback, HSTS, logging, and external-operations runbook. This repository remains a production-deployable baseline rather than a standalone production operation.
+See [docs/PRODUCTION-DEPLOYMENT.md](docs/PRODUCTION-DEPLOYMENT.md) for the
+localhost deployment, backup, migration, readiness, restart, and recovery
+runbook. The historical filename is retained so existing links continue to
+work.
 
 ### Disposable production runtime smoke
 
@@ -182,31 +244,29 @@ not a deployment and does not verify external TLS, firewalling, registry
 promotion/signing, secret-manager delivery, monitoring, backup storage, or
 rollback infrastructure.
 
-### Production environment and TLS contract
+### Local HTTP and intentionally out-of-scope cloud controls
 
-The production environment must provide, through a secret manager or protected deployment configuration:
+Local HTTP intentionally uses loopback and does not require TLS. Keep `.env`
+and XAMPP environment values on the local machine, keep Docker host ports bound
+to `127.0.0.1`, and keep `HSTS_ENABLED=false` for local HTTP. The PHP session,
+CSRF, authorization, upload, and rate-limit protections remain active.
 
-- `DB_NAME`, restricted CRUD-only `DB_USER`, and `DB_PASSWORD`.
-- `MYSQL_ROOT_PASSWORD` only to the database initialization/deployment boundary; never to the normal application service.
-- `PHP_BASE_IMAGE`, reviewed at the exact PHP 8.3 Apache release/digest used for the build.
-- `PRODUCTION_APP_IMAGE`, an immutable registry digest for the reviewed application image.
-- `PRODUCTION_MYSQL_IMAGE`, pinned to the reviewed MySQL version/digest. The example currently records the reviewed MySQL 8.4.3 digest; refresh it deliberately during patching.
-- `TRUSTED_PROXY_IPS`, a comma-separated exact-IP allow-list for the fixed reverse proxy; production preflight requires it when HSTS is enabled.
-- `HSTS_ENABLED=false` during local HTTP development. Production preflight requires `true` after HTTPS is guaranteed for the complete hostname and subdomain policy; set `HSTS_MAX_AGE` deliberately.
+Cloud TLS, WAFs, secret managers, external monitoring, public firewall policy,
+off-site backup storage, and internet-facing deployment are intentionally out
+of scope. Local operators are responsible for protecting the machine and local
+backup files.
 
-The PHP session marks cookies `Secure` when the request is HTTPS. `X-Forwarded-Proto: https` is honored only when `REMOTE_ADDR` is in `TRUSTED_PROXY_IPS`; arbitrary client-supplied forwarding headers are ignored. TLS certificates, HTTPS redirects, proxy source-IP preservation, trusted-proxy network policy, HSTS preload/subdomain decisions, and external firewalling remain deployment responsibilities. The repository does not force HTTPS in local development.
-
-The PHP production configuration disables display errors and startup error display, sends technical errors to container stderr, hides exception arguments, and keeps strict HTTP-only session settings. User-facing health and database failures remain generic.
-
-### Health, logs, and alerts
+### Local health, logs, and recovery
 
 - `/health.php` is liveness-only and returns HTTP 200 without opening MySQL.
 - `/ready.php` is database readiness. It returns HTTP 200 only when `SELECT 1` succeeds and HTTP 503 with a generic body when the database is unavailable. It never returns SQL errors, credentials, paths, or stack traces.
-- The production application healthcheck uses `/ready.php`; the MySQL healthcheck uses `mysqladmin ping` locally inside the database container.
-- Apache access logs go to stdout and errors go to stderr. PHP technical errors go to stderr through `/proc/self/fd/2`. Docker or the deployment runtime must collect, restrict, rotate, and retain these streams according to operational policy.
+- The Docker application healthcheck uses `/health.php` for liveness; `/ready.php` is the local database readiness contract. The MySQL healthcheck uses `mysqladmin ping` locally inside the database container.
+- Apache access logs go to stdout and errors go to stderr. PHP technical errors go to stderr through `/proc/self/fd/2`. Local operators should restrict and rotate these streams without printing credentials.
 - Each HTTP request receives a server-generated `X-Request-ID`; request start/completion logs and Apache access logs include it. Client-provided correlation IDs, cookies, authorization headers, CSRF tokens, passwords, request bodies, and database credentials are not logged.
 
-At minimum, alert on readiness failures, sustained HTTP 5xx rates, elevated latency, authentication failure/rate-limit spikes, authorization-denied spikes, database connection/replication/storage failures, backup generation or restore-verification failures, upload storage exhaustion, and host/container disk pressure. Define log retention, access control, redaction review, rotation, and on-call escalation before production use.
+When diagnosing a local outage, check readiness, bounded logs, database storage,
+backup generation/restore verification, upload storage, and host/container disk
+pressure. External monitoring and alerting are intentionally out of scope.
 
 ### Image patching process
 

@@ -85,8 +85,8 @@ function run_localhost_readiness_unit_tests(): int
     $tests->assertContains('DB_HOST=127.0.0.1', $environmentExample, 'The native local workflow must document a loopback database host.');
     $tests->assertContains('APP_PORT=8080', $environmentExample, 'The local application port must be documented.');
     $tests->assertContains('MYSQL_PORT=3307', $environmentExample, 'The local database port must be documented.');
-    $tests->assertContains('.env\n', $gitignore, 'Local environment files must remain ignored.');
-    $tests->assertContains('*.dump\n', $gitignore, 'Local database dumps must remain ignored.');
+    $tests->assertContains(".env\n", $gitignore, 'Local environment files must remain ignored.');
+    $tests->assertContains("*.dump\n", $gitignore, 'Local database dumps must remain ignored.');
 
     $tests->assertContains('"status":"ok"', $healthEndpoint, 'Liveness must retain its generic success response.');
     $tests->assertContains('"check":"liveness"', $healthEndpoint, 'Liveness must identify itself without database access.');

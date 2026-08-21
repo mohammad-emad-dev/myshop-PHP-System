@@ -1,158 +1,160 @@
-# MyShop production deployment runbook
+# MyShop localhost deployment and operations runbook
 
-This repository provides a hardened Docker Compose deployment baseline. It
-does not deploy to an environment, manage production secrets, operate a
-reverse proxy, or provide an external backup/monitoring service. Use this
-runbook with an approved deployment platform and change record.
+MyShop is a localhost-first application for a developer or business computer.
+It is not intended to be exposed directly to the public internet or to a LAN
+by default. This historical filename is retained so existing links continue
+to work; the runbook is intentionally local, not a cloud deployment guide.
 
-## 1. Inject deployment configuration
+The recommended local workflow is Docker Desktop with the Linux container
+engine. XAMPP remains supported as the manual local alternative. In this model,
+local operators are responsible for protecting the machine, local credentials,
+and local backup files.
 
-Create a protected environment file outside the repository, or inject the
-same variables through the deployment platform. Never commit it, place it in
-the image, print it, or pass it to the normal application service unless the
-Compose file explicitly requires the value there.
+local operators are responsible for protecting the machine and local backup files.
 
-Required values include:
+Cloud controls such as TLS termination, WAFs, secret managers, external
+monitoring, public firewall policy, off-site backup storage, and internet-facing
+deployment are intentionally out of scope. Do not add them to a local install
+as an implicit requirement.
 
-- `APP_ENV=production`.
-- The restricted runtime `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, and
-  `DB_PASSWORD`.
-- A separate `DB_SCHEMA_USER` and `DB_SCHEMA_PASSWORD` for controlled schema
-  work. These are not application-service credentials.
-- `MYSQL_ROOT_PASSWORD` only for the database/deployment boundary.
-- Immutable `PHP_BASE_IMAGE`, `PRODUCTION_APP_IMAGE`, and
-  `PRODUCTION_MYSQL_IMAGE` references in the form `name@sha256:<64 hex chars>`.
-- `HSTS_ENABLED=true` and `HSTS_MAX_AGE` between 31536000 and 63072000.
-- `TRUSTED_PROXY_IPS` as a comma-separated list of exact reverse-proxy IPs.
+## 1. Canonical Docker installation
 
-Validate the file without revealing its values:
+From a clean checkout:
 
-```text
-php scripts/production-preflight.php \
-  --env-file /protected/myshop/production.env \
-  --compose-file docker-compose.production.yml
+```powershell
+Copy-Item .env.example .env
+notepad .env
+docker compose --env-file .env config --quiet
+docker compose --env-file .env up --build -d
+docker compose --env-file .env ps
 ```
 
-The preflight rejects missing settings, placeholder or weak credentials,
-mutable image tags, invalid HSTS values, invalid proxy addresses, and root or
-schema credentials in the normal `app` service. It does not contact a
-registry, database, secret manager, or production host.
+Replace every password placeholder with a unique local value. Keep `.env`
+outside Git and never print it, put it in an image, or paste its contents into
+an issue or log. The application is available at
+`http://127.0.0.1:${APP_PORT}`; the default is `http://127.0.0.1:8080`.
 
-## 2. Disposable production runtime smoke
+The Compose app port defaults to `127.0.0.1:8080` and the optional host MySQL
+port defaults to `127.0.0.1:3307`. Both bindings are loopback-only. The app
+waits for the MySQL health check before starting normal traffic, and the named
+`mysql_data` volume retains the database across app/container restarts. The
+project `public/uploads/` directory retains validated local uploads.
 
-Before a deployment change is accepted, run the disposable runtime smoke from
-the repository root:
+Create the first local administrator through the existing CLI-only bootstrap
+profile after setting the three `BOOTSTRAP_ADMIN_*` values in `.env`:
 
-```text
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-production-smoke.ps1
+```powershell
+docker compose --env-file .env --profile bootstrap run --rm bootstrap
 ```
 
-The runner creates a unique Compose project and fresh named volumes, builds
-the current production image, injects generated temporary database
-credentials, and publishes only the app to a temporary loopback port. It
-verifies `/health.php` and `/ready.php`, stops MySQL to require a generic HTTP
-503 from readiness, starts MySQL again to require HTTP 200, and inspects the
-runtime for a read-only root, the intended uploads volume, no host database
-port, `no-new-privileges`, restricted app environment, no Git executable or
-repository metadata, and disabled PHP error display.
+Do not use `down --volumes` for an active local installation. It destroys the
+local database volume and is reserved for disposable verification.
 
-The runner performs no business mutations and never uses `.env`, `ioms_db`,
-production credentials, GitHub secrets, or persistent deployment volumes. It
-removes its image, containers, volumes, network, temporary environment, and
-HTTP scratch file in a `finally` cleanup path; cleanup failure is fatal. The
-smoke proves only this repository's disposable Docker runtime boundary. It
-does not verify external TLS, firewalling, registry promotion or signing,
-secret-manager delivery, monitoring, backup storage, migration ownership, or
-rollback infrastructure.
+## 2. XAMPP installation
 
-## 3. Verify the immutable release and release evidence
-
-Resolve and review the application, PHP base, and MySQL image digests before
-the change window. Confirm that the application digest is the reviewed image
-containing the intended commit, and retain the previous application digest for
-rollback. Do not replace a digest with `latest`, a branch tag, or a mutable CI
-tag during deployment.
-
-The repository policy also requires every third-party GitHub Action to use a
-full 40-character commit SHA and an inline official release comment. To update
-one deliberately, inspect the official tag and commit with `git ls-remote`,
-review the release notes, replace the workflow reference with that exact SHA,
-and run `php scripts/ci-supply-chain-check.php` plus the complete Quality Gate.
-Do not infer or copy an action SHA from an untrusted example.
-
-Build a candidate with a temporary CI build environment and tag. Resolve the
-built image ID to its immutable digest, then create the protected deployment
-environment with that digest. Do not build from the protected deployment
-environment; it is deploy-only:
+Start Apache and MySQL from the existing XAMPP control panel. Configure the
+project using the XAMPP Apache/PHP environment values:
 
 ```text
-docker compose --env-file /protected/myshop/build.env \
-  --file docker-compose.production.yml config --quiet
-docker compose --env-file /protected/myshop/build.env \
-  --file docker-compose.production.yml build --pull app
-docker image inspect <temporary-build-image> --format '{{.Id}}'
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_NAME=<local database name>
+DB_USER=<local runtime user>
+DB_PASSWORD=<local runtime password>
 ```
 
-After the reviewed image digest and verification checks are complete, set
-`PRODUCTION_APP_IMAGE` in `/protected/myshop/production.env` to the resolved
-`name@sha256:<64 hex chars>` reference. Run the preflight and Compose
-configuration checks against that protected file, then deploy without a build:
-Deploy only after the digest passes preflight.
+Keep these values in the local machine's Apache or PHP environment; `.env`
+loading is not assumed by a manually managed XAMPP process. Configure Apache's
+document root or virtual host to `public/`, keep the repository root outside
+the web document root, and browse only to `http://127.0.0.1/` or the local port
+configured by XAMPP. Initialize a new database with `database/schema.sql`, then
+apply the documented migrations in order. The Docker bootstrap profile is not
+used by XAMPP.
+
+If Apache or MySQL reports a port conflict, use the documented port conflicts
+procedure: stop the conflicting local service
+or select an unused localhost port in XAMPP and update the matching local URL
+or DB port. Never solve a local conflict by binding a service to every network
+interface.
+
+## 3. Ports and local exposure
+
+| Service | Default host binding | Configuration | Purpose |
+| --- | --- | --- | --- |
+| MyShop Apache | `127.0.0.1:8080` | `APP_PORT` | Local browser traffic |
+| Docker MySQL | `127.0.0.1:3307` | `MYSQL_PORT` | Optional host-side DB tools |
+| XAMPP MySQL | `127.0.0.1:3306` | XAMPP config and `DB_PORT` | Manual local alternative |
+
+The Docker app connects to the Compose service name `db` on port `3306`; the
+host `MYSQL_PORT` is only for optional local tools. Keep Docker and XAMPP
+stacks stopped when not in use so they do not compete for ports. If a port is
+occupied, change only the local port value and retain the loopback address.
+
+## 4. Health, readiness, and restart and recovery
+
+`/health.php` is liveness-only. It returns a generic HTTP 200 response without
+opening MySQL. `/ready.php` performs `SELECT 1`, returns generic HTTP 200 only
+when the local database is ready, and returns generic HTTP 503 while MySQL is
+stopped or unavailable. Neither endpoint exposes SQL errors, credentials,
+filesystem paths, or stack traces.
+
+Check and recover the Docker stack without printing `.env` values:
+
+```powershell
+docker compose --env-file .env ps
+docker compose --env-file .env logs --tail 80 app db
+docker compose --env-file .env up -d
+docker compose --env-file .env restart
+docker compose --env-file .env ps
+```
+
+After stopping and starting MySQL, wait for its health check and require
+`/ready.php` to change from generic 503 back to 200 before retrying a write.
+The liveness endpoint may remain 200 during that outage. After an application
+or computer restart, the database volume and upload directory must still be
+present.
+
+## 5. Local backup and restore
+
+An active administrator creates a backup from the protected Settings flow. The
+request remains POST-only, CSRF-protected, and requires current-password
+reauthentication. Save the download outside the repository and outside both
+the public document root and upload directory. Local backup files contain
+staff password hashes and must be protected like credentials.
+
+Accept a backup only when it contains the exact completion marker:
 
 ```text
-php scripts/production-preflight.php \
-  --env-file /protected/myshop/production.env \
-  --compose-file docker-compose.production.yml
-docker compose --env-file /protected/myshop/production.env \
-  --file docker-compose.production.yml config --quiet
+-- MYSHOP_BACKUP_COMPLETE
 ```
 
-After the reviewed image digest and verification checks are complete, generate
-the safe release manifest/check. It records only the commit, workflow/ref,
-image digest, migration version/list, and `verified` status; it does not read
-or emit credentials, environment files, PII, database data, or backup contents.
-The CI job prints this JSON as evidence and does not publish it externally.
+The marker is written only after the consistent snapshot and transaction have
+completed. A failed or interrupted stream must not be treated as complete.
+The application intentionally has no browser restore endpoint.
 
-```text
-RELEASE_IMAGE_REFERENCE=registry.example/myshop@sha256:<reviewed-digest> \
-RELEASE_VERIFICATION_STATUS=verified \
-RELEASE_COMMIT_SHA=<reviewed-commit> \
-RELEASE_WORKFLOW=production-verification \
-RELEASE_REF=<reviewed-ref> \
-php scripts/release-integrity-check.php
-```
+Before a migration or repair, back up the database and verify the dump in a
+separately named disposable local database. Confirm the canonical table set,
+foreign keys, representative rows, runtime-account privileges, and application
+read access before considering the backup usable. Never blindly import
+`database/schema.sql` over an existing database.
 
-Retain the previous application image by its complete digest in the protected
-deployment record and keep it available in the registry or deployment cache
-until the new release is accepted. A CI build tag is an intermediate label,
-not rollback evidence or a deployable release reference.
+For a corrupted or replaced local database:
 
-The production image has no repository bind mount. The application root is
-read-only; only the named `production_uploads` volume is writable by the
-application. MySQL has no published host port.
+1. Stop application writes and preserve the original database volume or data
+   directory. Do not overwrite the only recovery point.
+2. Reject any dump without `MYSHOP_BACKUP_COMPLETE` and restore the verified
+   dump into a uniquely named disposable local database first.
+3. Validate schema, migrations, constraints, representative data, and a
+   read-only application check.
+4. Recreate or replace the local database only after the operator accepts the
+   recovery point. Keep the original until the restored database is verified.
+5. Restart the app, require readiness HTTP 200, and record the recovery point,
+   operator, and validation result in the local operations record.
 
-## 4. Back up the database before schema changes
+## 6. Migrations and rollback limits
 
-Before applying any migration to an existing database:
-
-1. Stop or quiesce application writes according to the deployment procedure.
-2. Have an administrator create a backup through the protected Settings flow
-   using the required current-password re-authentication.
-3. Verify the `-- MYSHOP_BACKUP_COMPLETE` marker and perform isolated restore
-   verification before accepting the artifact into retention storage.
-4. Store the verified backup outside the repository and document its protected
-   storage location, encryption key identifier, operator, and change ID.
-
-Backups contain one-way staff password hashes and are sensitive credentials.
-Never place them under `public/`, in a Docker bind mount serving the app, or in
-Git. The repository streams the SQL backup but does not encrypt or replicate
-it; those are external operations.
-
-## 5. Apply migrations in order
-
-Use the controlled schema/deployment account, never `DB_USER`, and never run
-migrations from an HTTP request or application startup. For a database created
-from the original Batch 1 schema, apply these files in order:
+For an existing local database, use the controlled schema account and apply
+the migrations in order:
 
 1. `database/batch2_staff_active.sql`
 2. `database/batch3_product_history.sql`
@@ -160,144 +162,86 @@ from the original Batch 1 schema, apply these files in order:
 4. `database/batch17_login_rate_limit.sql`
 5. `database/batch22_audit_log.sql`
 
-Stop on the first error. Inspect the database and change record before
-retrying. Do not import `database/schema.sql` over an existing database. The
-repository does not implement automatic migration orchestration or a
-transactional rollback for arbitrary DDL.
+Stop on the first migration error and inspect the database before retrying.
+Container startup is not a migration mechanism. The repository does not
+provide automatic DDL rollback; the recovery path is a verified backup into a
+separately named local target followed by operator-approved replacement.
 
-After migration, run the schema validation against a disposable verification
-target where possible. A database restore or rollback must use a controlled
-schema account and a verified backup; it must not use a browser-accessible
-restore route.
+An application image or source rollback does not roll back database changes.
+For the optional Compose production-stage verification, retain the previous
+image digest and deploy only after the digest passes preflight. For routine
+localhost work, restore the previous checkout only when its schema is
+compatible with the current database.
 
-## 6. Start and verify the release
-
-Start the reviewed Compose release only after preflight, image, backup, and
-migration checks pass:
-
-```text
-docker compose --env-file /protected/myshop/production.env \
-  --file docker-compose.production.yml up -d
-docker compose --env-file /protected/myshop/production.env \
-  --file docker-compose.production.yml ps
-```
-
-Verify the database and application health checks, then check readiness
-through the configured reverse proxy:
-
-```text
-curl --fail --silent --show-error https://shop.example/ready.php
-```
-
-`/health.php` is liveness-only and does not require MySQL. `/ready.php` returns
-HTTP 200 only after `SELECT 1` succeeds and returns a generic HTTP 503 when the
-database is unavailable. Neither endpoint returns SQL details, credentials,
-paths, stack traces, or configuration values.
-
-Perform a small authenticated smoke check for login/logout, one permitted
-admin or cashier read path, and one expected authorization denial. Do not
-perform destructive or business-volume actions as a smoke test. Confirm that
-existing uploads are present through the named `production_uploads` volume and
-that new validated uploads do not require a writable application root.
-
-## 7. HSTS and reverse proxy requirements
-
-Terminate TLS at the approved reverse proxy or platform edge, preserve the
-direct proxy source IP, and forward HTTPS state only from an address in
-`TRUSTED_PROXY_IPS`. Configure the exact proxy IPs; never use `*`, arbitrary
-client forwarding headers, or a broad unreviewed network range. Enable HSTS
-only when HTTPS is guaranteed for the complete hostname policy and the
-operator accepts the long-lived browser policy.
-
-The repository does not provision certificates, redirect HTTP to HTTPS,
-configure DNS, preserve proxy source addresses, manage firewall rules, or
-decide HSTS preload/subdomain policy.
-
-## 8. Rollback and database limitations
-
-For an application-only regression, select the previously reviewed immutable
-`PRODUCTION_APP_IMAGE` in the protected deployment configuration and redeploy
-the app service:
-
-```text
-docker compose --env-file /protected/myshop/production.env \
-  --file docker-compose.production.yml up -d app
-```
-
-Keep the prior image digest available until the release is accepted. An image
-rollback does not roll back database changes. For an incompatible migration,
-stop writes, follow the approved restore procedure into a separately named
-target database, validate schema and representative data, and perform a
-controlled database cutover. Do not delete or overwrite the original target
-until the incident owner approves the recovery point.
-
-The repository does not implement automatic database rollback, blue/green
-cutover, point-in-time recovery, replication failover, or zero-downtime
-orchestration.
-
-## 9. Incident response quick runbook
+## 7. Local incident quick runbook
 
 ### Database outage
 
-1. Confirm the reverse proxy reports `/ready.php` as HTTP 503 while `/health.php`
-   remains liveness-only; do not remove or recreate the persistent database
-   volume.
-2. Preserve sanitized application/database logs and the current release digest.
-3. Check database container health, storage capacity, and the last approved
-   change. Restore service or escalate to the database owner without changing
-   schema objects during the outage.
-4. After recovery, require `/ready.php` HTTP 200 and perform the documented
-   authenticated read-only smoke check before reopening traffic.
+1. Confirm `/health.php` remains liveness-only and `/ready.php` returns generic
+   503; do not delete or recreate `mysql_data` or the XAMPP data directory.
+2. Inspect bounded local logs and the Docker/XAMPP service state without
+   printing `.env` or credentials.
+3. Restore MySQL availability, wait for the health check, and require readiness
+   200 before reopening writes.
 
 ### Failed application deployment
 
-1. Stop the rollout and retain the failed release digest and release manifest.
-2. If the database schema is compatible, redeploy the previously reviewed
-   application digest only and verify readiness and the authenticated smoke
-   paths.
-3. If compatibility is uncertain, stop writes and involve the incident owner;
-   an image rollback does not undo database changes.
+1. Stop the change and retain the failed checkout/image identity.
+2. Restart the app after verifying the database is healthy.
+3. If schema compatibility is uncertain, stop writes and use the backup/recovery
+   procedure before changing the database. An application rollback does not
+   undo a migration.
 
 ### Restore incident
 
-1. Stop application writes and preserve the original database; never overwrite
-   the original recovery point during investigation.
-2. Reject any backup without `-- MYSHOP_BACKUP_COMPLETE`, restore only into a
-   uniquely named target database, and use the controlled schema account.
-3. Validate schema, migrations, constraints, indexes, representative rows,
-   and application read access before an approved cutover.
-4. Record the recovery point, operator, change ID, validation evidence, and
-   cutover decision in the deployment/incident record.
+1. Stop writes and preserve the original database; preserve the original database
+   until the recovery target is validated.
+2. Reject incomplete dumps, restore only into a uniquely named local target,
+   and validate the schema and representative data.
+3. Record the recovery point and operator decision before replacement.
 
-The repository does not automate incident communication, failover, or cutover.
-The deployment operator must assign the incident owner, database owner, backup
-owner, and recovery decision owner before accepting production traffic.
+## 8. Optional disposable image verification
 
-## 10. Logging, monitoring, and incident ownership
+The production-stage Compose file and preflight are retained for local
+read-only verification of image isolation and release metadata. They are not a
+cloud deployment or a prerequisite for Docker/XAMPP operation.
 
-Collect Apache access logs from stdout and Apache/PHP technical errors from
-stderr. Retain and restrict them according to operational policy. Request IDs
-are server-generated; passwords, cookies, CSRF tokens, authorization headers,
-request bodies, and database credentials must remain out of logs.
+The repository's optional process may use a temporary CI build tag, but the
+temporary CI build tag is never a deployable identity. Resolve the built image
+ID to its immutable digest, run the preflight and release-integrity checks, and
+retain only disposable credentials. Do not build from a protected deployment
+file. Deploy only after the digest passes preflight.
 
-Alert on readiness failures, sustained 5xx responses, latency, authentication
-failure or rate-limit spikes, authorization denials, database/storage errors,
-backup or restore-verification failures, upload-volume exhaustion, and
-container/host disk pressure. Assign an on-call owner, escalation path,
-retention period, redaction reviewer, backup owner, and recovery decision
-owner before accepting production traffic.
+The repository's CI actions remain pinned and the local checks may be run with:
 
-The repository does not provide a scheduler, log backend, metrics backend,
-alert manager, incident-management integration, secret manager, KMS,
-off-site backup replication, registry promotion/signing policy, certificate
-authority integration, or external firewall/WAF.
+```powershell
+php scripts/ci-supply-chain-check.php
+php scripts/release-integrity-check.php
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-production-smoke.ps1
+```
 
-## 11. Readiness conclusion
+These checks do not add cloud TLS, WAF, secret-manager, external monitoring,
+registry promotion, or public firewall controls.
 
-Passing repository checks means the code and deployment baseline are
-production-deployable with the documented external controls. It does not by
-itself establish that the application is production-ready: secret injection,
-immutable registry verification, TLS/proxy/firewall policy, backup retention
-and restore drills, migration ownership, monitoring, alerting, incident
-response, and rollback authority must be implemented and verified by the
-deployment operator.
+## 9. Local logging and security boundaries
+
+Apache access logs use stdout and Apache/PHP technical errors use stderr in
+Docker. Requests receive a server-generated `X-Request-ID`. Passwords,
+cookies, authorization headers, CSRF tokens, request bodies, database
+credentials, and sensitive customer data must remain out of logs. Public
+health/readiness responses remain generic.
+
+Authentication, CSRF validation, administrator authorization, upload
+validation, rate limiting, security headers, and transactional business writes
+remain active in both local workflows. Only `public/` may be the web document
+root; `config/`, `database/`, backup files, and local environment files must
+not be served.
+
+## 10. Local readiness conclusion
+
+The local readiness contract is satisfied when a clean checkout starts with
+documented local values, both services remain loopback-bound, the database and
+uploads survive restart, liveness/readiness return the documented safe
+responses, a complete backup restores into a disposable target, and the full
+regression and browser checks pass. Local operators remain responsible for the
+host machine and backup-file security.
