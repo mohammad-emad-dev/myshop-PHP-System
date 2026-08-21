@@ -10,8 +10,6 @@ engine. XAMPP remains supported as the manual local alternative. In this model,
 local operators are responsible for protecting the machine, local credentials,
 and local backup files.
 
-local operators are responsible for protecting the machine and local backup files.
-
 Cloud controls such as TLS termination, WAFs, secret managers, external
 monitoring, public firewall policy, off-site backup storage, and internet-facing
 deployment are intentionally out of scope. Do not add them to a local install
