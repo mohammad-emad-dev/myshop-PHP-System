@@ -13,6 +13,24 @@ dependency direction of extracted modules, and establishes the evidence-based
 Phase 4G candidate inventory. No legacy function or compatibility wrapper is
 deleted in this phase.
 
+## Phase 5C list and volume contracts
+
+Interactive list and selector services return bounded arrays. Products and
+stock/order history use newest-first ordering with an ID tie-breaker;
+categories, customers, suppliers, and their selectors use name/id ordering.
+Search input is truncated and bound through prepared statements. The public
+pages retain their existing authentication, authorization, staff scoping,
+pagination, messages, redirects, and rendering contracts.
+
+`get_all_products()`, `get_stock_movements()`, `get_orders()`,
+`get_orders_for_staff()`, `get_categories()`, `get_customers()`, and
+`get_suppliers()` remain complete-array legacy compatibility loaders. Their
+retention is intentional and is not evidence that interactive pages are
+unbounded. `export_stream_entity()` remains complete by export row count but
+uses cursor-batched prepared queries and one-row fetches, so its in-memory
+working set remains bounded. Dashboard scalar/aggregate scans and fixed-window
+reports retain their existing return shapes.
+
 Batch 6A places active-session authentication, administrator authorization, and
 redirect implementations in `includes/auth.php` and `includes/http.php`. Batch
 5 placed bounded Supplier reads in `includes/people.php`; earlier batches placed

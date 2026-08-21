@@ -452,9 +452,18 @@ The localhost baseline is the supported operating target. Remaining local
 follow-up work includes:
 
 - Periodic local backup/restore drills and machine-specific host security review.
-- Continuing bounded-query review for any remaining large POS, report, history, or selector dataset that is not covered by the existing pagination/export checks.
+- Phase 5C completed the local data-volume audit for products, stock movements,
+  orders, categories, customers, suppliers, selectors, dashboard reports, and
+  exports. Interactive reads are bounded; complete-array facade loaders remain
+  documented compatibility behavior.
+- Continue bounded-query review for any new POS, report, history, or selector
+  dataset added after Phase 5C.
 - Keeping the implemented CI Quality Gate, disposable runtime smoke, Browser QA, and accessibility checks green for each release candidate.
 - Splitting the large shared functions module into focused application services over time.
+
+See [Phase 5C local performance and data-volume readiness](docs/architecture/PHASE-5C-LOCAL-PERFORMANCE-TDD.md)
+for the audited caller map, disposable fixture, EXPLAIN checks, and the
+intentional export/compatibility boundaries.
 
 Cloud deployment controls such as TLS, WAFs, secret managers, and external
 monitoring are intentionally out of scope rather than hidden behind a

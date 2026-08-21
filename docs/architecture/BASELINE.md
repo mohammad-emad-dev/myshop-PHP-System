@@ -1,6 +1,6 @@
 # MyShop architecture baseline
 
-Status: Phase 4G dead-code and legacy-retirement baseline
+Status: Phase 5C localhost data-volume readiness baseline
 
 This baseline preserves the completed Phase 4F closure review and records the
 controlled Phase 4G retirement result.
@@ -343,11 +343,12 @@ The PHP harness is `tests/run.php`. It currently loads:
 - `tests/Integration/backup_restore_test.php`
 - `tests/Integration/operational_test.php`
 - `tests/Integration/export_streaming_test.php`
+- `tests/Integration/data_volume_test.php`
 
 Coverage includes validation, deployment contracts, HTTP responses, scanner
 behavior, supply-chain policy, release metadata, disposable MySQL CRUD and
-authorization behavior, backup/restore, operational endpoints, and streaming
-exports.
+authorization behavior, backup/restore, operational endpoints, streaming
+exports, and local data-volume clipping/scoping.
 
 The Playwright suite in `e2e/tests/critical-journeys.spec.js` covers login,
 logout, protected routes, admin/cashier journeys, product search/pagination,
@@ -362,3 +363,20 @@ the disposable MySQL regression suite.
 This document records coverage that exists in the repository. A test is not
 considered passing for this batch unless it is listed in the implementation
 report with its actual command result.
+
+## Phase 5C local data-volume readiness
+
+Phase 5C audited the seven complete-array legacy loaders, all migrated list and
+selector callers, dashboard reports, and CSV exports. No production caller was
+found for the complete-array compatibility loaders, and they remain retained
+because repository evidence cannot rule out external callers. Interactive
+pages use bounded focused services with prepared searches and deterministic
+ordering. CSV exports retain cursor-batched streaming with a 250-row batch and
+are intentionally complete by row count while bounded in memory.
+
+The disposable volume contract inserts 600 rows for each primary list entity,
+600 stock movements, and 600 orders across two staff scopes. It verifies result
+clipping, ordering, staff/product scoping, and representative `EXPLAIN` plans.
+No index or schema migration was added; the current schema indexes were
+adequate for the verified local access paths. See
+`PHASE-5C-LOCAL-PERFORMANCE-TDD.md` for the full evidence record.

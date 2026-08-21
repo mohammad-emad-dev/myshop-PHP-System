@@ -10,6 +10,13 @@ All remaining facade functions are retained by the evidence-based manifest in
 `PHASE-4G-DEAD-CODE-RETIREMENT-TDD.md`; no module dependency or runtime caller
 boundary changed.
 
+Phase 5C added the local data-volume audit without changing module ownership:
+interactive list pages and selectors call `catalog.php`, `people.php`,
+`inventory.php`, and `orders.php` directly; dashboard reports remain owned by
+`dashboard.php`; and complete CSV exports remain owned by `export.php`.
+The seven complete-array compatibility loaders in `functions.php` have no
+tracked production callers and remain available for compatibility.
+
 ## Public-page to shared-function map
 
 The following map is derived from the current tracked PHP source. Function
