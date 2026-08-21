@@ -33,7 +33,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 audit_log_current_actor($conn, 'supplier_create', 'Supplier', null, false, ['reason' => 'validation_failed']);
                 $error = 'Supplier name is required.';
             } else {
-                $operation_success = create_supplier($conn, $name, $phone, $email, $address);
+                $operation_success = suppliers_create($conn, $name, $phone, $email, $address);
                 audit_log_current_actor($conn, 'supplier_create', 'Supplier', null, $operation_success);
                 if ($operation_success) {
                     $success = 'Supplier added successfully.';
@@ -55,7 +55,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 audit_log_current_actor($conn, 'supplier_update', 'Supplier', $id, false, ['reason' => 'validation_failed']);
                 $error = 'Supplier name is required.';
             } else {
-                $operation_success = update_supplier($conn, $id, $name, $phone, $email, $address);
+                $operation_success = suppliers_update($conn, $id, $name, $phone, $email, $address);
                 audit_log_current_actor($conn, 'supplier_update', 'Supplier', $id, $operation_success);
                 if ($operation_success) {
                     $success = 'Supplier updated successfully.';
@@ -69,7 +69,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 audit_log_current_actor($conn, 'supplier_delete', 'Supplier', $id, false, ['reason' => 'protected_record']);
                 $error = 'Deleting the default General Supplier is prohibited.';
             } else {
-                $operation_success = delete_supplier($conn, $id);
+                $operation_success = suppliers_delete($conn, $id);
                 audit_log_current_actor($conn, 'supplier_delete', 'Supplier', $id, $operation_success);
                 if ($operation_success) {
                     $success = 'Supplier deleted successfully. Past orders from this supplier will show as general supplier purchases.';
