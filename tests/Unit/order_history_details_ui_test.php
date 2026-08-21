@@ -155,7 +155,7 @@ function run_order_history_details_ui_unit_tests(): int
         'order-details-modal',
         'print_invoice.php?id=',
         'cross-staff',
-        'captureSanitizedScreenshot(page, `admin-order-history',
+        "captureSanitizedScreenshot(page, 'admin-order-history'",
     ] as $contract) {
         $tests->assertContains($contract, $browserTests, 'Phase 6F browser contract is missing: ' . $contract);
     }

@@ -345,7 +345,7 @@ test('admin can load critical pages, search and paginate products, and access ex
   expect(exportResult.disposition).toContain('products.csv');
 });
 
-test('admin can review scoped order history, details, and invoice access while cashier scope remains isolated', async ({ page }) => {
+test('admin can review scoped order history, details, and invoice access while cross-staff cashier scope remains isolated', async ({ page }) => {
   await login(page, adminCredentials);
   await loadPage(page, '/orders.php', /POS Terminal/);
 
@@ -359,7 +359,7 @@ test('admin can review scoped order history, details, and invoice access while c
 
   await loadPage(page, '/order_history.php?type=all', /Transaction History/);
   await expect(page.locator('.order-history-page')).toBeVisible();
-  await expect(page.locator('.data-table-shell')).toBeVisible();
+  await expect(page.locator('.order-history-surface .data-table-shell')).toBeVisible();
   await captureSanitizedScreenshot(page, 'admin-order-history');
 
   const detailButton = page.locator('.order-details-btn').first();
@@ -368,6 +368,7 @@ test('admin can review scoped order history, details, and invoice access while c
   expect(orderId).not.toBeNull();
   await detailButton.click();
   await expect(page.locator('#orderDetailsModal')).toBeVisible();
+  await expect(page.locator('.order-details-modal')).toBeVisible();
   await expect(page.locator('#modalDetailsTableBody')).toContainText(dataPrefix);
   await captureSanitizedScreenshot(page, 'admin-order-history-detail');
 
@@ -380,11 +381,8 @@ test('admin can review scoped order history, details, and invoice access while c
 
   await logout(page);
   await login(page, cashierCredentials);
-  const crossStaffResult = await page.evaluate(async (id) => {
-    const response = await fetch(`/get_order_details.php?id=${encodeURIComponent(id)}`, { credentials: 'include' });
-    return response.status;
-  }, orderId);
-  expect(crossStaffResult).toBe(404);
+  const crossStaffResponse = await page.request.get(`/get_order_details.php?id=${encodeURIComponent(orderId)}`);
+  expect(crossStaffResponse.status()).toBe(404);
 
   await loadPage(page, '/order_history.php?type=sale', /Transaction History/);
   await expect(page.locator('.order-history-page')).toBeVisible();

@@ -37,17 +37,21 @@ $csp_nonce = send_security_headers();
     <!-- Use basic styling optimized for print, no external bloated CSS -->
     <style nonce="<?php echo htmlspecialchars($csp_nonce, ENT_QUOTES, 'UTF-8'); ?>">
         body {
-            font-family: 'Courier New', Courier, monospace;
-            background-color: #fff;
-            color: #000;
+            font-family: Arial, Helvetica, sans-serif;
+            background-color: #f2f6f5;
+            color: #173139;
             margin: 0;
             padding: 20px;
             font-size: 14px;
         }
         .invoice-box {
-            max-width: 80mm; /* Standard thermal printer width */
+            max-width: 860px;
             margin: auto;
-            padding: 10px;
+            padding: 40px;
+            background: #fff;
+            border: 1px solid #d9e5e3;
+            border-radius: 12px;
+            box-shadow: 0 18px 45px rgba(23, 49, 57, 0.12);
         }
         h1, h2, h3, h4, p {
             margin: 0;
@@ -60,22 +64,26 @@ $csp_nonce = send_security_headers();
         .fw-bold { font-weight: bold; }
         
         .divider {
-            border-bottom: 1px dashed #000;
-            margin: 10px 0;
+            border-bottom: 1px solid #d9e5e3;
+            margin: 18px 0;
         }
         
         table {
             width: 100%;
             border-collapse: collapse;
-            margin: 10px 0;
+            margin: 24px 0;
         }
         th, td {
             padding: 4px 0;
             vertical-align: top;
         }
         th {
-            border-bottom: 1px dashed #000;
+            border-bottom: 1px solid #d9e5e3;
             text-align: left;
+            color: #4b6268;
+            text-transform: uppercase;
+            font-size: 11px;
+            letter-spacing: 0.06em;
         }
         .qty-col { width: 15%; text-align: center; }
         .price-col { width: 25%; text-align: right; }
@@ -91,8 +99,8 @@ $csp_nonce = send_security_headers();
         .grand-total {
             font-size: 16px;
             font-weight: bold;
-            border-top: 1px dashed #000;
-            border-bottom: 1px dashed #000;
+            border-top: 1px solid #d9e5e3;
+            border-bottom: 1px solid #d9e5e3;
             padding: 5px 0;
         }
         
@@ -100,18 +108,19 @@ $csp_nonce = send_security_headers();
             text-align: center;
             font-size: 12px;
             margin-top: 20px;
+            color: #4b6268;
         }
 
         /* Adjustments for normal A4 printing (optional, it gracefully degrades) */
         @media print {
-            body { margin: 0; padding: 0; }
-            .invoice-box { width: 100%; max-width: 100%; border: none; padding: 0; }
+            body { margin: 0; padding: 0; background: #fff; }
+            .invoice-box { width: 100%; max-width: 100%; border: none; border-radius: 0; box-shadow: none; padding: 0; }
         }
     </style>
 </head>
-<body>
+<body class="invoice-print-page">
 
-<div class="invoice-box">
+<div class="invoice-box invoice-document">
     <h2>myShop</h2>
     <p>Inventory & POS System</p>
     <p>123 Business Avenue, Tech City</p>
@@ -130,7 +139,7 @@ $csp_nonce = send_security_headers();
     
     <div class="divider"></div>
     
-    <table>
+    <table class="invoice-items-table">
         <thead>
             <tr>
                 <th>Item</th>

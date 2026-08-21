@@ -65,8 +65,7 @@ require_once '../includes/layouts/header.php';
     <?php require_once '../includes/layouts/sidebar.php'; ?>
     <?php require_once '../includes/layouts/navbar.php'; ?>
 
-    <div class="container-fluid px-4 py-4">
-        <!-- Summary Stats Bar -->
+    <div class="container-fluid px-4 py-5 order-history-page data-page">
         <?php
         $total_orders_count = $order_summary['total_orders'];
         $total_sales_amount = $order_summary['total_sales_amount'];
@@ -74,173 +73,170 @@ require_once '../includes/layouts/header.php';
         $sales_count = $order_summary['sales_count'];
         $purchases_count = $order_summary['purchases_count'];
         ?>
-        <div class="row g-3 mb-4">
-            <div class="col-md-4">
-                <div class="p-3 bg-white shadow-sm d-flex justify-content-between align-items-center rounded-3 dashboard-card border-left-primary">
-                    <div>
-                        <h2 class="fs-3 mb-0 fw-bold history-kpi-value"><?php echo $total_orders_count; ?></h2>
-                        <p class="text-muted mb-0 small fw-medium">Total Orders</p>
-                    </div>
-                    <div class="rounded-full primary-bg p-3 d-flex align-items-center justify-content-center history-kpi-icon"><i class="fas fa-receipt primary-text"></i></div>
+        <div class="order-history-page-header data-page-header">
+            <div class="data-page-header__content">
+                <p class="data-page-kicker mb-2">Operations / Reporting</p>
+                <div class="data-page-header__title-row">
+                    <h2 class="h3 mb-0 fw-bold ui-page-heading"><i class="fas fa-receipt me-2 text-primary" aria-hidden="true"></i>Transaction History</h2>
+                    <span class="badge bg-primary rounded-pill ms-3 ui-count-text"><?php echo number_format($total_orders_count); ?> orders</span>
                 </div>
+                <p class="data-page-context mb-0 mt-2">Review sales and purchase activity, inspect line items, and export authorized records.</p>
             </div>
-            <div class="col-md-4">
-                <div class="p-3 bg-white shadow-sm d-flex justify-content-between align-items-center rounded-3 dashboard-card border-left-success">
-                    <div>
-                        <h2 class="fs-3 mb-0 fw-bold history-kpi-value">$<?php echo number_format($total_sales_amount, 2); ?></h2>
-                        <p class="text-muted mb-0 small fw-medium">Sales (<?php echo $sales_count; ?>)</p>
-                    </div>
-                    <div class="rounded-full success-bg p-3 d-flex align-items-center justify-content-center history-kpi-icon"><i class="fas fa-arrow-up success-text"></i></div>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="p-3 bg-white shadow-sm d-flex justify-content-between align-items-center rounded-3 dashboard-card border-left-warning">
-                    <div>
-                        <h2 class="fs-3 mb-0 fw-bold history-kpi-value">$<?php echo number_format($total_purchases_amount, 2); ?></h2>
-                        <p class="text-muted mb-0 small fw-medium">Purchases (<?php echo $purchases_count; ?>)</p>
-                    </div>
-                    <div class="rounded-full warning-bg p-3 d-flex align-items-center justify-content-center history-kpi-icon"><i class="fas fa-arrow-down warning-text"></i></div>
-                </div>
+            <div class="data-page-actions">
+                <?php if (auth_is_admin($conn)): ?>
+                <button class="btn btn-success data-page-action" data-bs-toggle="modal" data-bs-target="#exportReportModal">
+                    <i class="fas fa-file-excel me-2" aria-hidden="true"></i>Export CSV
+                </button>
+                <?php endif; ?>
             </div>
         </div>
-        <div class="row my-2">
-            <div class="col-md-12">
-                <div class="card shadow-sm border-0 rounded-4">
-                    <div class="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center flex-wrap g-2">
-                        <h2 class="h4 mb-0 text-secondary fw-bold">Transaction History</h2>
-                        <div class="d-flex align-items-center gap-2">
-                            <div class="btn-group" role="group" aria-label="Order filters">
-                                <a href="<?php echo htmlspecialchars('order_history.php?' . http_build_query(['type' => 'all', 'page_size' => $page_size, 'page' => 1]), ENT_QUOTES, 'UTF-8'); ?>" class="btn btn-outline-primary <?php echo $filter_type === 'all' ? 'active' : ''; ?>">All</a>
-                                <a href="<?php echo htmlspecialchars('order_history.php?' . http_build_query(['type' => 'sale', 'page_size' => $page_size, 'page' => 1]), ENT_QUOTES, 'UTF-8'); ?>" class="btn btn-outline-primary <?php echo $filter_type === 'sale' ? 'active' : ''; ?>">Sales</a>
-                                <?php if ($is_admin_user): ?>
-                                    <a href="<?php echo htmlspecialchars('order_history.php?' . http_build_query(['type' => 'purchase', 'page_size' => $page_size, 'page' => 1]), ENT_QUOTES, 'UTF-8'); ?>" class="btn btn-outline-primary <?php echo $filter_type === 'purchase' ? 'active' : ''; ?>">Purchases</a>
-                                <?php endif; ?>
-                            </div>
-                            <?php if (auth_is_admin($conn)): ?>
-                            <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#exportReportModal">
-                                <i class="fas fa-file-excel me-1"></i> Export CSV
-                            </button>
-                            <?php endif; ?>
-                        </div>
-                    </div>
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
-                            <span class="text-muted small">Showing <?php echo $range_start; ?>-<?php echo $range_end; ?> of <?php echo $total_orders; ?> orders</span>
-                            <form method="GET" action="order_history.php" class="d-flex align-items-center gap-2">
-                                <input type="hidden" name="type" value="<?php echo htmlspecialchars($filter_type, ENT_QUOTES, 'UTF-8'); ?>">
-                                <input type="hidden" name="page" value="1">
-                                <label for="orderPageSize" class="form-label mb-0 small text-muted">Per page</label>
-                                <select id="orderPageSize" name="page_size" class="form-select form-select-sm" aria-label="Orders per page" onchange="this.form.submit()">
-                                    <?php foreach ($page_size_options as $option): ?>
-                                        <option value="<?php echo $option; ?>" <?php echo $page_size === $option ? 'selected' : ''; ?>><?php echo $option; ?></option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </form>
-                        </div>
-                        <div class="table-responsive">
-                            <table class="table table-hover table-striped align-middle">
-                                <thead class="bg-light text-secondary">
-                                    <tr>
-                                        <th scope="col">Order ID</th>
-                                        <th scope="col">Date & Time</th>
-                                        <th scope="col">Cashier</th>
-                                        <th scope="col">Party</th>
-                                        <th scope="col">Type</th>
-                                        <th scope="col" class="text-end">Total Amount</th>
-                                        <th scope="col" class="text-center">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php if (empty($orders)): ?>
-                                        <tr>
-                                            <td colspan="6" class="text-center py-5 text-muted">
-                                                <i class="fas fa-folder-open fa-3x mb-3 text-secondary opacity-50"></i>
-                                                <p class="mb-0">No transaction records found matching the criteria.</p>
-                                            </td>
-                                        </tr>
-                                    <?php else: ?>
-                                        <?php foreach ($orders as $order): ?>
-                                            <tr>
-                                                <td class="fw-bold">#<?php echo $order['id']; ?></td>
-                                                <td><?php echo date('Y-m-d h:i A', strtotime($order['order_date'])); ?></td>
-                                                <td><?php echo htmlspecialchars($order['staff_name']); ?></td>
-                                                <td>
-                                                    <?php 
-                                                    if ($order['order_type'] === 'sale') {
-                                                        echo htmlspecialchars($order['customer_name'] ?? 'Walk-in Customer');
-                                                    } else {
-                                                        echo htmlspecialchars($order['supplier_name'] ?? 'General Supplier');
-                                                    }
-                                                    ?>
-                                                </td>
-                                                <td>
-                                                    <?php if ($order['order_type'] === 'sale'): ?>
-                                                        <span class="badge bg-primary rounded-pill px-3 py-2"><i class="fas fa-cash-register me-1"></i> Sale</span>
-                                                    <?php else: ?>
-                                                        <span class="badge bg-success rounded-pill px-3 py-2"><i class="fas fa-box me-1"></i> Purchase</span>
-                                                    <?php endif; ?>
-                                                </td>
-                                                <td class="text-end fw-bold text-dark">$<?php echo number_format($order['total_amount'], 2); ?></td>
-                                                <td class="text-center">
-                                                    <button type="button" class="btn btn-sm btn-outline-primary order-details-btn" data-order-id="<?php echo (int)$order['id']; ?>">
-                                                        <i class="fas fa-eye me-1"></i> View Details
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        <?php endforeach; ?>
-                                    <?php endif; ?>
-                                </tbody>
-                            </table>
-                        </div>
-                        <?php if ($total_pages > 1): ?>
-                            <nav class="mt-4" aria-label="Order history pagination">
-                                <ul class="pagination justify-content-center flex-wrap mb-0">
-                                    <li class="page-item <?php echo $page <= 1 ? 'disabled' : ''; ?>">
-                                        <a class="page-link" aria-label="Previous page" href="<?php echo $page > 1 ? htmlspecialchars($order_history_url($page - 1), ENT_QUOTES, 'UTF-8') : '#'; ?>">Previous</a>
-                                    </li>
-                                    <?php foreach ($pagination_pages as $pagination_page): ?>
-                                        <?php if ($pagination_page === '...'): ?>
-                                            <li class="page-item disabled"><span class="page-link">&hellip;</span></li>
-                                        <?php else: ?>
-                                            <li class="page-item <?php echo $page === $pagination_page ? 'active' : ''; ?>">
-                                                <a class="page-link" href="<?php echo htmlspecialchars($order_history_url($pagination_page), ENT_QUOTES, 'UTF-8'); ?>" <?php echo $page === $pagination_page ? 'aria-current="page"' : ''; ?>><?php echo $pagination_page; ?></a>
-                                            </li>
-                                        <?php endif; ?>
-                                    <?php endforeach; ?>
-                                    <li class="page-item <?php echo $page >= $total_pages ? 'disabled' : ''; ?>">
-                                        <a class="page-link" aria-label="Next page" href="<?php echo $page < $total_pages ? htmlspecialchars($order_history_url($page + 1), ENT_QUOTES, 'UTF-8') : '#'; ?>">Next</a>
-                                    </li>
-                                </ul>
-                            </nav>
+
+        <div class="order-history-summary" aria-label="Transaction summary">
+            <div class="order-history-stat data-surface">
+                <div class="order-history-stat__icon" aria-hidden="true"><i class="fas fa-receipt"></i></div>
+                <div><span class="order-history-stat__label">All orders</span><strong class="order-history-stat__value history-kpi-value"><?php echo number_format($total_orders_count); ?></strong><span class="order-history-stat__meta">Within your authorized scope</span></div>
+            </div>
+            <div class="order-history-stat data-surface order-history-stat--sale">
+                <div class="order-history-stat__icon" aria-hidden="true"><i class="fas fa-arrow-trend-up"></i></div>
+                <div><span class="order-history-stat__label">Sales</span><strong class="order-history-stat__value history-kpi-value">$<?php echo number_format($total_sales_amount, 2); ?></strong><span class="order-history-stat__meta"><?php echo number_format($sales_count); ?> transactions</span></div>
+            </div>
+            <div class="order-history-stat data-surface order-history-stat--purchase">
+                <div class="order-history-stat__icon" aria-hidden="true"><i class="fas fa-arrow-trend-down"></i></div>
+                <div><span class="order-history-stat__label">Purchases</span><strong class="order-history-stat__value history-kpi-value">$<?php echo number_format($total_purchases_amount, 2); ?></strong><span class="order-history-stat__meta"><?php echo number_format($purchases_count); ?> transactions</span></div>
+            </div>
+        </div>
+
+        <section class="data-surface order-history-surface" aria-labelledby="transactionHistoryHeading">
+            <div class="order-history-surface__header">
+                <div>
+                    <p class="data-page-kicker mb-2">Ledger view</p>
+                    <h3 class="h5 mb-0 fw-bold ui-page-heading" id="transactionHistoryHeading">Orders and transactions</h3>
+                </div>
+                <span class="order-history-scope"><i class="fas fa-shield-halved me-1" aria-hidden="true"></i><?php echo $is_admin_user ? 'Administrator view' : 'Your sales view'; ?></span>
+            </div>
+            <div class="data-surface__body">
+                <div class="data-toolbar order-history-toolbar">
+                    <div class="order-history-filter-group" role="group" aria-label="Order filters">
+                        <span class="order-history-toolbar__label">Show</span>
+                        <a href="<?php echo htmlspecialchars('order_history.php?' . http_build_query(['type' => 'all', 'page_size' => $page_size, 'page' => 1]), ENT_QUOTES, 'UTF-8'); ?>" class="btn btn-outline-primary <?php echo $filter_type === 'all' ? 'active' : ''; ?>">All</a>
+                        <a href="<?php echo htmlspecialchars('order_history.php?' . http_build_query(['type' => 'sale', 'page_size' => $page_size, 'page' => 1]), ENT_QUOTES, 'UTF-8'); ?>" class="btn btn-outline-primary <?php echo $filter_type === 'sale' ? 'active' : ''; ?>">Sales</a>
+                        <?php if ($is_admin_user): ?>
+                            <a href="<?php echo htmlspecialchars('order_history.php?' . http_build_query(['type' => 'purchase', 'page_size' => $page_size, 'page' => 1]), ENT_QUOTES, 'UTF-8'); ?>" class="btn btn-outline-primary <?php echo $filter_type === 'purchase' ? 'active' : ''; ?>">Purchases</a>
                         <?php endif; ?>
                     </div>
+                    <form method="GET" action="order_history.php" class="order-history-page-size">
+                        <input type="hidden" name="type" value="<?php echo htmlspecialchars($filter_type, ENT_QUOTES, 'UTF-8'); ?>">
+                        <input type="hidden" name="page" value="1">
+                        <label for="orderPageSize" class="form-label mb-0">Per page</label>
+                        <select id="orderPageSize" name="page_size" class="form-select form-select-sm" aria-label="Orders per page" onchange="this.form.submit()">
+                            <?php foreach ($page_size_options as $option): ?>
+                                <option value="<?php echo $option; ?>" <?php echo $page_size === $option ? 'selected' : ''; ?>><?php echo $option; ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </form>
                 </div>
+                <p class="data-table-summary order-history-table-summary"><i class="fas fa-list-check me-1" aria-hidden="true"></i>Showing <?php echo $range_start; ?>-<?php echo $range_end; ?> of <?php echo $total_orders; ?> orders.</p>
+                <div class="data-table-shell">
+                    <table class="table table-hover align-middle data-table order-history-table">
+                        <thead>
+                            <tr>
+                                <th scope="col">Order ID</th>
+                                <th scope="col">Date &amp; time</th>
+                                <th scope="col">Cashier</th>
+                                <th scope="col">Customer / supplier</th>
+                                <th scope="col">Type</th>
+                                <th scope="col" class="text-end">Total</th>
+                                <th scope="col" class="text-center">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php if (empty($orders)): ?>
+                                <tr>
+                                    <td colspan="7" class="data-empty-state order-history-empty-state">
+                                        <span class="data-empty-state__icon" aria-hidden="true"><i class="fas fa-receipt"></i></span>
+                                        <strong>No transaction records found.</strong>
+                                        <span>Try another transaction filter or return when a new order is recorded.</span>
+                                    </td>
+                                </tr>
+                            <?php else: ?>
+                                <?php foreach ($orders as $order): ?>
+                                    <tr class="order-row">
+                                        <td class="order-row__id">#<?php echo $order['id']; ?></td>
+                                        <td class="order-row__date"><?php echo date('Y-m-d h:i A', strtotime($order['order_date'])); ?></td>
+                                        <td class="order-row__staff"><?php echo htmlspecialchars($order['staff_name']); ?></td>
+                                        <td class="order-row__party">
+                                            <?php if ($order['order_type'] === 'sale') {
+                                                echo htmlspecialchars($order['customer_name'] ?? 'Walk-in Customer');
+                                            } else {
+                                                echo htmlspecialchars($order['supplier_name'] ?? 'General Supplier');
+                                            } ?>
+                                        </td>
+                                        <td>
+                                            <?php if ($order['order_type'] === 'sale'): ?>
+                                                <span class="badge bg-primary rounded-pill order-type-badge"><i class="fas fa-cash-register me-1" aria-hidden="true"></i>Sale</span>
+                                            <?php else: ?>
+                                                <span class="badge bg-success rounded-pill order-type-badge"><i class="fas fa-box me-1" aria-hidden="true"></i>Purchase</span>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td class="text-end order-row__total">$<?php echo number_format($order['total_amount'], 2); ?></td>
+                                        <td class="text-center order-row__actions">
+                                            <button type="button" class="btn btn-sm btn-outline-primary order-details-btn" data-order-id="<?php echo (int)$order['id']; ?>">
+                                                <i class="fas fa-eye me-1" aria-hidden="true"></i> View Details
+                                            </button>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
+                <?php if ($total_pages > 1): ?>
+                    <nav class="data-pagination" aria-label="Order history pagination">
+                        <ul class="pagination justify-content-center flex-wrap mb-0">
+                            <li class="page-item <?php echo $page <= 1 ? 'disabled' : ''; ?>">
+                                <a class="page-link" aria-label="Previous page" href="<?php echo $page > 1 ? htmlspecialchars($order_history_url($page - 1), ENT_QUOTES, 'UTF-8') : '#'; ?>">Previous</a>
+                            </li>
+                            <?php foreach ($pagination_pages as $pagination_page): ?>
+                                <?php if ($pagination_page === '...'): ?>
+                                    <li class="page-item disabled"><span class="page-link">&hellip;</span></li>
+                                <?php else: ?>
+                                    <li class="page-item <?php echo $page === $pagination_page ? 'active' : ''; ?>">
+                                        <a class="page-link" href="<?php echo htmlspecialchars($order_history_url($pagination_page), ENT_QUOTES, 'UTF-8'); ?>" <?php echo $page === $pagination_page ? 'aria-current="page"' : ''; ?>><?php echo $pagination_page; ?></a>
+                                    </li>
+                                <?php endif; ?>
+                            <?php endforeach; ?>
+                            <li class="page-item <?php echo $page >= $total_pages ? 'disabled' : ''; ?>">
+                                <a class="page-link" aria-label="Next page" href="<?php echo $page < $total_pages ? htmlspecialchars($order_history_url($page + 1), ENT_QUOTES, 'UTF-8') : '#'; ?>">Next</a>
+                            </li>
+                        </ul>
+                    </nav>
+                <?php endif; ?>
             </div>
-        </div>
+        </section>
     </div>
 
     <!-- Order Details Modal -->
     <div class="modal fade" id="orderDetailsModal" tabindex="-1" aria-labelledby="orderDetailsModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered modal-lg">
-            <div class="modal-content border-0 rounded-4">
-                <div class="modal-header py-3">
+        <div class="modal-dialog modal-dialog-centered modal-lg data-modal-dialog order-details-modal order-history-detail">
+            <div class="modal-content border-0 rounded-4 data-modal">
+                <div class="modal-header data-modal__header">
                     <h5 class="modal-title fw-bold ui-modal-title" id="orderDetailsModalLabel"><i class="fas fa-file-invoice-dollar me-2 text-primary"></i>Transaction Details</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                <div class="modal-body p-4">
-                    <div class="row mb-4 bg-light p-3 rounded-3 g-2">
+                <div class="modal-body data-modal__body">
+                    <div class="order-details-meta">
                         <div class="col-sm-6">
-                            <strong>Order Reference:</strong> <span id="modalOrderId" class="text-primary fw-bold"></span>
+                            <span class="order-details-meta__label">Order reference</span><strong id="modalOrderId" class="order-details-meta__value"></strong>
                         </div>
                         <div class="col-sm-6 text-sm-end">
-                            <strong>Transaction Date:</strong> <span id="modalOrderDate" class="text-muted"></span>
+                            <span class="order-details-meta__label">Transaction date</span><strong id="modalOrderDate" class="order-details-meta__value"></strong>
                         </div>
                     </div>
 
                     <!-- Dynamic Customer/Supplier Section -->
-                    <div id="modalPartyDetails" class="mb-4 p-3 rounded-3 border border-light-subtle bg-light bg-opacity-50 d-none">
-                        <h6 class="fw-bold mb-2 text-secondary" id="modalPartyTitle"></h6>
-                        <div class="row g-2 text-dark small">
+                    <div id="modalPartyDetails" class="order-details-party d-none">
+                        <h6 class="fw-bold mb-3" id="modalPartyTitle"></h6>
+                        <div class="row g-3 text-dark small">
                             <div class="col-md-6">
                                 <strong>Name:</strong> <span id="modalPartyName" class="fw-semibold"></span><br>
                                 <strong>Phone:</strong> <span id="modalPartyPhone"></span>
@@ -252,9 +248,9 @@ require_once '../includes/layouts/header.php';
                         </div>
                     </div>
                     
-                    <div class="table-responsive">
-                        <table class="table align-middle">
-                            <thead class="table-light text-secondary">
+                    <div class="data-table-shell order-details-table-shell">
+                        <table class="table align-middle data-table order-details-table">
+                            <thead>
                                 <tr>
                                     <th>Product Name</th>
                                     <th class="text-center ui-col-qty-100">Quantity</th>
@@ -268,16 +264,16 @@ require_once '../includes/layouts/header.php';
                         </table>
                     </div>
                     
-                    <div class="d-flex justify-content-end border-top pt-3 mt-4">
-                        <div class="text-end">
-                            <span class="text-muted fs-6">Grand Total</span>
-                            <h3 class="fw-bold text-success mt-1" id="modalOrderTotal"></h3>
+                    <div class="order-details-total">
+                        <div>
+                            <span class="order-details-total__label">Grand total</span>
+                            <strong id="modalOrderTotal" class="order-details-total__value"></strong>
                         </div>
                     </div>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary rounded-3" data-bs-dismiss="modal">Close</button>
-                    <button type="button" class="btn btn-primary rounded-3 px-4" id="downloadPdfBtn"><i class="fas fa-file-pdf me-1"></i> Download PDF</button>
+                <div class="modal-footer data-modal__footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary px-4" id="downloadPdfBtn"><i class="fas fa-file-pdf me-1" aria-hidden="true"></i> Download PDF</button>
                 </div>
             </div>
         </div>
@@ -287,13 +283,13 @@ require_once '../includes/layouts/header.php';
     <!-- Export Report Modal -->
     <div class="modal fade" id="exportReportModal" tabindex="-1" aria-labelledby="exportReportModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content border-0 rounded-4">
+            <div class="modal-content border-0 rounded-4 data-modal">
                 <form action="export_report.php" method="GET" target="_blank">
-                    <div class="modal-header py-3">
+                    <div class="modal-header data-modal__header">
                         <h5 class="modal-title fw-bold ui-modal-title" id="exportReportModalLabel"><i class="fas fa-file-export me-2 text-primary"></i>Export Transaction Report</h5>
                         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
-                    <div class="modal-body p-4">
+                    <div class="modal-body data-modal__body">
                         <div class="mb-3">
                             <label for="export_type" class="form-label fw-semibold">Transaction Type</label>
                             <select class="form-select" id="export_type" name="type">
@@ -313,9 +309,9 @@ require_once '../includes/layouts/header.php';
                             </div>
                         </div>
                     </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary rounded-3" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-success rounded-3 px-4" id="exportReportBtn"><i class="fas fa-download me-1"></i> Export CSV</button>
+                    <div class="modal-footer data-modal__footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-success px-4" id="exportReportBtn"><i class="fas fa-download me-1"></i> Export CSV</button>
                     </div>
                 </form>
             </div>
@@ -325,7 +321,7 @@ require_once '../includes/layouts/header.php';
 
     <!-- Hidden Print Container for PDF Generation -->
     <div id="invoicePrintWrapper">
-        <div id="invoicePrintContainer">
+        <div id="invoicePrintContainer" class="invoice-print-page invoice-document">
             <div class="invoice-header-row">
                 <div>
                     <h1 class="invoice-brand-title">MYSHOP SYSTEM</h1>
