@@ -1,6 +1,6 @@
 # Phase 4G — Dead Code and Legacy Retirement
 
-Status: manifest-first review; removal pending RED/GREEN verification
+Status: complete
 
 This is the Phase 4G removal manifest derived from
 `PHASE-4F-FACADE-CLOSURE-TDD.md`. It is intentionally conservative. A legacy
@@ -181,3 +181,25 @@ active assets and inline handlers.
 
 No wildcard deletion, schema change, UI redesign, compatibility-wrapper
 removal, or Phase 5 work is included.
+
+## TDD and verification record
+
+| Checkpoint | Result |
+|---|---|
+| Manifest checkpoint | `86a02d6` — complete removal manifest committed before code/test changes |
+| RED retirement contract | `b6ff383` — focused test failed only because `docs/preview.png` still existed |
+| GREEN retirement change | `79048f2` — exact binary artifact deletion; focused retirement test passed with 39 assertions |
+| Focused removal tests | PASS — 39 assertions |
+| Full disposable PHP regression | PASS — 2,645 assertions (1,787 unit, 858 integration) |
+| PHP lint | PASS — all tracked PHP files under application, test, script, database, and config paths |
+| JavaScript syntax | PASS — all tracked JavaScript files with `node --check` |
+| Repository security scan | PASS — zero findings |
+| Supply-chain scan | PASS — zero findings |
+| `git diff --check` | PASS |
+| Historical Phase 3/4 documents | PASS — unchanged |
+| Browser QA | PASS — 18/18 at 375px, 768px, and 1440px |
+| Final worktree | clean; no new secrets, dumps, generated artifacts, or disposable resources |
+
+No internal production callers were migrated in Phase 4G. No facade function,
+compatibility wrapper, JavaScript asset, CSS asset, screenshot, security
+boundary, backup/export boundary, or operational file was removed.

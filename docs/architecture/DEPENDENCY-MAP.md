@@ -1,9 +1,14 @@
 # MyShop dependency map
 
 This map records current call-site and dependency relationships after the
-Phase 4F final compatibility facade and architecture closure review after
-supplier mutation service extraction. It remains a
+Phase 4G dead-code and legacy-retirement review after the Phase 4F final
+compatibility facade closure. It remains a
 characterization artifact; the compatibility wrappers are still required.
+
+Phase 4G removed only the unreferenced generated `docs/preview.png` mockup.
+All remaining facade functions are retained by the evidence-based manifest in
+`PHASE-4G-DEAD-CODE-RETIREMENT-TDD.md`; no module dependency or runtime caller
+boundary changed.
 
 ## Public-page to shared-function map
 

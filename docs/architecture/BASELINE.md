@@ -1,6 +1,9 @@
 # MyShop architecture baseline
 
-Status: Phase 4F final compatibility facade and architecture closure baseline
+Status: Phase 4G dead-code and legacy-retirement baseline
+
+This baseline preserves the completed Phase 4F closure review and records the
+controlled Phase 4G retirement result.
 
 Captured from the `security-hardening-baseline` branch at starting revision
 `70d1ad64a5c639b93897c1c1abd2ab28063cef90`.
@@ -37,7 +40,10 @@ Browser QA is intentionally separate from the dependency-free PHP test harness.
    order reads by `includes/orders.php`; customer mutations are owned by
    `includes/customers.php` and supplier mutations are owned by
    `includes/suppliers.php`; legacy names remain available as
-   compatibility wrappers.
+   compatibility wrappers. Phase 4G removed only the unreferenced generated
+   `docs/preview.png` artifact; all facade functions remain because their
+   compatibility, security, test, export, or external-caller contracts are
+   unresolved or active.
 5. `config/db.php` reads `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, and
    `DB_PASSWORD` from the process environment and creates the mysqli
    connection. It does not run schema creation or migrations.
@@ -111,6 +117,12 @@ refactoring contract in `REFACTORING-CONTRACT.md`.
 
 `includes/functions.php` is currently both a compatibility facade and the main
 application service module.
+
+Phase 4G retired only the generated, unreferenced `docs/preview.png` mockup.
+No function was removed from the facade, no compatibility wrapper was deleted,
+and no authentication, rate-limit, staff, backup, export, health, readiness,
+or frontend asset boundary was changed. The complete per-candidate manifest is
+recorded in `PHASE-4G-DEAD-CODE-RETIREMENT-TDD.md`.
 
 | Lines/functions | Responsibility |
 |---|---|
