@@ -33,7 +33,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
             $image_path = null;
             if (isset($_FILES['image']) && (!is_array($_FILES['image']) || (int)($_FILES['image']['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE)) {
-                $image_path = handle_image_upload($_FILES['image']);
+                $image_path = uploads_handle_image($_FILES['image']);
                 if ($image_path === false) {
                     $error = 'Invalid image file or upload failed. Allowed formats: JPG, PNG, GIF (max 5MB).';
                 }
@@ -44,7 +44,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     $success = 'Product created successfully';
                 } else {
                     if (is_string($image_path)) {
-                        delete_newly_uploaded_image($image_path);
+                        uploads_delete_newly_uploaded_image($image_path);
                     }
                     $error = 'Failed to create product. Check if the barcode is already in use.';
                 }
@@ -62,7 +62,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $image_path = null;
             $upload_ok = true;
             if (isset($_FILES['image']) && (!is_array($_FILES['image']) || (int)($_FILES['image']['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE)) {
-                $image_path = handle_image_upload($_FILES['image']);
+                $image_path = uploads_handle_image($_FILES['image']);
                 if ($image_path === false) {
                     $error = 'Invalid image file or upload failed. Allowed formats: JPG, PNG, GIF (max 5MB).';
                     $upload_ok = false;
@@ -74,7 +74,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     $success = 'Product updated successfully';
                 } else {
                     if (is_string($image_path)) {
-                        delete_newly_uploaded_image($image_path);
+                        uploads_delete_newly_uploaded_image($image_path);
                     }
                     $error = 'Failed to update product. Check if the barcode is already in use.';
                 }

@@ -35,7 +35,7 @@ function run_upload_unit_tests(): int
         '4096',
         '16 * 1024 * 1024',
         "realpath(dirname(__DIR__) . DIRECTORY_SEPARATOR . 'public')",
-        "return 'uploads/' . $new_filename;",
+        'return \'uploads/\' . $new_filename;',
         "preg_match('#\\Auploads/[a-f0-9]{32}\\.(?:jpe?g|png|gif)\\z#D'",
         'move_uploaded_file($temporary_file, $target_file)',
         'return @unlink($resolved_target) || !file_exists($resolved_target);',
