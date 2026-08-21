@@ -586,6 +586,15 @@ require_once '../includes/layouts/header.php';
             });
         });
 
+        document.querySelectorAll('.modal[data-bs-keyboard="true"]').forEach(function(modalElement) {
+            modalElement.addEventListener('keydown', function(event) {
+                if (event.key === 'Escape') {
+                    var modal = bootstrap.Modal.getOrCreateInstance(modalElement);
+                    modal.hide();
+                }
+            });
+        });
+
 </script>
         <?php endif; ?>
     </div>
