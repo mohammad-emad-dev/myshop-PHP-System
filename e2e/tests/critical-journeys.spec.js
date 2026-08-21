@@ -399,6 +399,160 @@ test('admin Products and Stock Ledger surfaces support dense-data workflows', as
   await expect(page).toHaveURL(/stock_movements.php$/);
 });
 
+test('admin Customers, Suppliers, and Categories surfaces support shared CRUD workflows', async ({ page }) => {
+  await login(page, adminCredentials);
+
+  const peopleSurfaces = [
+    {
+      route: '/customers.php?page_size=10',
+      heading: 'Customers',
+      pageClass: '.customers-page',
+      table: '#customersTable',
+      row: '.customer-row',
+      search: 'Search customers',
+      searchId: '#searchCustomer',
+      pageSize: '#customerPageSize',
+      addButton: /Add Customer/,
+      addModal: '#addCustomerModal',
+      editModal: '#editCustomerModal',
+      editButton: '.edit-customer-btn',
+      exportHref: 'export_report.php?entity=customers',
+      empty: '.customer-empty-state',
+      entity: 'customer',
+    },
+    {
+      route: '/suppliers.php?page_size=10',
+      heading: 'Suppliers',
+      pageClass: '.suppliers-page',
+      table: '#suppliersTable',
+      row: '.supplier-row',
+      search: 'Search suppliers',
+      searchId: '#searchSupplier',
+      pageSize: '#supplierPageSize',
+      addButton: /Add Supplier/,
+      addModal: '#addSupplierModal',
+      editModal: '#editSupplierModal',
+      editButton: '.edit-supplier-btn',
+      exportHref: 'export_report.php?entity=suppliers',
+      empty: '.supplier-empty-state',
+      entity: 'supplier',
+    },
+  ];
+
+  for (const surface of peopleSurfaces) {
+    await loadPage(page, surface.route, surface.heading);
+    await expect(page.locator(surface.pageClass)).toBeVisible();
+    await expect(page.locator(surface.table)).toHaveClass(/data-table/);
+    await expect(page.locator('.data-table-shell')).toBeVisible();
+    await expect(page.getByRole('link', { name: /Export CSV/ })).toHaveAttribute('href', surface.exportHref);
+    await expect(page.locator(surface.pageSize)).toHaveValue('10');
+    await expect(page.locator(surface.row).first()).toBeVisible();
+    await assertKeyboardFocusIsVisible(page, surface.searchId, 1);
+    await captureSanitizedScreenshot(page, `admin-${surface.entity}s-after`);
+
+    const seededName = `${dataPrefix}_${surface.entity.toUpperCase()}`;
+    await page.getByLabel(surface.search).fill(seededName);
+    await page.getByRole('button', { name: 'Apply' }).click();
+    await expect(page.locator(surface.row)).toHaveCount(1);
+    await expect(page.locator(surface.row).first()).toContainText(seededName);
+
+    await page.getByRole('button', { name: surface.addButton }).click();
+    await expect(page.locator(surface.addModal)).toBeVisible();
+    await expect(page.locator(`${surface.addModal} form input[name="csrf_token"]`)).toHaveCount(1);
+    await page.locator(`${surface.addModal} input[name="name"]`).fill('');
+    await page.locator(`${surface.addModal} button[type="submit"]`).click();
+    await expect(page.locator(surface.addModal)).toBeVisible();
+    await page.locator(`${surface.addModal} .btn-close`).click();
+    await expect(page.locator(surface.addModal)).toBeHidden();
+
+    const createdName = `${dataPrefix}_${surface.entity.toUpperCase()}_UI`;
+    const updatedName = `${createdName}_UPDATED`;
+    await page.getByRole('button', { name: surface.addButton }).click();
+    await page.locator(`${surface.addModal} input[name="name"]`).fill(createdName);
+    await page.locator(`${surface.addModal} input[name="phone"]`).fill('555-901');
+    await page.locator(`${surface.addModal} input[name="email"]`).fill(`${surface.entity}.ui@example.test`);
+    await page.locator(`${surface.addModal} textarea[name="address"]`).fill('Disposable UI workflow address');
+    await Promise.all([
+      page.waitForNavigation(),
+      page.locator(`${surface.addModal} button[type="submit"]`).click(),
+    ]);
+    await expect(page.locator('body')).toHaveAttribute('data-feedback-success', /added successfully/);
+
+    await page.getByLabel(surface.search).fill(createdName);
+    await page.getByRole('button', { name: 'Apply' }).click();
+    await expect(page.locator(surface.row)).toHaveCount(1);
+    await page.locator(surface.row).first().locator(surface.editButton).click();
+    await expect(page.locator(surface.editModal)).toBeVisible();
+    await page.locator(`${surface.editModal} input[name="name"]`).fill(updatedName);
+    await Promise.all([
+      page.waitForNavigation(),
+      page.locator(`${surface.editModal} button[type="submit"]`).click(),
+    ]);
+    await expect(page.locator('body')).toHaveAttribute('data-feedback-success', /updated successfully/);
+
+    await page.getByLabel(surface.search).fill(updatedName);
+    await page.getByRole('button', { name: 'Apply' }).click();
+    await expect(page.locator(surface.row)).toHaveCount(1);
+    await page.locator(surface.row).first().locator('form.delete-form button[type="submit"]').click();
+    await expect(page.getByRole('button', { name: 'Yes, delete it!' })).toBeVisible();
+    await Promise.all([
+      page.waitForNavigation(),
+      page.getByRole('button', { name: 'Yes, delete it!' }).click(),
+    ]);
+    await expect(page.locator('body')).toHaveAttribute('data-feedback-success', /deleted successfully/);
+    await page.getByLabel(surface.search).fill(updatedName);
+    await page.getByRole('button', { name: 'Apply' }).click();
+    await expect(page.locator(surface.empty)).toBeVisible();
+  }
+
+  await loadPage(page, '/categories.php?page_size=10', /Categories/);
+  await expect(page.locator('.categories-page')).toBeVisible();
+  await expect(page.locator('#categoriesTable')).toHaveClass(/data-table/);
+  await expect(page.locator('.data-table-shell')).toBeVisible();
+  await expect(page.locator('#categoryPageSize')).toHaveValue('10');
+  await assertKeyboardFocusIsVisible(page, '#searchCategory', 1);
+  await captureSanitizedScreenshot(page, 'admin-categories-after');
+
+  const defaultRow = page.locator('.category-row').filter({ hasText: 'General' }).first();
+  await expect(defaultRow.locator('button[disabled]')).toHaveCount(2);
+  await expect(defaultRow).toHaveClass(/default-category-state/);
+
+  const seededCategory = `${dataPrefix}_CATEGORY`;
+  await page.getByLabel('Search categories').fill(seededCategory);
+  await page.getByRole('button', { name: 'Apply' }).click();
+  await expect(page.locator('.category-row')).toHaveCount(1);
+  await expect(page.locator('.category-row').first()).toContainText(seededCategory);
+  await page.locator('.category-row').first().locator('.edit-category-btn').click();
+  await expect(page.locator('#editCategoryModal')).toBeVisible();
+  await expect(page.locator('#edit_name')).toHaveValue(seededCategory);
+  await page.locator('#editCategoryModal .btn-close').click();
+  await expect(page.locator('#editCategoryModal')).toBeHidden();
+
+  allowExpectedForbidden(page, '/categories.php');
+  const csrfStatus = await page.evaluate(async () => {
+    const body = new URLSearchParams({
+      csrf_token: 'invalid-crud-token',
+      action: 'create',
+      name: 'invalid browser category',
+      description: 'must be rejected',
+    });
+    const response = await fetch('/categories.php', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body,
+    });
+    return response.status;
+  });
+  expect(csrfStatus).toBe(403);
+
+  await page.getByRole('button', { name: /Add Category/ }).click();
+  await expect(page.locator('#addCategoryModal')).toBeVisible();
+  await expect(page.locator('#addCategoryModal form input[name="csrf_token"]')).toHaveCount(1);
+  await page.locator('#addCategoryModal .btn-close').click();
+  await expect(page.locator('#addCategoryModal')).toBeHidden();
+});
+
 test('authenticated POS barcode lookup returns the disposable catalog product', async ({ page }) => {
   await login(page, adminCredentials);
 
