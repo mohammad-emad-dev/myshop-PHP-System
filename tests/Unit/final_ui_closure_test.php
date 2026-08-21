@@ -69,6 +69,7 @@ function run_final_ui_closure_unit_tests(): int
         'event.key',
         "'Escape'",
         'modal.hide()',
+        '}, true);',
         'aria-labelledby="addStaffModalLabel"',
         'aria-labelledby="editStaffModalLabel"',
     ] as $contract) {
