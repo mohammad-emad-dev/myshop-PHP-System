@@ -28,7 +28,8 @@ Phase 3F places the category sales distribution read in the same module; its
 legacy name also remains a delegation-only compatibility wrapper.
 Phase 4B places category creation and update implementations in
 `includes/categories.php`; Phase 4C places category deletion there as well.
-Their legacy names remain delegation-only wrappers.
+Phase 4D places customer creation, update, and deletion implementations in
+`includes/customers.php`. Their legacy names remain delegation-only wrappers.
 
 ## Focused Dashboard statistics contract
 
@@ -120,6 +121,34 @@ and rendering while calling `categories_create()`, `categories_update()`, and
 `categories_delete()` directly. The legacy `create_category()`,
 `update_category()`, and `delete_category()` names remain delegation-only
 wrappers with their original signatures and boolean return contracts.
+
+## Focused Customer mutation contracts
+
+`customers_create($conn, $name, $phone, $email, $address)` preserves the
+existing sanitization helpers, rejects an empty name, uses prepared bindings,
+and returns `true` only when the insert affects exactly one row. Statement,
+connection, and SQL failures return `false` after the existing diagnostic is
+logged. `customers_update($conn, $id, $name, $phone, $email, $address)` rejects
+IDs `<= 1` and empty names, preserves the existing sanitization and bindings,
+and returns the result of successful statement execution without checking
+affected rows; therefore a missing ID retains the legacy `true` result when
+the update executes successfully. `customers_delete($conn, $id)` rejects IDs
+`<= 1` and returns `true` only when exactly one row is deleted.
+
+ID `1` is the protected Walk-in Customer. Customer deletion retains the
+existing foreign-key behavior for historical orders: `Order.customer_id` is
+set to `NULL` by the database rather than deleting the order. The focused
+services require an explicit connection, use prepared statements, close every
+statement on success and failure, do not require `functions.php`, and do not
+read session or global state. They preserve safe boolean failure results and
+existing error logging.
+
+`public/customers.php` calls `customers_create()`, `customers_update()`, and
+`customers_delete()` directly while retaining authentication, CSRF ordering,
+administrator authorization, input handling, audit metadata, messages,
+redirects, pagination, and rendering. The legacy `create_customer()`,
+`update_customer()`, and `delete_customer()` names remain delegation-only
+compatibility wrappers in `includes/functions.php`.
 
 ## Focused Product mutation contracts
 

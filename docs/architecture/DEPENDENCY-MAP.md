@@ -1,7 +1,7 @@
 # MyShop dependency map
 
 This map records current call-site and dependency relationships after the
-Phase 4C Category deletion service extraction. It remains a
+Phase 4D customer mutation service extraction. It remains a
 characterization artifact; the compatibility wrappers are still required.
 
 ## Public-page to shared-function map
@@ -14,7 +14,7 @@ names are grouped only for readability; the source remains the authority.
 | `audit_log.php` | `start_secure_session`, `verify_login`, `require_admin`, `normalize_page_number`, `normalize_page_size`, `truncate_list_search`, `count_audit_logs`, `get_audit_logs_page` |
 | `backup_database.php` | `start_secure_session`, `verify_login`, `is_admin`, `verify_csrf_token`, `audit_log`, `get_backup_table_allowlist`, `quote_backup_table`, `stream_database_backup` |
 | `categories.php` | `start_secure_session`, `verify_login`, `is_admin`, `require_admin`, `verify_csrf_token`, `generate_csrf_token`, `sanitize_input`, `normalize_page_number`, `normalize_page_size`, `truncate_list_search`, `categories_create`, `categories_update`, `categories_delete`, `catalog_count_categories`, `catalog_get_categories_page`, `audit_log_current_actor`, `audit_log_denied` |
-| `customers.php` | `start_secure_session`, `verify_login`, `is_admin`, `verify_csrf_token`, `generate_csrf_token`, `sanitize_input`, `normalize_page_number`, `normalize_page_size`, `truncate_list_search`, `create_customer`, `update_customer`, `delete_customer`, `people_count_customers`, `people_get_customers_page`, `audit_log_current_actor`, `audit_log_denied` |
+| `customers.php` | `start_secure_session`, `verify_login`, `is_admin`, `verify_csrf_token`, `generate_csrf_token`, `sanitize_input`, `normalize_page_number`, `normalize_page_size`, `truncate_list_search`, `customers_create`, `customers_update`, `customers_delete`, `people_count_customers`, `people_get_customers_page`, `audit_log_current_actor`, `audit_log_denied` |
 | `export_report.php` | `start_secure_session`, `verify_login`, `require_admin`, `export_report_definitions`, `export_validate_entity`, `export_validate_order_filters`, `export_csv_text`, `export_csv_write_row`, `export_csv_fail`, `export_stream_entity` |
 | `get_order_details.php` | `start_secure_session`, `verify_login`, `is_admin`, `orders_get_by_id`, `orders_get_details`, `audit_log_current_actor` |
 | `health.php` | `initialize_request_context` |
@@ -156,9 +156,11 @@ delegation-only compatibility wrapper for remaining callers. `public/orders.php`
 calls `orders_create()` directly and continues to own request parsing, CSRF,
 page-level purchase authorization, POS validation, generic messages, and
 rendering.
-Staff administration, category/customer/supplier writes, and other
-not-yet-extracted workflows remain in `includes/functions.php` or their existing
-page controllers.
+Staff administration, supplier writes, and other not-yet-extracted workflows
+remain in `includes/functions.php` or their existing page controllers. Customer
+writes are now owned by `includes/customers.php`; `create_customer()`,
+`update_customer()`, and `delete_customer()` remain in the facade only as
+delegation-only compatibility wrappers.
 
 ## Orders module boundary
 
@@ -268,6 +270,27 @@ compatibility wrappers. `get_customers()` and `get_suppliers()` remain
 unbounded legacy loaders; `get_customer_by_id()` and `get_supplier_by_id()`
 remain uncalled legacy lookups. None was moved without a verified caller.
 
+## Customer mutation module boundary
+
+`includes/customers.php` has no dependency on `includes/functions.php`, session
+state, or global state. It requires only `validation.php`, accepts the database
+connection and customer inputs explicitly, and uses prepared statements with
+statement cleanup on every success and failure path.
+
+| Focused function | Mutation and return contract |
+|---|---|
+| `customers_create` | Sanitizes the supplied fields, rejects an empty name, inserts one customer, and returns `true` only when `affected_rows === 1`; prepared-statement, connection, and SQL failures return `false`. |
+| `customers_update` | Sanitizes the supplied fields, rejects IDs `<= 1` and empty names, and preserves the legacy execute-success contract, including `true` for a missing ID when the update executes successfully. |
+| `customers_delete` | Rejects IDs `<= 1`, deletes one customer, and returns `true` only when `affected_rows === 1`; the existing foreign key leaves historical orders intact and sets `Order.customer_id` to `NULL`. |
+
+The protected ID `1` is the Walk-in Customer and cannot be updated or deleted.
+The focused services preserve the legacy error logging, boolean failure
+contract, prepared bindings, sanitization, and closed-connection behavior.
+`public/customers.php` calls the focused services directly after its existing
+CSRF and administrator gates. The legacy customer names remain
+delegation-only wrappers in `functions.php`. `includes/people.php` remains
+read-only.
+
 ## Read-only functions
 
 These functions are intended to read or normalize data. They still may log
@@ -352,7 +375,10 @@ errors and may depend on `$conn` or session scope.
 | `categories_update` | Focused category update service with duplicate-name and General-category protection. |
 | `categories_delete` | Focused category deletion transaction with General verification, product reassignment, rollback, and boolean failure behavior. |
 | `create_category`, `update_category`, `delete_category` | Delegation-only compatibility wrappers for the focused Category module. |
-| `create_customer`, `update_customer`, `delete_customer` | Mutate customer data. |
+| `customers_create` | Focused customer creation service with sanitization, prepared insert, and exact affected-row success contract. |
+| `customers_update` | Focused customer update service with protected-ID/name validation and preserved execute-success behavior. |
+| `customers_delete` | Focused customer deletion service with protected-ID validation and exact affected-row success contract. |
+| `create_customer`, `update_customer`, `delete_customer` | Delegation-only compatibility wrappers for the focused Customer module. |
 | `create_supplier`, `update_supplier`, `delete_supplier` | Mutate supplier data. |
 | `uploads_handle_image` | Validates and writes a safe image to the canonical `public/uploads` directory. |
 | `uploads_delete_newly_uploaded_image` | Deletes a safe current-request upload path and preserves the outside-root/traversal protections. |

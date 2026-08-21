@@ -1,6 +1,6 @@
 # MyShop architecture baseline
 
-Status: Phase 4A secure upload module extraction baseline
+Status: Phase 4D customer mutation service extraction baseline
 
 Captured from the `security-hardening-baseline` branch at starting revision
 `70d1ad64a5c639b93897c1c1abd2ab28063cef90`.
@@ -28,12 +28,14 @@ Browser QA is intentionally separate from the dependency-free PHP test harness.
 3. A page normally requires `includes/functions.php`, starts a secure session,
    loads `config/db.php`, and then performs request-specific work.
 4. `includes/functions.php` loads `security.php`, `pagination.php`, `audit.php`,
-   `http.php`, `auth.php`, `catalog.php`, `people.php`, `inventory.php`,
-   `products.php`, `orders.php`, `uploads.php`, and `categories.php` as a compatibility facade. Catalog and People page
+   `http.php`, `auth.php`, `validation.php`, `catalog.php`, `people.php`,
+   `inventory.php`, `products.php`, `orders.php`, `uploads.php`,
+   `categories.php`, and `customers.php` as a compatibility facade. Catalog and People page
    callers may use their focused read functions directly; product mutations are
    owned by `includes/products.php`, category creation/update by
-  `includes/categories.php`, including category deletion, and order creation plus bounded/single-record
-   order reads by `includes/orders.php`; legacy names remain available as
+   `includes/categories.php`, including category deletion, and order creation plus bounded/single-record
+   order reads by `includes/orders.php`; customer mutations are owned by
+   `includes/customers.php`; legacy names remain available as
    compatibility wrappers.
 5. `config/db.php` reads `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, and
    `DB_PASSWORD` from the process environment and creates the mysqli
@@ -119,12 +121,13 @@ application service module.
 | `get_low_stock_products()`, stock movement reads, `log_stock_movement()` | Delegation-only low-stock and bounded stock-movement compatibility wrappers; the legacy unbounded movement loader remains in the facade |
 | `create_product()`, `update_product()`, `delete_product()` | Delegation-only compatibility wrappers to `includes/products.php`; upload request dispatch remains page-owned while filesystem validation/storage/cleanup is owned by `includes/uploads.php` |
 | `create_category()`, `update_category()`, `delete_category()` | Delegation-only compatibility wrappers to `includes/categories.php` |
+| `create_customer()`, `update_customer()`, `delete_customer()` | Delegation-only compatibility wrappers to `includes/customers.php` |
 | `create_order()` | Delegation-only compatibility wrapper to `includes/orders.php`; the wrapper preserves the existing order-ID-or-false return contract |
 | `orders_count()`, `orders_get_page()`, `orders_get_summary()`, `orders_get_by_id()`, `orders_get_details()` | Focused bounded and single-record order reads; the legacy names remain delegation-only wrappers for remaining callers |
 | `get_dashboard_stats()`, `get_chart_data()`, `get_inventory_valuation()`, `get_top_selling_products()`, `get_category_sales_distribution()` | Delegation-only compatibility wrappers to `includes/dashboard.php`; remaining report functions remain in the facade |
 | Role checks and staff administration functions | Authorization and staff administration |
 | Category read/mutation functions | Category reads remain in Catalog compatibility wrappers; category create/update/delete are delegated to `includes/categories.php` |
-| Customer read/mutation functions | Remaining customer reads and customer mutations |
+| Customer read/mutation functions | Customer reads remain in People compatibility wrappers; customer create/update/delete are delegated to `includes/customers.php` |
 | Supplier read/mutation functions | Remaining supplier reads and supplier mutations |
 | Remaining dashboard report functions | Other dashboard report functions not yet extracted |
 
@@ -142,6 +145,9 @@ Focused shared modules already extracted from the facade:
 - `includes/people.php`: read-only bounded customer and supplier count, page,
   and selector queries. The legacy public function names remain thin wrappers
   in `functions.php`.
+- `includes/validation.php`: pure reusable input sanitization helpers shared by
+  focused services and the compatibility facade; it has no database, session,
+  or global-state dependency.
 - `includes/inventory.php`: bounded low-stock and stock-movement reads, movement
   writing, and the atomic manual stock-adjustment service. The low-stock and
   bounded movement names remain available as compatibility wrappers; the
@@ -177,6 +183,11 @@ Focused shared modules already extracted from the facade:
   prepared statements, product reassignment, transaction rollback, and
   preserved boolean failure contracts. The legacy create/update/delete names
   remain delegation-only wrappers.
+- `includes/customers.php`: explicit customer creation, update, and deletion
+  services with preserved sanitization, Walk-in Customer protection, prepared
+  statements, affected-row contracts, foreign-key behavior, statement cleanup,
+  and safe boolean failure results. The legacy customer names remain
+  delegation-only wrappers.
 
 ## Public pages and responsibilities
 
@@ -191,7 +202,7 @@ Focused shared modules already extracted from the facade:
 | `public/order_history.php` | Scoped order history filters, pagination, summaries, order-history view and interactions |
 | `public/get_order_details.php` | Scoped JSON order-detail endpoint |
 | `public/pos_product_lookup.php` | Authenticated barcode lookup endpoint backed by the Catalog module |
-| `public/customers.php` | Customer CRUD request dispatch, People search/pagination, forms and table |
+| `public/customers.php` | Customer CRUD request dispatch, direct `customers_create()`/`customers_update()`/`customers_delete()` calls, People search/pagination, forms and table |
 | `public/suppliers.php` | Supplier CRUD request dispatch, People search/pagination, forms and table |
 | `public/audit_log.php` | Admin audit filtering, pagination, and audit table |
 | `public/export_report.php` | Admin CSV validation, headers, and delegation to streaming exporter |
@@ -225,7 +236,8 @@ Shared modules own most other application SQL:
   count/page/selector reads; `includes/functions.php` retains compatibility
   wrappers.
 - `includes/people.php`: bounded customer and supplier count/page/selector reads;
-  `includes/functions.php` retains compatibility wrappers.
+  `includes/functions.php` retains compatibility wrappers. Customer writes are
+  owned by `includes/customers.php`.
 - `includes/products.php`: product creation, update, and deletion transactions,
   product stock-history integration, and product audit writes; the legacy names
   remain compatibility wrappers in `includes/functions.php`.
@@ -236,7 +248,8 @@ Shared modules own most other application SQL:
   available through the compatibility facade.
 - `includes/functions.php`: legacy full product reads, remaining inventory,
   order, staff, reference-data, remaining report queries, and protected
-  mutations that have not yet been extracted; `get_dashboard_stats()`,
+  mutations that have not yet been extracted; customer mutation names are
+  compatibility wrappers for `includes/customers.php`; `get_dashboard_stats()`,
   `get_chart_data()`, `get_inventory_valuation()`, `get_top_selling_products()`,
   and `get_category_sales_distribution()` are compatibility wrappers for
   `includes/dashboard.php`; `get_low_stock_products()` is a compatibility
