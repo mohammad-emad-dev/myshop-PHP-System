@@ -139,7 +139,7 @@ function run_inventory_read_unit_tests(): int
         'WHERE p.stock <= p.alert_threshold',
         'ORDER BY p.stock ASC, p.name ASC, p.id ASC',
         'normalize_page_size($limit, 100, [25, 50, 100])',
-        "bind_param('i', $limit)",
+        'bind_param(\'i\', $limit)',
         "Low-stock product prepare failed: '",
         "Low-stock product bind failed: '",
         "Low-stock product execute failed: '",

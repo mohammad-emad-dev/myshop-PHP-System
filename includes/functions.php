@@ -559,43 +559,7 @@ function get_product_by_id($conn, $id)
 
 function get_low_stock_products($conn, $limit = 100)
 {
-    $limit = normalize_page_size($limit, 100, [25, 50, 100]);
-    $stmt = null;
-    try {
-        $stmt = $conn->prepare(
-            "SELECT p.*, c.name as category_name
-             FROM Product p
-             LEFT JOIN Category c ON p.category_id = c.id
-             WHERE p.stock <= p.alert_threshold
-             ORDER BY p.stock ASC, p.name ASC, p.id ASC
-             LIMIT ?"
-        );
-        if (!$stmt) {
-            error_log('Low-stock product prepare failed: ' . $conn->error);
-            return [];
-        }
-        if (!$stmt->bind_param('i', $limit)) {
-            error_log('Low-stock product bind failed: ' . $stmt->error);
-            return [];
-        }
-        if (!$stmt->execute()) {
-            error_log('Low-stock product execute failed: ' . $stmt->error);
-            return [];
-        }
-        $result = $stmt->get_result();
-        if (!$result) {
-            error_log('Low-stock product result retrieval failed: ' . $stmt->error);
-            return [];
-        }
-        return $result->fetch_all(MYSQLI_ASSOC);
-    } catch (Throwable $exception) {
-        error_log('Low-stock product query failed: ' . $exception->getMessage());
-        return [];
-    } finally {
-        if ($stmt instanceof mysqli_stmt) {
-            $stmt->close();
-        }
-    }
+    return inventory_get_low_stock_products($conn, $limit);
 }
 
 function log_stock_movement($conn, $product_id, $staff_id, $quantity, $movement_type, $reason = null)

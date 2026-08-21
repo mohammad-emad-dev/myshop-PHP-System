@@ -24,7 +24,7 @@
                 $low_stock_notification_products = [];
                 $low_stock_count = 0;
                 if (isset($conn) && $conn instanceof mysqli) {
-                    $low_stock_notification_products = get_low_stock_products($conn);
+                    $low_stock_notification_products = inventory_get_low_stock_products($conn);
                     $low_stock_count = count($low_stock_notification_products);
                 }
                 ?>
