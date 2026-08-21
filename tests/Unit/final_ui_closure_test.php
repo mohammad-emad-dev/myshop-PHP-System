@@ -143,6 +143,8 @@ function run_final_ui_closure_unit_tests(): int
         "captureSanitizedScreenshot(page, 'admin-audit-log-final'",
         '.settings-staff-table td',
         '.audit-log-table td',
+        "page.keyboard.press('Escape')",
+        "expect(page.locator('#addStaffModal')).toBeHidden()",
         "['/audit_log.php', 'audit-log']",
         "['/settings.php', 'settings-final']",
         'prefers-reduced-motion',
