@@ -1,7 +1,7 @@
 # MyShop dependency map
 
 This map records current call-site and dependency relationships after the
-Phase 3F dashboard category-sales service extraction. It remains a
+Phase 3G low-stock Inventory service extraction. It remains a
 characterization artifact; the compatibility wrappers are still required.
 
 ## Public-page to shared-function map
@@ -18,7 +18,7 @@ names are grouped only for readability; the source remains the authority.
 | `export_report.php` | `start_secure_session`, `verify_login`, `require_admin`, `export_report_definitions`, `export_validate_entity`, `export_validate_order_filters`, `export_csv_text`, `export_csv_write_row`, `export_csv_fail`, `export_stream_entity` |
 | `get_order_details.php` | `start_secure_session`, `verify_login`, `is_admin`, `orders_get_by_id`, `orders_get_details`, `audit_log_current_actor` |
 | `health.php` | `initialize_request_context` |
-| `index.php` | `start_secure_session`, `verify_login`, `is_admin`, `dashboard_get_stats`, `dashboard_get_chart_data`, `dashboard_get_inventory_valuation`, `dashboard_get_top_selling_products`, `dashboard_get_category_sales_distribution`, `get_low_stock_products` |
+| `index.php` | `start_secure_session`, `verify_login`, `is_admin`, `dashboard_get_stats`, `dashboard_get_chart_data`, `dashboard_get_inventory_valuation`, `dashboard_get_top_selling_products`, `dashboard_get_category_sales_distribution`, `inventory_get_low_stock_products` |
 | `login.php` | `start_secure_session`, `send_security_headers`, `verify_csrf_token`, `get_login_source_ip`, `build_login_rate_limit_key`, `login_rate_limit_check`, `login_rate_limit_record_failure`, `login_rate_limit_reset`, `audit_log`, `audit_log_current_actor`, `destroy_current_session`, `generate_csrf_token`, `redirect`, `verify_login`, `get_asset_integrity` |
 | `order_history.php` | `start_secure_session`, `verify_login`, `is_admin`, `sanitize_input`, `normalize_page_number`, `normalize_page_size`, `orders_count`, `orders_get_summary`, `orders_get_page` |
 | `orders.php` | `start_secure_session`, `verify_login`, `is_admin`, `verify_csrf_token`, `generate_csrf_token`, `truncate_list_search`, `catalog_get_pos_products`, `catalog_get_categories_for_selector`, `people_get_customers_for_selector`, `people_get_suppliers_for_selector`, `catalog_get_product_by_id`, `orders_create`, `audit_log_current_actor`, `audit_log_denied` |
@@ -189,6 +189,7 @@ accepts `$conn` explicitly for each stock-movement operation.
 |---|---|---|
 | `inventory_count_stock_movements` | Count all movements or movements for one product | Prepared optional product filter; returns `0` on invalid input or failure |
 | `inventory_get_stock_movements_page` | Bounded movement page with optional product filter and deterministic newest-first ordering | Prepared product/limit/offset values; returns `[]` on invalid input or failure |
+| `inventory_get_low_stock_products` | Bounded Product read for rows where stock is at or below alert threshold, with optional Category name | Normalizes limit to 25, 50, or 100; returns `p.*` plus `category_name`, ordered by stock/name/id; returns `[]` on query or closed-connection failure |
 | `inventory_log_stock_movement` | Inserts one stock-movement history row | Preserves the prepared insert, binding, boolean return, and error-log contract; adds no transaction boundary |
 | `inventory_adjust_stock` | Atomic validated manual stock adjustment | Owns row locking, guarded update, movement insert, explicit-actor success/failure audit, commit, rollback, and cleanup; returns `true` only after commit |
 
@@ -203,9 +204,11 @@ also remains a delegation-only wrapper for remaining un-migrated callers.
 it directly for manual adjustments.
 `get_stock_movements()` remains an unbounded legacy loader because the
 inventory-wide caller inventory found no verified runtime caller.
-`get_low_stock_products()` remains in the facade for the dashboard and navbar
-callers. Inventory valuation now belongs to the Dashboard module; its legacy
-name remains only as a compatibility wrapper.
+`public/index.php` and `includes/layouts/navbar.php` call
+`inventory_get_low_stock_products()` directly. The legacy
+`get_low_stock_products()` name remains a delegation-only compatibility wrapper
+for any future or un-migrated callers. Inventory valuation now belongs to the
+Dashboard module; its legacy name remains only as a compatibility wrapper.
 
 ## People module boundary
 
@@ -250,10 +253,10 @@ errors and may depend on `$conn` or session scope.
 - `catalog_count_products` (`count_products` compatibility wrapper)
 - `catalog_get_products_page` (`get_products_page` compatibility wrapper)
 - `catalog_get_product_by_id` (`get_product_by_id` compatibility wrapper)
-- `get_low_stock_products`
 - `get_stock_movements` (legacy unbounded loader)
 - `inventory_count_stock_movements` (`count_stock_movements` compatibility wrapper)
 - `inventory_get_stock_movements_page` (`get_stock_movements_page` compatibility wrapper)
+- `inventory_get_low_stock_products` (`get_low_stock_products` compatibility wrapper)
 
 ### Order and reporting reads
 
@@ -365,10 +368,10 @@ the compatibility wrapper remains available for un-migrated callers and tests.
 ## Safe remaining extraction candidates
 
 Dashboard KPI aggregation, chart data, inventory valuation, top-selling
-products, and category sales distribution are now extracted and characterized
-in `includes/dashboard.php`. Remaining dashboard/report functions, including
-low-stock and other report reads, remain in the facade and require separate
-caller and contract audits before any move.
+products, and category sales distribution are extracted and characterized in
+`includes/dashboard.php`; low-stock reads are extracted and characterized in
+`includes/inventory.php`. Other dashboard/report functions remain in the facade
+and require separate caller and contract audits before any move.
 
 Batch 6A moved only active-session verification, the administrator role check,
 the administrator denial path, and redirect implementation behind wrappers. It

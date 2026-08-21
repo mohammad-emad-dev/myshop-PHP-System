@@ -167,7 +167,9 @@ callers must not assume the distinction is currently available.
 - `get_pos_products()` — bounded product array.
 - `get_stock_movements()` — complete movement array; legacy unbounded query.
 - `inventory_get_stock_movements_page()` / `get_stock_movements_page()` — bounded movement page.
-- `get_low_stock_products()` — bounded low-stock array.
+- `inventory_get_low_stock_products()` / `get_low_stock_products()` — bounded
+  low-stock array containing the existing `Product` fields plus the
+  `category_name` alias; the legacy name is a compatibility wrapper.
 - `get_products_page()` — bounded product page.
 - `get_categories()` — complete legacy category array with product counts.
 - `get_categories_page()` — bounded category page with product counts.
@@ -286,6 +288,9 @@ extracting modules unless callers are migrated and tested together.
   global query failures and global closed-connection failures. Scoped explicit
   statement failures return `[]`; a closed scoped connection preserves the
   existing thrown mysqli failure.
+- `inventory_get_low_stock_products()` and its `get_low_stock_products()`
+  compatibility wrapper return `[]` for query failure and closed-connection
+  failure after the existing server-side diagnostic is logged.
 - `get_order_summary()` returns default numeric summary fields on failure.
 - Paginated readers return empty arrays when the query fails.
 

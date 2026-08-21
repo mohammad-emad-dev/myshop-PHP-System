@@ -1,6 +1,6 @@
 # MyShop architecture baseline
 
-Status: Phase 3F dashboard category-sales extraction baseline
+Status: Phase 3G low-stock read extraction baseline
 
 Captured from the `security-hardening-baseline` branch at starting revision
 `70d1ad64a5c639b93897c1c1abd2ab28063cef90`.
@@ -115,7 +115,7 @@ application service module.
 | `verify_login()`, `redirect()` | Delegation-only Auth and HTTP compatibility wrappers |
 | `build_product_filter_sql()` | Catalog filter compatibility wrapper |
 | `get_all_products()` and Catalog compatibility wrappers | Legacy full product read plus delegation to `includes/catalog.php` |
-| `get_low_stock_products()`, stock movement reads, `log_stock_movement()` | Low-stock reads, stock-movement reads/pagination, and compatibility-preserving movement-write wrappers |
+| `get_low_stock_products()`, stock movement reads, `log_stock_movement()` | Delegation-only low-stock and bounded stock-movement compatibility wrappers; the legacy unbounded movement loader remains in the facade |
 | `create_product()`, `update_product()`, `delete_product()` | Delegation-only compatibility wrappers to `includes/products.php`; upload validation remains page-owned |
 | `create_order()` | Delegation-only compatibility wrapper to `includes/orders.php`; the wrapper preserves the existing order-ID-or-false return contract |
 | `orders_count()`, `orders_get_page()`, `orders_get_summary()`, `orders_get_by_id()`, `orders_get_details()` | Focused bounded and single-record order reads; the legacy names remain delegation-only wrappers for remaining callers |
@@ -124,7 +124,7 @@ application service module.
 | Category read/mutation functions | Remaining category reads and category mutations |
 | Customer read/mutation functions | Remaining customer reads and customer mutations |
 | Supplier read/mutation functions | Remaining supplier reads and supplier mutations |
-| Remaining dashboard report functions | Low-stock and other report functions not yet extracted |
+| Remaining dashboard report functions | Other dashboard report functions not yet extracted |
 
 Focused shared modules already extracted from the facade:
 
@@ -140,10 +140,10 @@ Focused shared modules already extracted from the facade:
 - `includes/people.php`: read-only bounded customer and supplier count, page,
   and selector queries. The legacy public function names remain thin wrappers
   in `functions.php`.
-- `includes/inventory.php`: bounded stock-movement reads, movement writing,
-  and the atomic manual stock-adjustment service. The legacy movement writer
-  and bounded read names remain compatibility wrappers where callers have not
-  migrated.
+- `includes/inventory.php`: bounded low-stock and stock-movement reads, movement
+  writing, and the atomic manual stock-adjustment service. The low-stock and
+  bounded movement names remain available as compatibility wrappers; the
+  bounded movement wrappers continue to support callers not yet migrated.
 - `includes/products.php`: explicit product creation, update, and deletion
   transactions, product stock-history integration, and product audit writes.
   The legacy `create_product()`, `update_product()`, and `delete_product()`
@@ -173,7 +173,7 @@ Focused shared modules already extracted from the facade:
 | Page | Current responsibility |
 |---|---|
 | `public/login.php` | Login, logout, rate-limit interaction, session changes, authentication audit, login view |
-| `public/index.php` | Dashboard authorization, direct `dashboard_get_stats()`, `dashboard_get_chart_data()`, `dashboard_get_inventory_valuation()`, `dashboard_get_top_selling_products()`, and `dashboard_get_category_sales_distribution()` calls, remaining report data preparation, dashboard view |
+| `public/index.php` | Dashboard authorization, direct `dashboard_get_stats()`, `dashboard_get_chart_data()`, `dashboard_get_inventory_valuation()`, `dashboard_get_top_selling_products()`, `dashboard_get_category_sales_distribution()`, and `inventory_get_low_stock_products()` calls, remaining report data preparation, dashboard view |
 | `public/products.php` | Product CRUD request dispatch, request validation, authorization, CSRF, image upload handling, generic messages, Catalog search/pagination, product table, forms, and rendering; delegates product database mutations directly to `products_create()`, `products_update()`, and `products_delete()` |
 | `public/categories.php` | Category CRUD request dispatch, admin checks, Catalog search/pagination, category view |
 | `public/stock_movements.php` | Manual stock adjustment request validation, CSRF and authorization boundary, delegation to the Inventory service, movement history filtering/pagination, and stock ledger view |
@@ -229,7 +229,8 @@ Shared modules own most other application SQL:
   mutations that have not yet been extracted; `get_dashboard_stats()`,
   `get_chart_data()`, `get_inventory_valuation()`, `get_top_selling_products()`,
   and `get_category_sales_distribution()` are compatibility wrappers for
-  `includes/dashboard.php`.
+  `includes/dashboard.php`; `get_low_stock_products()` is a compatibility
+  wrapper for `includes/inventory.php`.
 - `includes/audit.php:62-300`: audit writes and reads.
 - `includes/export.php:115-392`: bounded export queries.
 - `includes/backup.php:114-168`: table definition and streamed data queries.
@@ -243,8 +244,9 @@ architectural risk is persistence coupling, not a confirmed SQL injection.
   sends security headers, loads external CSS, and opens the HTML document.
 - `includes/layouts/sidebar.php:31-87` renders primary navigation and a CSRF-
   protected logout form. Admin-only navigation links are conditionally shown.
-- `includes/layouts/navbar.php:88-216` renders top navigation, low-stock
-  notifications, account controls, and the main content opening tag.
+- `includes/layouts/navbar.php:24-216` calls the focused Inventory low-stock
+  read for notifications, then renders top navigation, account controls, and
+  the main content opening tag.
 - `includes/layouts/footer.php` closes the page, loads the CSP compatibility
   shim, Bootstrap, optional page assets, and the shared script.
 
