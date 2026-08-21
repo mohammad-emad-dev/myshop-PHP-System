@@ -166,42 +166,43 @@ require_once '../includes/layouts/header.php';
     <?php require_once '../includes/layouts/sidebar.php'; ?>
     <?php require_once '../includes/layouts/navbar.php'; ?>
 
-    <div class="container-fluid px-4 py-5">
+    <div class="container-fluid px-4 py-5 products-page data-page">
 
         <div class="row my-2">
             <div class="col-md-12">
-                <div class="card shadow-sm border-0 rounded-4">
-                    <div class="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center">
-                        <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
-                            <div>
+                <div class="card shadow-sm border-0 rounded-4 data-surface products-surface">
+                    <div class="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center data-page-header">
+                        <div class="data-page-header__content">
+                            <p class="data-page-kicker mb-2">Catalog operations</p>
+                            <div class="data-page-header__title-row">
                                 <h2 class="h3 mb-0 fw-bold ui-page-heading">
                                     Inventory Catalog
                                     <span class="badge bg-primary rounded-pill ms-2 align-middle ui-count-text-lg"><?php echo number_format($total_products); ?> Items</span>
                                 </h2>
-                                <p class="text-muted mb-0 mt-1">Manage all your products, pricing, and stock alerts.</p>
                             </div>
-                            <div class="d-flex gap-2">
+                            <p class="data-page-context mb-0 mt-2">Manage product identity, pricing, stock, and alert thresholds.</p>
+                        </div>
+                        <div class="d-flex gap-2 data-page-actions">
                                 <?php if (auth_is_admin($conn)): ?>
-                                <a href="export_report.php?entity=products" class="btn btn-success rounded-3 shadow-sm px-4 fw-medium" target="_blank">
+                                <a href="export_report.php?entity=products" class="btn btn-success rounded-3 shadow-sm px-4 fw-medium data-page-action" target="_blank">
                                     <i class="fas fa-file-excel me-2"></i>Export CSV
                                 </a>
-                                <button class="btn btn-primary rounded-3 shadow-sm px-4 fw-medium pulse-btn" data-bs-toggle="modal" data-bs-target="#addProductModal">
+                                <button class="btn btn-primary rounded-3 shadow-sm px-4 fw-medium pulse-btn data-page-action" data-bs-toggle="modal" data-bs-target="#addProductModal">
                                     <i class="fas fa-plus-circle me-2"></i>Add Product
                                 </button>
                                 <?php endif; ?>
-                            </div>
                         </div>
                     </div>
-                    <div class="card-body">
-                        <form method="GET" action="products.php" class="row mb-3 g-2 align-items-end">
-                            <div class="col-md-4">
+                    <div class="card-body data-surface__body">
+                        <form method="GET" action="products.php" class="row mb-3 g-2 align-items-end data-toolbar">
+                            <div class="col-md-4 data-toolbar__field">
                                 <label for="searchProduct" class="form-label">Search products</label>
                                 <div class="input-group shadow-sm rounded-3 overflow-hidden border">
                                     <span class="input-group-text bg-white border-0"><i class="fas fa-search text-muted"></i></span>
                                     <input type="search" id="searchProduct" name="search" value="<?php echo htmlspecialchars($search, ENT_QUOTES, 'UTF-8'); ?>" placeholder="Name, category, or barcode" class="form-control border-0 px-2 ui-search-input">
                                 </div>
                             </div>
-                            <div class="col-sm-4 col-md-2">
+                            <div class="col-sm-4 col-md-2 data-toolbar__field">
                                 <label for="pageSize" class="form-label">Items per page</label>
                                 <select id="pageSize" name="page_size" class="form-select">
                                     <?php foreach ($allowed_page_sizes as $allowed_page_size): ?>
@@ -216,15 +217,15 @@ require_once '../includes/layouts/header.php';
                                 <input type="hidden" name="highlight" value="<?php echo $highlight_id; ?>">
                             <?php endif; ?>
                             <input type="hidden" name="page" value="1">
-                            <div class="col-auto">
-                                <button type="submit" class="btn btn-outline-primary">Apply</button>
+                            <div class="col-auto data-toolbar__submit">
+                                <button type="submit" class="btn btn-outline-primary data-control-button">Apply</button>
                             </div>
                         </form>
                         <?php if ($filter === 'low_stock'): ?>
-                            <p class="text-muted small mb-3">Showing products at or below their stock alert threshold.</p>
+                            <p class="text-muted small mb-3 data-filter-summary"><i class="fas fa-triangle-exclamation me-1" aria-hidden="true"></i>Showing products at or below their stock alert threshold.</p>
                         <?php endif; ?>
-                        <div class="table-responsive">
-                            <table class="table table-hover align-middle" id="productsTable">
+                        <div class="table-responsive data-table-shell">
+                            <table class="table table-hover align-middle data-table products-table" id="productsTable">
                                 <thead class="bg-light text-secondary">
                                     <tr>
                                         <th scope="col">ID</th>
@@ -241,7 +242,11 @@ require_once '../includes/layouts/header.php';
                                 <tbody>
                                     <?php if (empty($products)): ?>
                                         <tr>
-                                            <td colspan="9" class="text-center text-muted py-4">No products matched your search or filter.</td>
+                                            <td colspan="9" class="text-center text-muted py-4 data-empty-state">
+                                                <span class="data-empty-state__icon" aria-hidden="true"><i class="fas fa-box-open"></i></span>
+                                                <strong>No products matched this view.</strong>
+                                                <span>Try another search or clear the low-stock filter.</span>
+                                            </td>
                                         </tr>
                                     <?php endif; ?>
                                     <?php foreach ($products as $product): ?>
@@ -254,7 +259,7 @@ require_once '../includes/layouts/header.php';
                                             $row_class = 'table-danger-subtle';
                                         }
                                         ?>
-                                        <tr class="<?php echo $row_class; ?>">
+                                        <tr class="product-row <?php echo $row_class; ?>">
                                             <td><?php echo $product['id']; ?></td>
                                             <td>
                                                 <div class="fw-bold"><?php echo htmlspecialchars($product['name']); ?></div>
@@ -275,31 +280,31 @@ require_once '../includes/layouts/header.php';
                                             <td class="text-success fw-bold">$<?php echo number_format($product['price'], 2); ?></td>
                                             <td>
                                                 <?php if ($is_low): ?>
-                                                    <span class="badge rounded-pill bg-danger shadow-sm">Low Stock (<?php echo $product['stock']; ?>)</span>
+                                                    <span class="badge rounded-pill bg-danger shadow-sm product-status">Low Stock (<?php echo $product['stock']; ?>)</span>
                                                 <?php else: ?>
-                                                    <span class="badge rounded-pill bg-success shadow-sm">In Stock (<?php echo $product['stock']; ?>)</span>
+                                                    <span class="badge rounded-pill bg-success shadow-sm product-status">In Stock (<?php echo $product['stock']; ?>)</span>
                                                 <?php endif; ?>
                                             </td>
                                             <td class="fw-bold <?php echo $is_low ? 'text-danger' : 'text-secondary'; ?>">
                                                 <?php echo $product['alert_threshold']; ?>
                                             </td>
-                                            <td>
+                                            <td class="product-image-cell">
                                                 <?php if ($product['image_path']): ?>
-                                                    <div class="product-img-wrapper product-image-wrapper">
+                                                    <div class="product-img-wrapper product-image-wrapper data-image-thumb">
                                                         <img src="<?php echo htmlspecialchars($product['image_path']); ?>" alt="Product" class="product-image-hover">
                                                     </div>
                                                 <?php else: ?>
-                                                    <div class="d-flex align-items-center justify-content-center bg-light text-muted product-image-placeholder">
+                                                    <div class="d-flex align-items-center justify-content-center bg-light text-muted product-image-placeholder data-image-thumb" aria-hidden="true">
                                                         <i class="fas fa-image fs-5 opacity-50"></i>
                                                     </div>
                                                 <?php endif; ?>
                                             </td>
-                                             <td>
-                                                 <a href="stock_movements.php?product_id=<?php echo $product['id']; ?>" class="btn btn-sm btn-outline-secondary me-1" title="Stock History">
+                                             <td class="product-actions data-action-group">
+                                                 <a href="stock_movements.php?product_id=<?php echo $product['id']; ?>" class="btn btn-sm btn-outline-secondary me-1 data-action-button" title="Stock History">
                                                      <i class="fas fa-history"></i>
                                                  </a>
                                                  <?php if (auth_is_admin($conn)): ?>
-                                                 <button type="button" class="btn btn-sm btn-outline-info me-1 edit-product-btn"
+                                                 <button type="button" class="btn btn-sm btn-outline-info me-1 edit-product-btn data-action-button"
                                                          aria-label="Edit product" title="Edit product"
                                                          data-product-id="<?php echo (int)$product['id']; ?>"
                                                          data-product-name="<?php echo htmlspecialchars($product['name'] ?? '', ENT_QUOTES, 'UTF-8'); ?>"
@@ -315,7 +320,7 @@ require_once '../includes/layouts/header.php';
                                                       <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(generate_csrf_token()); ?>">
                                                       <input type="hidden" name="action" value="delete">
                                                       <input type="hidden" name="id" value="<?php echo (int)$product['id']; ?>">
-                                                      <button type="submit" class="btn btn-sm btn-outline-danger" aria-label="Delete product" title="Delete product">
+                                                          <button type="submit" class="btn btn-sm btn-outline-danger data-action-button" aria-label="Delete product" title="Delete product">
                                                           <i class="fas fa-trash"></i>
                                                       </button>
                                                   </form>
@@ -326,7 +331,7 @@ require_once '../includes/layouts/header.php';
                                 </tbody>
                             </table>
                         </div>
-                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mt-4">
+                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mt-4 data-pagination">
                             <p class="text-muted small mb-0">
                                 Showing <?php echo number_format($range_start); ?>–<?php echo number_format($range_end); ?> of <?php echo number_format($total_products); ?> products
                             </p>
@@ -368,15 +373,15 @@ require_once '../includes/layouts/header.php';
 
     <!-- Add Product Modal -->
     <div class="modal fade" id="addProductModal" tabindex="-1" aria-labelledby="addProductModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content border-0 rounded-4">
-                <div class="modal-header py-3">
+        <div class="modal-dialog modal-dialog-centered data-modal-dialog">
+            <div class="modal-content border-0 rounded-4 data-modal">
+                <div class="modal-header py-3 data-modal__header">
                     <h5 class="modal-title fw-bold ui-modal-title" id="addProductModalLabel"><i class="fas fa-plus me-2 text-primary"></i>Add New Product</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <form method="POST" enctype="multipart/form-data">
                     <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(generate_csrf_token()); ?>">
-                    <div class="modal-body">
+                    <div class="modal-body data-modal__body">
                         <input type="hidden" name="action" value="create">
                         <div class="mb-3">
                             <label for="name" class="form-label">Product Name</label>
@@ -420,7 +425,7 @@ require_once '../includes/layouts/header.php';
                             <input class="form-control" type="file" id="image" name="image" accept="image/*">
                         </div>
                     </div>
-                    <div class="modal-footer">
+                    <div class="modal-footer data-modal__footer">
                         <button type="button" class="btn btn-secondary rounded-3" data-bs-dismiss="modal">Cancel</button>
                         <button type="submit" class="btn btn-primary rounded-3 px-4">Add Product</button>
                     </div>
@@ -431,15 +436,15 @@ require_once '../includes/layouts/header.php';
 
     <!-- Edit Product Modal -->
     <div class="modal fade" id="editProductModal" tabindex="-1" aria-labelledby="editProductModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content border-0 rounded-4">
-                <div class="modal-header py-3">
+        <div class="modal-dialog modal-dialog-centered data-modal-dialog">
+            <div class="modal-content border-0 rounded-4 data-modal">
+                <div class="modal-header py-3 data-modal__header">
                     <h5 class="modal-title fw-bold ui-modal-title" id="editProductModalLabel"><i class="fas fa-edit me-2 text-primary"></i>Edit Product Details</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <form method="POST" enctype="multipart/form-data">
                     <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(generate_csrf_token()); ?>">
-                    <div class="modal-body">
+                    <div class="modal-body data-modal__body">
                         <input type="hidden" name="action" value="update">
                         <input type="hidden" id="edit_id" name="id">
 
@@ -485,7 +490,7 @@ require_once '../includes/layouts/header.php';
                             <input class="form-control" type="file" id="edit_image" name="image" accept="image/*">
                         </div>
                     </div>
-                    <div class="modal-footer">
+                    <div class="modal-footer data-modal__footer">
                         <button type="button" class="btn btn-secondary rounded-3" data-bs-dismiss="modal">Cancel</button>
                         <button type="submit" class="btn btn-primary rounded-3 px-4">Save Changes</button>
                     </div>

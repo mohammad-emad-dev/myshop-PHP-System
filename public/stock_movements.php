@@ -110,24 +110,25 @@ require_once '../includes/layouts/header.php';
     <?php require_once '../includes/layouts/sidebar.php'; ?>
     <?php require_once '../includes/layouts/navbar.php'; ?>
 
-    <div class="container-fluid px-4 py-5">
+    <div class="container-fluid px-4 py-5 inventory-page data-page">
         
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <div>
+        <div class="d-flex justify-content-between align-items-center mb-4 data-page-header inventory-page-header">
+            <div class="data-page-header__content">
+                <p class="data-page-kicker mb-2">Inventory control</p>
                 <h2 class="h3 mb-0 fw-bold ui-page-heading">
                     Stock Ledger
                     <span class="badge bg-primary rounded-pill ms-2 align-middle ui-count-text-lg"><?php echo number_format($total_movements); ?> Records</span>
                 </h2>
-                <p class="text-muted mb-0 mt-1">Detailed history of all inventory stock updates, additions, and manual corrections.</p>
+                <p class="data-page-context mb-0 mt-2">Trace stock changes, operational reasons, and the staff member who recorded them.</p>
             </div>
-            <div class="d-flex gap-2">
+            <div class="d-flex gap-2 data-page-actions">
                 <?php if (auth_is_admin($conn)): ?>
-                <a href="export_report.php?entity=stock" class="btn btn-success rounded-3 shadow-sm px-4 fw-medium" target="_blank">
+                <a href="export_report.php?entity=stock" class="btn btn-success rounded-3 shadow-sm px-4 fw-medium data-page-action" target="_blank">
                     <i class="fas fa-file-excel me-2"></i>Export CSV
                 </a>
                 <?php endif; ?>
                 <?php if (auth_is_admin($conn)): ?>
-                <button class="btn btn-primary rounded-3 shadow-sm px-4 fw-medium pulse-btn" data-bs-toggle="modal" data-bs-target="#addMovementModal">
+                <button class="btn btn-primary rounded-3 shadow-sm px-4 fw-medium pulse-btn data-page-action" data-bs-toggle="modal" data-bs-target="#addMovementModal">
                     <i class="fas fa-plus-circle me-2"></i>New Adjustment
                 </button>
                 <?php endif; ?>
@@ -135,10 +136,10 @@ require_once '../includes/layouts/header.php';
         </div>
 
         <!-- Filter Card -->
-        <div class="card shadow-sm border-0 rounded-4 mb-4">
-            <div class="card-body py-4">
-                <form method="GET" class="row align-items-end g-3">
-                    <div class="col-md-6">
+        <div class="card shadow-sm border-0 rounded-4 mb-4 data-surface data-filter-surface">
+            <div class="card-body py-4 data-surface__body">
+                <form method="GET" class="row align-items-end g-3 data-toolbar inventory-filter">
+                    <div class="col-md-6 data-toolbar__field">
                         <label for="product_id" class="form-label fw-semibold text-secondary">Filter by Product</label>
                         <select name="product_id" id="product_id" class="form-select rounded-3">
                             <option value="">-- Show All Products --</option>
@@ -149,7 +150,7 @@ require_once '../includes/layouts/header.php';
                             <?php endforeach; ?>
                         </select>
                     </div>
-                    <div class="col-md-2">
+                    <div class="col-md-2 data-toolbar__field">
                         <label for="ledgerPageSize" class="form-label fw-semibold text-secondary">Per page</label>
                         <select name="page_size" id="ledgerPageSize" class="form-select rounded-3">
                             <?php foreach ($page_size_options as $option): ?>
@@ -157,14 +158,14 @@ require_once '../includes/layouts/header.php';
                             <?php endforeach; ?>
                         </select>
                     </div>
-                    <div class="col-md-4">
-                        <button type="submit" class="btn btn-primary rounded-3 px-4 w-100">
+                    <div class="col-md-4 data-toolbar__submit">
+                        <button type="submit" class="btn btn-primary rounded-3 px-4 w-100 data-control-button">
                             <i class="fas fa-filter me-2"></i>Filter Ledger
                         </button>
                     </div>
                     <?php if ($selected_product_id !== null): ?>
-                    <div class="col-md-2">
-                        <a href="stock_movements.php" class="btn btn-outline-secondary rounded-3 w-100">
+                    <div class="col-md-2 data-toolbar__clear">
+                        <a href="stock_movements.php" class="btn btn-outline-secondary rounded-3 w-100 data-control-button">
                             Clear
                         </a>
                     </div>
@@ -174,13 +175,13 @@ require_once '../includes/layouts/header.php';
         </div>
 
         <!-- Movements Table Card -->
-        <div class="card shadow-sm border-0 rounded-4">
-            <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
-                            <span class="text-muted small">Showing <?php echo $range_start; ?>-<?php echo $range_end; ?> of <?php echo $total_movements; ?> records</span>
+        <div class="card shadow-sm border-0 rounded-4 data-surface data-ledger-surface">
+            <div class="card-body data-surface__body">
+                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3 data-table-summary">
+                            <span class="text-muted small"><i class="fas fa-list-ol me-1" aria-hidden="true"></i>Showing <?php echo $range_start; ?>-<?php echo $range_end; ?> of <?php echo $total_movements; ?> records</span>
                         </div>
-                        <div class="table-responsive">
-                    <table class="table table-hover table-striped align-middle">
+                        <div class="table-responsive data-table-shell">
+                    <table class="table table-hover table-striped align-middle data-table inventory-table" id="stockMovementsTable">
                         <thead class="bg-light text-secondary">
                             <tr>
                                 <th scope="col" class="ui-col-id-80">ID</th>
@@ -195,9 +196,10 @@ require_once '../includes/layouts/header.php';
                         <tbody>
                             <?php if (empty($movements)): ?>
                                 <tr>
-                                    <td colspan="7" class="text-center py-5 text-muted">
-                                        <i class="fas fa-history fa-3x mb-3 text-secondary ui-icon-opacity-50"></i>
-                                        <p class="mb-0">No stock movements found in the ledger.</p>
+                                    <td colspan="7" class="text-center py-5 text-muted data-empty-state">
+                                        <span class="data-empty-state__icon" aria-hidden="true"><i class="fas fa-history"></i></span>
+                                        <strong>No stock movements found.</strong>
+                                        <span>Adjust the product filter or record a new adjustment.</span>
                                     </td>
                                 </tr>
                             <?php else: ?>
@@ -222,28 +224,28 @@ require_once '../includes/layouts/header.php';
                                             break;
                                     }
                                     ?>
-                                    <tr>
+                                    <tr class="movement-row">
                                         <td>#<?php echo $m['id']; ?></td>
-                                        <td>
-                                            <a href="products.php?highlight=<?php echo $m['product_id']; ?>" class="fw-semibold text-decoration-none text-dark">
+                                        <td class="movement-product">
+                                            <a href="products.php?highlight=<?php echo $m['product_id']; ?>" class="fw-semibold text-decoration-none text-dark data-row-link">
                                                 <?php echo htmlspecialchars($m['product_name']); ?>
                                             </a>
                                         </td>
-                                        <td class="text-center <?php echo $qty_class; ?>">
+                                        <td class="text-center movement-quantity <?php echo $qty_class; ?>">
                                             <?php echo $qty_prefix . $qty; ?>
                                         </td>
-                                        <td class="text-center">
+                                        <td class="text-center movement-type">
                                             <?php echo $type_badge; ?>
                                         </td>
-                                        <td class="text-muted">
+                                        <td class="text-muted movement-reason">
                                             <?php echo htmlspecialchars($m['reason'] ?? 'N/A'); ?>
                                         </td>
-                                        <td>
+                                        <td class="movement-staff">
                                             <span class="fw-semibold text-secondary">
                                                 <?php echo htmlspecialchars($m['staff_name'] ?? 'System'); ?>
                                             </span>
                                         </td>
-                                        <td>
+                                        <td class="movement-date">
                                             <span class="text-secondary small">
                                                 <i class="far fa-clock me-1 text-muted"></i>
                                                 <?php echo date('Y-m-d h:i A', strtotime($m['created_at'])); ?>
@@ -256,7 +258,7 @@ require_once '../includes/layouts/header.php';
                     </table>
                         </div>
                         <?php if ($total_pages > 1): ?>
-                            <nav class="mt-4" aria-label="Stock movement pagination">
+                            <nav class="mt-4 data-pagination" aria-label="Stock movement pagination">
                                 <ul class="pagination justify-content-center flex-wrap mb-0">
                                     <li class="page-item <?php echo $page <= 1 ? 'disabled' : ''; ?>">
                                         <a class="page-link" aria-label="Previous page" href="<?php echo $page > 1 ? htmlspecialchars($stock_ledger_url($page - 1), ENT_QUOTES, 'UTF-8') : '#'; ?>">Previous</a>
@@ -283,16 +285,16 @@ require_once '../includes/layouts/header.php';
 
 <!-- Add Movement Modal -->
 <div class="modal fade" id="addMovementModal" tabindex="-1" aria-labelledby="addMovementModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 rounded-4">
-            <div class="modal-header py-3">
+    <div class="modal-dialog modal-dialog-centered data-modal-dialog">
+        <div class="modal-content border-0 rounded-4 data-modal">
+            <div class="modal-header py-3 data-modal__header">
                 <h5 class="modal-title fw-bold ui-modal-title" id="addMovementModalLabel"><i class="fas fa-plus-circle me-2 text-primary"></i>New Stock Adjustment</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form action="stock_movements.php" method="POST">
                 <input type="hidden" name="action" value="adjust_stock">
                 <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token'] ?? ''); ?>">
-                <div class="modal-body py-4">
+                <div class="modal-body py-4 data-modal__body">
                     <div class="mb-3">
                         <label for="adj_product_id" class="form-label fw-bold">Select Product <span class="text-danger">*</span></label>
                         <select class="form-select rounded-3" id="adj_product_id" name="product_id" required>
@@ -316,7 +318,7 @@ require_once '../includes/layouts/header.php';
                         <textarea class="form-control rounded-3" id="adj_reason" name="reason" rows="2" required placeholder="e.g. Damaged goods, found extra inventory"></textarea>
                     </div>
                 </div>
-                <div class="modal-footer">
+                <div class="modal-footer data-modal__footer">
                     <button type="button" class="btn btn-secondary rounded-3" data-bs-dismiss="modal">Cancel</button>
                     <button type="submit" class="btn btn-primary rounded-3 px-4">Save Adjustment</button>
                 </div>

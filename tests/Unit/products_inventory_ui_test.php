@@ -81,7 +81,7 @@ function run_products_inventory_ui_unit_tests(): int
         'data-bs-target="#addProductModal"',
         'id="addProductModal"',
         'id="editProductModal"',
-        'class="edit-product-btn',
+        'edit-product-btn',
         'data-product-id=',
         'data-product-name=',
         'data-product-category-id=',

@@ -354,6 +354,7 @@ test('admin Products and Stock Ledger surfaces support dense-data workflows', as
   await expect(page.locator('#productsTable')).toHaveClass(/data-table/);
   await expect(page.getByRole('link', { name: /Export CSV/ })).toHaveAttribute('href', 'export_report.php?entity=products');
   await expect(page.locator('#image')).toHaveAttribute('accept', 'image/*');
+  await captureSanitizedScreenshot(page, 'admin-products-after');
 
   await page.getByLabel('Search products').fill(`${dataPrefix}_PRODUCT_`);
   await page.getByRole('button', { name: 'Apply' }).click();
@@ -366,20 +367,25 @@ test('admin Products and Stock Ledger surfaces support dense-data workflows', as
   await page.getByRole('button', { name: /Add Product/ }).click();
   await expect(page.locator('#addProductModal')).toBeVisible();
   await expect(page.locator('#addProductModal form')).toHaveAttribute('enctype', 'multipart/form-data');
-  await page.locator('#addProductModal [data-bs-dismiss="modal"]').click();
+  await page.locator('#addProductModal .btn-close').click();
+  await expect(page.locator('#addProductModal')).toBeHidden();
   await page.getByRole('button', { name: 'Edit product' }).first().click();
   await expect(page.locator('#editProductModal')).toBeVisible();
   await expect(page.locator('#edit_name')).not.toHaveValue('');
   await expect(page.locator('#edit_image')).toHaveAttribute('accept', 'image/*');
-  await page.locator('#editProductModal [data-bs-dismiss="modal"]').click();
-  await captureSanitizedScreenshot(page, 'admin-products-after');
-
+  await page.locator('#editProductModal .btn-close').click();
+  await expect(page.locator('#editProductModal')).toBeHidden();
   await loadPage(page, '/stock_movements.php?page_size=10', /Stock Ledger/);
   await expect(page.locator('.inventory-page')).toBeVisible();
   await expect(page.locator('#stockMovementsTable')).toHaveClass(/data-table/);
+  await expect(page.locator('#ledgerPageSize')).toHaveValue('10');
   await expect(page.getByRole('link', { name: /Export CSV/ })).toHaveAttribute('href', 'export_report.php?entity=stock');
   await expect(page.locator('#addMovementModal')).toHaveCount(1);
-  await page.getByLabel('Filter by Product').selectOption({ label: new RegExp(`${dataPrefix}_PRODUCT_07`) });
+  await captureSanitizedScreenshot(page, 'admin-stock-ledger-after');
+  const scopedProductOption = page.locator('#product_id option').filter({ hasText: `${dataPrefix}_PRODUCT_07` }).first();
+  const scopedProductId = await scopedProductOption.getAttribute('value');
+  expect(scopedProductId).not.toBeNull();
+  await page.getByLabel('Filter by Product').selectOption(scopedProductId);
   await page.getByRole('button', { name: /Filter Ledger/ }).click();
   await expect(page).toHaveURL(/product_id=/);
   await expect(page.locator('.movement-row')).toHaveCount(1);
@@ -391,7 +397,6 @@ test('admin Products and Stock Ledger surfaces support dense-data workflows', as
   await expect(page.locator('.movement-date')).toBeVisible();
   await page.getByRole('link', { name: 'Clear' }).click();
   await expect(page).toHaveURL(/stock_movements.php$/);
-  await captureSanitizedScreenshot(page, 'admin-stock-ledger-after');
 });
 
 test('authenticated POS barcode lookup returns the disposable catalog product', async ({ page }) => {
