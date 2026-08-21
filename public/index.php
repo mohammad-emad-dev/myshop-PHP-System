@@ -25,7 +25,7 @@ $stats               = dashboard_get_stats($conn, $dashboard_staff_id);
 $chart_data           = dashboard_get_chart_data($conn, 7, $dashboard_staff_id);
 $inventory_valuation  = dashboard_get_inventory_valuation($conn);
 $top_selling_products = dashboard_get_top_selling_products($conn, 5, $dashboard_staff_id);
-$category_sales       = get_category_sales_distribution($conn, $dashboard_staff_id);
+$category_sales       = dashboard_get_category_sales_distribution($conn, $dashboard_staff_id);
 $low_stock_products   = get_low_stock_products($conn);
 $total_low_stock      = count($low_stock_products);
 

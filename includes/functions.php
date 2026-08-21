@@ -2215,79 +2215,9 @@ function get_top_selling_products($conn, $limit = 5, $staff_id = null)
 }
 
 /**
- * Group sales volume distributions based on product categories.
+ * Compatibility wrapper for the focused Dashboard category-sales service.
  */
 function get_category_sales_distribution($conn, $staff_id = null, $limit = 100)
 {
-    $limit = normalize_page_size($limit, 100, [25, 50, 100]);
-    $sql = "SELECT COALESCE(c.name, 'Uncategorized') as category_name, SUM(od.subtotal) as total_sales 
-            FROM OrderDetail od 
-            JOIN `Order` o ON od.order_id = o.id 
-            JOIN Product p ON od.product_id = p.id 
-            LEFT JOIN Category c ON p.category_id = c.id 
-            WHERE o.order_type = 'sale'";
-    if ($staff_id !== null) {
-        $sql .= " AND o.staff_id = ?";
-    }
-    $sql .= " GROUP BY p.category_id, c.name
-              ORDER BY total_sales DESC
-              LIMIT ?";
-
-    if ($staff_id === null) {
-        $stmt = null;
-        try {
-            $stmt = $conn->prepare($sql);
-            if (!$stmt) {
-                error_log('Category sales distribution prepare failed: ' . $conn->error);
-                return [];
-            }
-            if (!$stmt->bind_param('i', $limit)) {
-                error_log('Category sales distribution bind failed: ' . $stmt->error);
-                return [];
-            }
-            if (!$stmt->execute()) {
-                error_log('Category sales distribution execute failed: ' . $stmt->error);
-                return [];
-            }
-            $result = $stmt->get_result();
-            if (!$result) {
-                error_log('Category sales distribution result failed: ' . $stmt->error);
-                return [];
-            }
-            return $result->fetch_all(MYSQLI_ASSOC);
-        } catch (Throwable $exception) {
-            error_log('Category sales distribution query failed: ' . $exception->getMessage());
-            return [];
-        } finally {
-            if ($stmt instanceof mysqli_stmt) {
-                $stmt->close();
-            }
-        }
-    }
-
-    $stmt = $conn->prepare($sql);
-    if (!$stmt) {
-        error_log('Scoped category sales distribution prepare failed: ' . $conn->error);
-        return [];
-    }
-    $staff_id = (int)$staff_id;
-    if (!$stmt->bind_param('ii', $staff_id, $limit)) {
-        error_log('Scoped category sales distribution bind failed: ' . $stmt->error);
-        $stmt->close();
-        return [];
-    }
-    if (!$stmt->execute()) {
-        error_log('Scoped category sales distribution execute failed: ' . $stmt->error);
-        $stmt->close();
-        return [];
-    }
-    $result = $stmt->get_result();
-    if (!$result) {
-        error_log('Scoped category sales distribution result failed: ' . $stmt->error);
-        $stmt->close();
-        return [];
-    }
-    $categories = $result->fetch_all(MYSQLI_ASSOC);
-    $stmt->close();
-    return $categories;
+    return dashboard_get_category_sales_distribution($conn, $staff_id, $limit);
 }
