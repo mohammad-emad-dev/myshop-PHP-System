@@ -52,7 +52,7 @@ if ($selected_product_id === false || $selected_product_id === null) {
 // Check if filtering for a specific product
 if ($selected_product_id !== null) {
     // Validate product exists to be safe
-    $product_check = get_product_by_id($conn, $selected_product_id);
+    $product_check = catalog_get_product_by_id($conn, $selected_product_id);
     if (!$product_check) {
         $selected_product_id = null; // invalid product, reset filter
     }
@@ -68,7 +68,7 @@ if ($page > $total_pages) {
 }
 $offset = ($page - 1) * $page_size;
 $movements = inventory_get_stock_movements_page($conn, $selected_product_id, $page_size, $offset);
-$products_list = get_pos_products($conn, '', 100); // bounded selector data
+$products_list = catalog_get_pos_products($conn, '', 100); // bounded selector data
 $range_start = $total_movements > 0 ? $offset + 1 : 0;
 $range_end = $total_movements > 0 ? min($offset + count($movements), $total_movements) : 0;
 $stock_ledger_url = static function ($target_page) use ($selected_product_id, $page_size) {

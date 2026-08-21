@@ -5,11 +5,10 @@ declare(strict_types=1);
 require_once __DIR__ . '/pagination.php';
 
 /**
- * Transitional people module.
+ * People read module.
  *
- * This module currently owns only bounded Customer and Supplier read
- * operations. Customer and Supplier writes remain in the legacy compatibility
- * facade until they are separately characterized and extracted.
+ * This module owns only bounded Customer and Supplier read operations.
+ * Customer and Supplier writes are owned by dedicated mutation modules.
  */
 function people_count_customers($conn, $search = '')
 {

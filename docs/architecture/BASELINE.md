@@ -1,6 +1,6 @@
 # MyShop architecture baseline
 
-Status: Phase 4E supplier mutation service extraction baseline
+Status: Phase 4F final compatibility facade and architecture closure baseline
 
 Captured from the `security-hardening-baseline` branch at starting revision
 `70d1ad64a5c639b93897c1c1abd2ab28063cef90`.
@@ -30,7 +30,7 @@ Browser QA is intentionally separate from the dependency-free PHP test harness.
 4. `includes/functions.php` loads `security.php`, `pagination.php`, `audit.php`,
    `http.php`, `auth.php`, `validation.php`, `catalog.php`, `people.php`,
    `inventory.php`, `products.php`, `orders.php`, `uploads.php`,
-   `categories.php`, `customers.php`, and `suppliers.php` as a compatibility facade. Catalog and People page
+   `categories.php`, `customers.php`, and `suppliers.php` as a compatibility facade. Catalog, People, and stock-movement page
    callers may use their focused read functions directly; product mutations are
    owned by `includes/products.php`, category creation/update by
    `includes/categories.php`, including category deletion, and order creation plus bounded/single-record
@@ -114,7 +114,7 @@ application service module.
 
 | Lines/functions | Responsibility |
 |---|---|
-| `:12-70` | Sanitization, identifiers, password policy, login normalization |
+| `:12-70` | Pure identifiers, password policy, login normalization, and login-rate-limit helpers; reusable sanitization now lives in `includes/validation.php` |
 | `:72-480` | Login rate-limit state, transaction helpers, and cleanup |
 | `verify_login()`, `redirect()` | Delegation-only Auth and HTTP compatibility wrappers |
 | `build_product_filter_sql()` | Catalog filter compatibility wrapper |

@@ -1,7 +1,8 @@
 # MyShop dependency map
 
 This map records current call-site and dependency relationships after the
-Phase 4E supplier mutation service extraction. It remains a
+Phase 4F final compatibility facade and architecture closure review after
+supplier mutation service extraction. It remains a
 characterization artifact; the compatibility wrappers are still required.
 
 ## Public-page to shared-function map
@@ -27,7 +28,7 @@ names are grouped only for readability; the source remains the authority.
 | `products.php` | `start_secure_session`, `verify_login`, `is_admin`, `verify_csrf_token`, `generate_csrf_token`, `sanitize_input`, `normalize_page_number`, `normalize_page_size`, `truncate_list_search`, `catalog_get_categories_for_selector`, `catalog_get_products_page`, `catalog_count_products`, `products_create`, `products_update`, `products_delete`, `uploads_handle_image`, `uploads_delete_newly_uploaded_image`, `audit_log_current_actor`, `audit_log_denied` |
 | `ready.php` | `initialize_request_context`, `log_application_error`; `config/db.php` performs the connection and readiness failure contract |
 | `settings.php` | `start_secure_session`, `verify_login`, `is_admin`, `require_admin`, `verify_csrf_token`, `generate_csrf_token`, `sanitize_input`, `password_meets_policy`, `create_staff_member`, `update_staff_member`, `delete_staff_member`, `set_staff_active`, `get_staff_members`, `audit_log_current_actor` |
-| `stock_movements.php` | `start_secure_session`, `verify_login`, `is_admin`, `verify_csrf_token`, `sanitize_input`, `normalize_page_number`, `normalize_page_size`, `get_pos_products`, `get_product_by_id`, `inventory_adjust_stock`, `inventory_get_stock_movements_page`, `inventory_count_stock_movements`, `audit_log_current_actor`, `audit_log_denied` |
+| `stock_movements.php` | `start_secure_session`, `verify_login`, `is_admin`, `verify_csrf_token`, `sanitize_input`, `normalize_page_number`, `normalize_page_size`, `catalog_get_pos_products`, `catalog_get_product_by_id`, `inventory_adjust_stock`, `inventory_get_stock_movements_page`, `inventory_count_stock_movements`, `audit_log_current_actor`, `audit_log_denied` |
 | `suppliers.php` | `start_secure_session`, `verify_login`, `is_admin`, `verify_csrf_token`, `generate_csrf_token`, `sanitize_input`, `normalize_page_number`, `normalize_page_size`, `truncate_list_search`, `suppliers_create`, `suppliers_update`, `suppliers_delete`, `people_count_suppliers`, `people_get_suppliers_page`, `audit_log_current_actor`, `audit_log_denied` |
 
 ## Global and implicit dependencies
@@ -83,8 +84,8 @@ The legacy names `get_products_page`, `count_products`, `get_pos_products`,
 `get_pos_product_by_barcode`, `get_product_by_id`, and
 `get_categories_for_selector`, `count_categories`, and `get_categories_page`
 remain in `functions.php` as delegation-only compatibility wrappers.
-Unmigrated callers, including `public/stock_movements.php` for product reads,
-continue to use those wrappers. `get_categories()` remains an unbounded
+`public/stock_movements.php` now calls the focused Catalog product lookup and
+bounded POS selector directly. `get_categories()` remains an unbounded
 legacy loader and `get_category_by_id()` remains an uncalled legacy lookup;
 neither was moved without a verified caller.
 

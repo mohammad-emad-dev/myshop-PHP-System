@@ -3,6 +3,11 @@
 This inventory records current return and control-flow behavior. Future
 modules must preserve these contracts until callers are migrated deliberately.
 
+Phase 4F records the final compatibility-facade classification, verifies the
+dependency direction of extracted modules, and establishes the evidence-based
+Phase 4G candidate inventory. No legacy function or file is deleted in this
+phase.
+
 Batch 6A places active-session authentication, administrator authorization, and
 redirect implementations in `includes/auth.php` and `includes/http.php`. Batch
 5 placed bounded Supplier reads in `includes/people.php`; earlier batches placed

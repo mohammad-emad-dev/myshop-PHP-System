@@ -182,7 +182,7 @@ function run_inventory_read_unit_tests(): int
     );
 
     foreach ([
-        'get_product_by_id($conn, $selected_product_id)',
+        'catalog_get_product_by_id($conn, $selected_product_id)',
         'auth_verify_login($conn)',
         'verify_csrf_token($csrf_token)',
         'auth_is_admin($conn)',
