@@ -43,12 +43,13 @@ function run_operational_baseline_unit_tests(): int
         preg_match('/--env-file \/protected\/myshop\/production\.env\s+\\\s+--file docker-compose\.production\.yml\s+build/m', $runbook) === 1,
         'The production runbook must not build from the protected deploy environment.'
     );
+    $releaseText = strtolower($readme . "\n" . $runbook);
     foreach ([
-        'temporary CI build tag',
-        'resolve the built image ID to its immutable digest',
+        'temporary ci build tag',
+        'resolve the built image id to its immutable digest',
         'deploy only after the digest passes preflight',
     ] as $releaseContract) {
-        $tests->assertContains($releaseContract, $readme . "\n" . $runbook, 'Release procedure contract is missing: ' . $releaseContract);
+        $tests->assertContains($releaseContract, $releaseText, 'Release procedure contract is missing: ' . $releaseContract);
     }
 
     foreach ([

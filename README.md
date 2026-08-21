@@ -138,14 +138,15 @@ Do not use down --volumes unless the local database is disposable.
 
 ~~~powershell
 Copy-Item .env.example .env.production
-# Edit .env.production using the production secret manager and reviewed image references.
+# Edit .env.production using the production secret manager. Replace the
+# PRODUCTION_APP_IMAGE sentinel with the reviewed immutable image digest.
 docker compose --env-file .env.production -f docker-compose.production.yml config --quiet
-docker compose --env-file .env.production -f docker-compose.production.yml build --pull app
+php scripts/production-preflight.php --env-file .env.production --compose-file docker-compose.production.yml
 docker compose --env-file .env.production -f docker-compose.production.yml up -d
 docker compose --env-file .env.production -f docker-compose.production.yml ps
 ~~~
 
-The production application image copies the reviewed source at build time and has no repository bind mount. Only a named `production_uploads` volume is writable by the application. The application root is read-only, Apache runtime/log paths use tmpfs, and both services restart unless stopped. MySQL has no published host port; a reverse proxy must be attached to the deployment network or use the platform’s internal service routing. The production Compose file does not run a browser-accessible schema or restore operation.
+The production application image must be built and reviewed before deployment, then referenced by its immutable digest; the protected deployment environment is not a build environment. The image has no repository bind mount. Only a named `production_uploads` volume is writable by the application. The application root is read-only, Apache runtime/log paths use tmpfs, and both services restart unless stopped. MySQL has no published host port; a reverse proxy must be attached to the deployment network or use the platform’s internal service routing. The production Compose file does not run a browser-accessible schema or restore operation.
 
 Fresh-volume database initialization uses the canonical schema and the restricted runtime-account initializer. Existing databases still require the controlled schema-account migration process documented above; do not treat container startup as a migration mechanism. The CLI-only bootstrap can be run as a controlled one-shot using deployment-injected `BOOTSTRAP_ADMIN_*` variables; never put those values in the image, repository, command history, or logs.
 
@@ -252,7 +253,10 @@ The repository security check intentionally scans only Git-tracked files. It ign
 php scripts/repository-security-check.php
 ~~~
 
-To exercise the production Compose checks locally with disposable values, copy the example environment to a file under the system temporary directory, replace only the application image with a local CI tag, then remove the file after validation:
+To exercise the production image build locally with disposable values, use a
+temporary CI build tag only. Resolve the built image ID to its immutable digest
+before creating a protected deployment environment; the temporary tag is not
+deployable:
 
 ~~~powershell
 $productionEnv = Join-Path $env:TEMP 'myshop-production-ci.env'
@@ -260,6 +264,7 @@ Copy-Item .env.example $productionEnv
 (Get-Content $productionEnv) -replace '^PRODUCTION_APP_IMAGE=.*$', 'PRODUCTION_APP_IMAGE=myshop-app:ci-local' | Set-Content $productionEnv
 docker compose --env-file $productionEnv --file docker-compose.production.yml config --quiet
 docker compose --env-file $productionEnv --file docker-compose.production.yml build --pull app
+# Resolve the built image ID to its immutable digest before deployment.
 Remove-Item -LiteralPath $productionEnv -Force
 ~~~
 

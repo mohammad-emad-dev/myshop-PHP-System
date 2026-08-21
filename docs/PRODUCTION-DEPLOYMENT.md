@@ -80,13 +80,31 @@ review the release notes, replace the workflow reference with that exact SHA,
 and run `php scripts/ci-supply-chain-check.php` plus the complete Quality Gate.
 Do not infer or copy an action SHA from an untrusted example.
 
-Validate the resolved Compose model and build the reviewed application image:
+Build a candidate with a temporary CI build environment and tag. Resolve the
+built image ID to its immutable digest, then create the protected deployment
+environment with that digest. Do not build from the protected deployment
+environment; it is deploy-only:
 
 ```text
+docker compose --env-file /protected/myshop/build.env \
+  --file docker-compose.production.yml config --quiet
+docker compose --env-file /protected/myshop/build.env \
+  --file docker-compose.production.yml build --pull app
+docker image inspect <temporary-build-image> --format '{{.Id}}'
+```
+
+After the reviewed image digest and verification checks are complete, set
+`PRODUCTION_APP_IMAGE` in `/protected/myshop/production.env` to the resolved
+`name@sha256:<64 hex chars>` reference. Run the preflight and Compose
+configuration checks against that protected file, then deploy without a build:
+Deploy only after the digest passes preflight.
+
+```text
+php scripts/production-preflight.php \
+  --env-file /protected/myshop/production.env \
+  --compose-file docker-compose.production.yml
 docker compose --env-file /protected/myshop/production.env \
   --file docker-compose.production.yml config --quiet
-docker compose --env-file /protected/myshop/production.env \
-  --file docker-compose.production.yml build --pull app
 ```
 
 After the reviewed image digest and verification checks are complete, generate
@@ -217,7 +235,45 @@ The repository does not implement automatic database rollback, blue/green
 cutover, point-in-time recovery, replication failover, or zero-downtime
 orchestration.
 
-## 9. Logging, monitoring, and incident ownership
+## 9. Incident response quick runbook
+
+### Database outage
+
+1. Confirm the reverse proxy reports `/ready.php` as HTTP 503 while `/health.php`
+   remains liveness-only; do not remove or recreate the persistent database
+   volume.
+2. Preserve sanitized application/database logs and the current release digest.
+3. Check database container health, storage capacity, and the last approved
+   change. Restore service or escalate to the database owner without changing
+   schema objects during the outage.
+4. After recovery, require `/ready.php` HTTP 200 and perform the documented
+   authenticated read-only smoke check before reopening traffic.
+
+### Failed application deployment
+
+1. Stop the rollout and retain the failed release digest and release manifest.
+2. If the database schema is compatible, redeploy the previously reviewed
+   application digest only and verify readiness and the authenticated smoke
+   paths.
+3. If compatibility is uncertain, stop writes and involve the incident owner;
+   an image rollback does not undo database changes.
+
+### Restore incident
+
+1. Stop application writes and preserve the original database; never overwrite
+   the original recovery point during investigation.
+2. Reject any backup without `-- MYSHOP_BACKUP_COMPLETE`, restore only into a
+   uniquely named target database, and use the controlled schema account.
+3. Validate schema, migrations, constraints, indexes, representative rows,
+   and application read access before an approved cutover.
+4. Record the recovery point, operator, change ID, validation evidence, and
+   cutover decision in the deployment/incident record.
+
+The repository does not automate incident communication, failover, or cutover.
+The deployment operator must assign the incident owner, database owner, backup
+owner, and recovery decision owner before accepting production traffic.
+
+## 10. Logging, monitoring, and incident ownership
 
 Collect Apache access logs from stdout and Apache/PHP technical errors from
 stderr. Retain and restrict them according to operational policy. Request IDs
@@ -236,7 +292,7 @@ alert manager, incident-management integration, secret manager, KMS,
 off-site backup replication, registry promotion/signing policy, certificate
 authority integration, or external firewall/WAF.
 
-## Readiness conclusion
+## 11. Readiness conclusion
 
 Passing repository checks means the code and deployment baseline are
 production-deployable with the documented external controls. It does not by
