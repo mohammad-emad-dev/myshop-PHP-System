@@ -5,8 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../bootstrap.php';
 
 /**
- * Protect the Category write boundary while delete_category() remains in the
- * compatibility facade for a later extraction batch.
+ * Protect the focused Category create/update write boundary.
  */
 function run_category_write_unit_tests(): int
 {
@@ -80,10 +79,8 @@ function run_category_write_unit_tests(): int
         }
     }
 
-    $tests->assertContains('function delete_category($conn, $id)', $facade, 'delete_category must remain available for this batch.');
     $tests->assertContains('categories_create($conn, $name, $description)', $page, 'Categories page must call categories_create directly.');
     $tests->assertContains('categories_update($conn, $id, $name, $description)', $page, 'Categories page must call categories_update directly.');
-    $tests->assertContains('delete_category($conn, $id)', $page, 'Categories page must retain the legacy delete_category caller.');
 
     foreach (['create_category', 'update_category'] as $legacyMutation) {
         $tests->assertFalse(
