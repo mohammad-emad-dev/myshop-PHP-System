@@ -283,6 +283,8 @@ function run_dashboard_integration_tests(): int
             $categoryAProductId > 0 && $categoryBProductId > 0 && $uncategorizedProductId > 0,
             'Dashboard category product fixtures were not created.'
         );
+        test_execute($conn, 'UPDATE Product SET category_id = ? WHERE id = ?', 'ii', [$categoryAId, $productId]);
+        test_execute($conn, 'UPDATE Product SET category_id = ? WHERE id = ?', 'ii', [$categoryBId, $secondProductId]);
 
         test_execute(
             $conn,
@@ -318,9 +320,9 @@ function run_dashboard_integration_tests(): int
         $globalCategorySales = dashboard_get_category_sales_distribution($conn);
         $tests->assertCount(3, $globalCategorySales, 'Global category distribution must include categorized and uncategorized sales.');
         $tests->assertSame($categoryAName, $globalCategorySales[0]['category_name'], 'Category distribution ordering must be by total sales descending.');
-        $tests->assertSame('80.00', (string)$globalCategorySales[0]['total_sales'], 'Category A total sales are incorrect.');
+        $tests->assertSame('140.00', (string)$globalCategorySales[0]['total_sales'], 'Category A total sales are incorrect.');
         $tests->assertSame($categoryBName, $globalCategorySales[1]['category_name'], 'Second category distribution ordering is incorrect.');
-        $tests->assertSame('50.00', (string)$globalCategorySales[1]['total_sales'], 'Category B total sales are incorrect.');
+        $tests->assertSame('65.00', (string)$globalCategorySales[1]['total_sales'], 'Category B total sales are incorrect.');
         $tests->assertSame('Uncategorized', $globalCategorySales[2]['category_name'], 'Missing categories must use the Uncategorized fallback.');
         $tests->assertSame('35.00', (string)$globalCategorySales[2]['total_sales'], 'Uncategorized total sales are incorrect.');
         $tests->assertCount(3, dashboard_get_category_sales_distribution($conn, null, 25), 'Allowed category page size 25 must remain valid.');
@@ -336,7 +338,7 @@ function run_dashboard_integration_tests(): int
         $cashierCategorySales = dashboard_get_category_sales_distribution($conn, $cashierId);
         $tests->assertCount(1, $cashierCategorySales, 'Cashier category distribution must be staff-scoped.');
         $tests->assertSame($categoryAName, $cashierCategorySales[0]['category_name'], 'Cashier category distribution is incorrect.');
-        $tests->assertSame('20.00', (string)$cashierCategorySales[0]['total_sales'], 'Cashier category total sales are incorrect.');
+        $tests->assertSame('40.00', (string)$cashierCategorySales[0]['total_sales'], 'Cashier category total sales are incorrect.');
         $tests->assertSame([], dashboard_get_category_sales_distribution($conn, 999999), 'Unknown staff scope must return an empty category distribution.');
 
         $globalCategoryClosed = new mysqli(
