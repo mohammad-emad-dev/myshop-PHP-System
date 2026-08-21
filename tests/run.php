@@ -23,6 +23,7 @@ require_once __DIR__ . '/Integration/backup_restore_test.php';
 require_once __DIR__ . '/Integration/operational_test.php';
 require_once __DIR__ . '/Integration/export_streaming_test.php';
 require_once __DIR__ . '/Integration/dashboard_test.php';
+require_once __DIR__ . '/Integration/inventory_read_test.php';
 
 $started = microtime(true);
 
@@ -48,10 +49,11 @@ try {
     $operationalAssertions = run_operational_tests();
     $exportAssertions = run_export_streaming_tests();
     $dashboardIntegrationAssertions = run_dashboard_integration_tests();
-    $totalAssertions = $unitAssertions + $architectureAssertions + $catalogAssertions + $productWriteAssertions + $orderWriteAssertions + $orderReadAssertions + $dashboardAssertions + $peopleAssertions + $inventoryAssertions + $inventoryAdjustmentAssertions + $authAssertions + $deploymentAssertions + $httpHarnessAssertions + $securityScanAssertions + $supplyChainAssertions + $releaseIntegrityAssertions + $integrationAssertions + $backupAssertions + $operationalAssertions + $exportAssertions + $dashboardIntegrationAssertions;
+    $inventoryReadIntegrationAssertions = run_inventory_read_integration_tests();
+    $totalAssertions = $unitAssertions + $architectureAssertions + $catalogAssertions + $productWriteAssertions + $orderWriteAssertions + $orderReadAssertions + $dashboardAssertions + $peopleAssertions + $inventoryAssertions + $inventoryAdjustmentAssertions + $authAssertions + $deploymentAssertions + $httpHarnessAssertions + $securityScanAssertions + $supplyChainAssertions + $releaseIntegrityAssertions + $integrationAssertions + $backupAssertions + $operationalAssertions + $exportAssertions + $dashboardIntegrationAssertions + $inventoryReadIntegrationAssertions;
     $duration = number_format(microtime(true) - $started, 2);
     echo "PASS: {$totalAssertions} assertions (" . ($unitAssertions + $architectureAssertions + $catalogAssertions + $productWriteAssertions + $orderWriteAssertions + $orderReadAssertions + $dashboardAssertions + $peopleAssertions + $inventoryAssertions + $inventoryAdjustmentAssertions + $authAssertions + $deploymentAssertions + $httpHarnessAssertions + $securityScanAssertions + $supplyChainAssertions + $releaseIntegrityAssertions) . " unit, " .
-        ($integrationAssertions + $backupAssertions + $operationalAssertions + $exportAssertions + $dashboardIntegrationAssertions) . " integration) in {$duration}s\n";
+        ($integrationAssertions + $backupAssertions + $operationalAssertions + $exportAssertions + $dashboardIntegrationAssertions + $inventoryReadIntegrationAssertions) . " integration) in {$duration}s\n";
     exit(0);
 } catch (Throwable $exception) {
     fwrite(STDERR, 'FAIL: ' . $exception->getMessage() . PHP_EOL);

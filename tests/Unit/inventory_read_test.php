@@ -5,7 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../bootstrap.php';
 
 /**
- * Protect the bounded stock-movement read seam and compatibility writer while
+ * Protect the bounded Inventory read seams and compatibility writers while
  * stock-mutation callers remain on the legacy facade and page.
  */
 function run_inventory_read_unit_tests(): int
@@ -29,9 +29,11 @@ function run_inventory_read_unit_tests(): int
         strpos($module, "require_once __DIR__ . '/functions.php'") !== false,
         'Inventory module must not require the compatibility facade.'
     );
-    foreach (['inventory_count_stock_movements', 'inventory_get_stock_movements_page', 'inventory_log_stock_movement'] as $functionName) {
+    foreach (['inventory_count_stock_movements', 'inventory_get_stock_movements_page', 'inventory_get_low_stock_products', 'inventory_log_stock_movement'] as $functionName) {
         $tests->assertContains('function ' . $functionName, $module, 'Inventory function is missing: ' . $functionName);
     }
+    $tests->assertFalse(strpos($module, '$_SESSION') !== false, 'Inventory module must not read session state.');
+    $tests->assertFalse(strpos($module, '$GLOBALS') !== false, 'Inventory module must not read global state.');
     $tests->assertContains(
         'function inventory_log_stock_movement($conn, $product_id, $staff_id, $quantity, $movement_type, $reason = null)',
         $module,
@@ -57,6 +59,7 @@ function run_inventory_read_unit_tests(): int
     foreach ([
         'count_stock_movements' => 'inventory_count_stock_movements',
         'get_stock_movements_page' => 'inventory_get_stock_movements_page',
+        'get_low_stock_products' => 'inventory_get_low_stock_products',
         'log_stock_movement' => 'inventory_log_stock_movement',
     ] as $legacyName => $inventoryName) {
         $wrapperPattern = '/function ' . preg_quote($legacyName, '/') . '\s*\([^)]*\)\s*\{(?<body>.*?)\n\}/s';
@@ -97,17 +100,79 @@ function run_inventory_read_unit_tests(): int
         $tests->assertContains($callerContract, $callerSource, 'Existing stock movement caller changed: ' . $callerPath);
     }
 
-    foreach (['function get_stock_movements($conn, $product_id = null)', 'function get_low_stock_products($conn, $limit = 100)', 'function get_inventory_valuation($conn)'] as $legacyFunction) {
+    foreach (['function get_stock_movements($conn, $product_id = null)', 'function get_inventory_valuation($conn)'] as $legacyFunction) {
         $tests->assertContains($legacyFunction, $facade, 'Out-of-scope Inventory read function changed: ' . $legacyFunction);
     }
+    $tests->assertContains(
+        'function get_low_stock_products($conn, $limit = 100)',
+        $facade,
+        'Low-stock compatibility wrapper signature changed.'
+    );
     $tests->assertContains('fetch_all(MYSQLI_ASSOC)', $facade, 'Unbounded stock-movement compatibility behavior was unexpectedly removed.');
     $tests->assertContains(
         'dashboard_get_inventory_valuation($conn)',
         $index,
         'Dashboard inventory valuation caller must use the focused Dashboard service.'
     );
-    $tests->assertContains('get_low_stock_products($conn)', $index, 'Dashboard low-stock caller changed out of scope.');
-    $tests->assertContains('get_low_stock_products($conn)', $navbar, 'Navbar low-stock caller changed out of scope.');
+    $tests->assertContains(
+        'inventory_get_low_stock_products($conn)',
+        $index,
+        'Dashboard low-stock caller was not migrated to Inventory.'
+    );
+    $tests->assertContains(
+        'inventory_get_low_stock_products($conn)',
+        $navbar,
+        'Navbar low-stock caller was not migrated to Inventory.'
+    );
+    foreach ([$index, $navbar] as $callerSource) {
+        $tests->assertSame(
+            0,
+            preg_match('/(?<!inventory_)\\bget_low_stock_products\\s*\\(/', $callerSource),
+            'A migrated low-stock caller still invokes the legacy facade function.'
+        );
+    }
+
+    foreach ([
+        'function inventory_get_low_stock_products($conn, $limit = 100)',
+        'SELECT p.*, c.name as category_name',
+        'LEFT JOIN Category c ON p.category_id = c.id',
+        'WHERE p.stock <= p.alert_threshold',
+        'ORDER BY p.stock ASC, p.name ASC, p.id ASC',
+        'normalize_page_size($limit, 100, [25, 50, 100])',
+        "bind_param('i', $limit)",
+        "Low-stock product prepare failed: '",
+        "Low-stock product bind failed: '",
+        "Low-stock product execute failed: '",
+        "Low-stock product result retrieval failed: '",
+        "Low-stock product query failed: '",
+        'catch (Throwable $exception)',
+        'finally',
+        'return $result->fetch_all(MYSQLI_ASSOC);',
+    ] as $lowStockContract) {
+        $tests->assertContains($lowStockContract, $module, 'Low-stock Inventory contract is missing: ' . $lowStockContract);
+    }
+
+    $lowStockWrapperPattern = '/function get_low_stock_products\\s*\\([^)]*\\)\\s*\\{(?<body>.*?)\\n\\}/s';
+    $lowStockWrapperMatched = preg_match($lowStockWrapperPattern, $facade, $lowStockMatches) === 1;
+    $tests->assertTrue($lowStockWrapperMatched, 'Low-stock compatibility wrapper is missing.');
+    if ($lowStockWrapperMatched) {
+        $tests->assertContains(
+            'return inventory_get_low_stock_products($conn, $limit);',
+            $lowStockMatches['body'],
+            'Low-stock compatibility wrapper must delegate exactly once.'
+        );
+        $tests->assertSame(
+            1,
+            substr_count($lowStockMatches['body'], 'inventory_get_low_stock_products('),
+            'Low-stock compatibility wrapper must contain one delegation.'
+        );
+        foreach (['SELECT ', 'query(', 'prepare(', 'bind_param', 'fetch_assoc'] as $implementationDetail) {
+            $tests->assertFalse(
+                strpos($lowStockMatches['body'], $implementationDetail) !== false,
+                'Low-stock compatibility wrapper still contains implementation detail: ' . $implementationDetail
+            );
+        }
+    }
 
     $countOffset = strpos($stockPage, 'inventory_count_stock_movements($conn');
     $pageOffset = strpos($stockPage, 'inventory_get_stock_movements_page($conn');

@@ -83,11 +83,16 @@ function run_dashboard_unit_tests(): int
         preg_match('/\bget_dashboard_stats\s*\(/', $index),
         'Dashboard page must not call the legacy statistics function.'
     );
-    foreach ([
-        'get_low_stock_products($conn)',
-    ] as $unchangedCaller) {
-        $tests->assertContains($unchangedCaller, $index, 'Unrelated dashboard caller changed: ' . $unchangedCaller);
-    }
+    $tests->assertContains(
+        'inventory_get_low_stock_products($conn)',
+        $index,
+        'Dashboard page must call the focused Inventory low-stock service directly.'
+    );
+    $tests->assertSame(
+        0,
+        preg_match('/(?<!inventory_)\\bget_low_stock_products\\s*\\(/', $index),
+        'Dashboard page must not call the legacy low-stock function.'
+    );
 
     $tests->assertContains(
         'function dashboard_get_chart_data($conn, $days = 7, $staff_id = null)',
