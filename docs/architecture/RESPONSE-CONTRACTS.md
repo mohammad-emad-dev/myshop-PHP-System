@@ -27,8 +27,8 @@ also remains a delegation-only compatibility wrapper.
 Phase 3F places the category sales distribution read in the same module; its
 legacy name also remains a delegation-only compatibility wrapper.
 Phase 4B places category creation and update implementations in
-`includes/categories.php`; their legacy names remain delegation-only wrappers
-while `delete_category()` remains facade-owned.
+`includes/categories.php`; Phase 4C places category deletion there as well.
+Their legacy names remain delegation-only wrappers.
 
 ## Focused Dashboard statistics contract
 
@@ -101,12 +101,24 @@ and rejects renaming the `General` category to another name. It preserves the
 existing prepared bindings and returns `true` after an executed update,
 including the current zero-row/missing-category behavior.
 
-Neither focused service reads session or global state, starts a transaction, or
-owns authorization, CSRF, audit, HTTP, or rendering behavior. `public/categories.php`
-keeps its existing authentication, CSRF-before-authorization ordering, admin
-gate, input validation, messages, and direct `delete_category()` path, while
-calling `categories_create()` and `categories_update()` directly. The legacy
-`create_category()` and `update_category()` names remain delegation-only
+The focused services do not read session or global state and do not own
+authorization, CSRF, audit, HTTP, or rendering behavior. The create/update
+services retain their existing non-transactional boundaries; `categories_delete()`
+owns the existing category-delete transaction. It casts the ID and returns
+`false` for non-positive IDs, missing categories, and the `General` category.
+After the existing category lookup, it starts the transaction, requires
+`General` to exist, deletes exactly one category, reassigns all product rows
+made `NULL` by the delete to General, and commits only after reassignment
+succeeds. Delete, reassignment, commit, closed-connection, and query failures
+return `false`; transactional failures roll back and preserve both category and
+product state. Existing prepared statements, affected-row checks, statement
+cleanup, error logging, and rollback diagnostics remain unchanged.
+
+`public/categories.php` keeps its existing authentication,
+CSRF-before-authorization ordering, admin gate, input validation, messages,
+and rendering while calling `categories_create()`, `categories_update()`, and
+`categories_delete()` directly. The legacy `create_category()`,
+`update_category()`, and `delete_category()` names remain delegation-only
 wrappers with their original signatures and boolean return contracts.
 
 ## Focused Product mutation contracts

@@ -1,7 +1,7 @@
 # MyShop dependency map
 
 This map records current call-site and dependency relationships after the
-Phase 4B Category create/update service extraction. It remains a
+Phase 4C Category deletion service extraction. It remains a
 characterization artifact; the compatibility wrappers are still required.
 
 ## Public-page to shared-function map
@@ -13,7 +13,7 @@ names are grouped only for readability; the source remains the authority.
 |---|---|
 | `audit_log.php` | `start_secure_session`, `verify_login`, `require_admin`, `normalize_page_number`, `normalize_page_size`, `truncate_list_search`, `count_audit_logs`, `get_audit_logs_page` |
 | `backup_database.php` | `start_secure_session`, `verify_login`, `is_admin`, `verify_csrf_token`, `audit_log`, `get_backup_table_allowlist`, `quote_backup_table`, `stream_database_backup` |
-| `categories.php` | `start_secure_session`, `verify_login`, `is_admin`, `require_admin`, `verify_csrf_token`, `generate_csrf_token`, `sanitize_input`, `normalize_page_number`, `normalize_page_size`, `truncate_list_search`, `categories_create`, `categories_update`, `delete_category`, `catalog_count_categories`, `catalog_get_categories_page`, `audit_log_current_actor`, `audit_log_denied` |
+| `categories.php` | `start_secure_session`, `verify_login`, `is_admin`, `require_admin`, `verify_csrf_token`, `generate_csrf_token`, `sanitize_input`, `normalize_page_number`, `normalize_page_size`, `truncate_list_search`, `categories_create`, `categories_update`, `categories_delete`, `catalog_count_categories`, `catalog_get_categories_page`, `audit_log_current_actor`, `audit_log_denied` |
 | `customers.php` | `start_secure_session`, `verify_login`, `is_admin`, `verify_csrf_token`, `generate_csrf_token`, `sanitize_input`, `normalize_page_number`, `normalize_page_size`, `truncate_list_search`, `create_customer`, `update_customer`, `delete_customer`, `people_count_customers`, `people_get_customers_page`, `audit_log_current_actor`, `audit_log_denied` |
 | `export_report.php` | `start_secure_session`, `verify_login`, `require_admin`, `export_report_definitions`, `export_validate_entity`, `export_validate_order_filters`, `export_csv_text`, `export_csv_write_row`, `export_csv_fail`, `export_stream_entity` |
 | `get_order_details.php` | `start_secure_session`, `verify_login`, `is_admin`, `orders_get_by_id`, `orders_get_details`, `audit_log_current_actor` |
@@ -100,11 +100,10 @@ behavior and boolean return contracts.
 | `categories_create` | Trims name/description, rejects an empty name, performs the existing duplicate-name lookup, inserts one row with `ss` bindings, requires one affected row, and returns `true` only for that success; validation, duplicate, query, and connection failures return `false`. |
 | `categories_update` | Normalizes the ID and text, rejects invalid IDs/names, rejects duplicate names, preserves General-category rename protection, updates with `ssi` bindings, and preserves the existing `true` return after an executed zero-row update for a missing category. |
 
-`public/categories.php` calls the focused create/update services after its
-existing CSRF and administrator gates. The legacy `create_category()` and
-`update_category()` names remain delegation-only wrappers in `functions.php`.
-`delete_category()` remains implemented and called through the facade because
-its reassignment transaction is intentionally outside this batch.
+`public/categories.php` calls the focused create/update/delete services after
+its existing CSRF and administrator gates. The legacy
+`create_category()`, `update_category()`, and `delete_category()` names remain
+delegation-only wrappers in `functions.php`.
 
 ## Product module boundary
 
@@ -351,8 +350,8 @@ errors and may depend on `$conn` or session scope.
 | `set_staff_active` | Enables/disables staff subject to admin-integrity rules. |
 | `categories_create` | Focused category creation service with trim, duplicate-name, prepared insert, and affected-row contracts. |
 | `categories_update` | Focused category update service with duplicate-name and General-category protection. |
-| `create_category`, `update_category` | Delegation-only compatibility wrappers for the focused Category module. |
-| `delete_category` | Remaining facade-owned category deletion and product reassignment transaction. |
+| `categories_delete` | Focused category deletion transaction with General verification, product reassignment, rollback, and boolean failure behavior. |
+| `create_category`, `update_category`, `delete_category` | Delegation-only compatibility wrappers for the focused Category module. |
 | `create_customer`, `update_customer`, `delete_customer` | Mutate customer data. |
 | `create_supplier`, `update_supplier`, `delete_supplier` | Mutate supplier data. |
 | `uploads_handle_image` | Validates and writes a safe image to the canonical `public/uploads` directory. |
