@@ -166,12 +166,40 @@ function run_facade_closure_unit_tests(): int
         'catalog.php', 'products.php', 'categories.php', 'customers.php', 'suppliers.php',
         'people.php', 'inventory.php', 'orders.php', 'dashboard.php', 'uploads.php', 'validation.php',
     ];
+    $expectedModuleIncludes = [
+        'catalog.php' => ['pagination.php'],
+        'products.php' => ['inventory.php', 'audit.php'],
+        'categories.php' => [],
+        'customers.php' => ['validation.php'],
+        'suppliers.php' => ['validation.php'],
+        'people.php' => ['pagination.php'],
+        'inventory.php' => ['pagination.php', 'security.php', 'audit.php'],
+        'orders.php' => ['inventory.php', 'audit.php', 'pagination.php'],
+        'dashboard.php' => ['pagination.php'],
+        'uploads.php' => [],
+        'validation.php' => [],
+    ];
     foreach ($completedModules as $moduleName) {
         $module = file_get_contents($repository . '/includes/' . $moduleName);
         $tests->assertTrue(is_string($module), 'Completed module could not be read: ' . $moduleName);
         $tests->assertFalse(strpos($module, "require_once __DIR__ . '/functions.php'") !== false, 'Completed module must not require the facade: ' . $moduleName);
-        $tests->assertFalse(strpos($module, '$_SESSION') !== false, 'Completed module must not read session state: ' . $moduleName);
-        $tests->assertFalse(strpos($module, '$GLOBALS') !== false, 'Completed module must not read global state: ' . $moduleName);
+        $tests->assertFalse(
+            preg_match('/\$_SESSION|\$GLOBALS|\bglobal\s+\$[A-Za-z_]/', $module) === 1,
+            'Completed module must not access session or global state: ' . $moduleName
+        );
+        foreach ($expectedModuleIncludes[$moduleName] as $requiredModule) {
+            $tests->assertContains(
+                "require_once __DIR__ . '/{$requiredModule}';",
+                $module,
+                'Completed module dependency declaration changed: ' . $moduleName . ' -> ' . $requiredModule
+            );
+        }
+        preg_match_all("/require_once __DIR__ \\. \'\/([^']+)\'/", $module, $includeMatches);
+        $actualIncludes = $includeMatches[1] ?? [];
+        sort($actualIncludes);
+        $expectedIncludes = $expectedModuleIncludes[$moduleName];
+        sort($expectedIncludes);
+        $tests->assertSame($expectedIncludes, $actualIncludes, 'Completed module has an unexpected dependency: ' . $moduleName);
     }
     $tests->assertContains('declare(strict_types=1);', $validation, 'Validation helpers must remain strict and pure.');
     $tests->assertFalse(strpos($validation, 'require_once') !== false, 'Validation helpers must not acquire dependencies.');
