@@ -109,7 +109,31 @@ focused services directly after its existing request validation, CSRF, and
 authorization gates. includes/functions.php keeps create_product(),
 update_product(), and delete_product() as delegation-only wrappers with their
 original signatures and return contracts for remaining callers. The page
-continues to own uploads, generic messages, HTTP responses, and rendering.
+continues to own upload request dispatch, generic messages, HTTP responses, and
+rendering; the focused Uploads module owns filesystem validation, storage, and
+cleanup.
+
+## Focused Uploads contracts
+
+`uploads_handle_image($file)` accepts the request upload structure explicitly
+and returns `false` for upload errors, non-uploaded files, invalid or mismatched
+MIME/content, invalid image structure, oversized files, invalid dimensions or
+pixel counts, unsafe destinations, or storage failure. On success it returns a
+relative `uploads/<32-lowercase-hex>.<jpg|jpeg|png|gif>` path. It preserves the
+5 MiB file limit, 4096-pixel width/height limits, 16-megapixel limit, finfo and
+`getimagesize()` checks, random filename generation, and canonical
+`public/uploads` boundary.
+
+`uploads_delete_newly_uploaded_image($relative_path)` returns `true` for a
+missing safe generated path or a successful deletion, and `false` for invalid
+path shapes, traversal, absolute paths, symlinks/outside-root paths, or unlink
+failure. It performs no database or session work. `public/products.php` calls
+these focused functions directly and retains the existing authorization, CSRF,
+product-service, cleanup-decision, and user-facing response behavior.
+
+The legacy `handle_image_upload()` and `delete_newly_uploaded_image()` names in
+`includes/functions.php` are delegation-only wrappers with their original
+signatures and return contracts.
 
 ## Focused Order creation contract
 
@@ -251,7 +275,7 @@ failures, and some infrastructure failures.
   failure, while success returns the created order ID.
 - Staff, category, customer, and supplier mutation functions on rejected or
   failed mutations.
-- `handle_image_upload()` and `delete_newly_uploaded_image()` on invalid input,
+- `uploads_handle_image()` and `uploads_delete_newly_uploaded_image()` on invalid input,
   unsafe paths, failed validation, or filesystem failure.
 - `audit_log()` and related helpers when an audit write cannot be completed.
 
@@ -363,6 +387,6 @@ passwords, cookies, CSRF tokens, request bodies, or database credentials.
 | Process termination | Database failure closure, redirect, admin/auth failures, export/backup failures |
 | Session writes | `security.php`, `auth.php:auth_verify_login`, login/settings pages |
 | Database writes | Rate limiting, audit, catalog, inventory, orders, staff, categories, customers, suppliers |
-| Filesystem writes | `handle_image_upload`, backup/export output streams, test/runner temporary files |
+| Filesystem writes | `uploads_handle_image`, `uploads_delete_newly_uploaded_image`, backup/export output streams, test/runner temporary files |
 | Server logs | `log_application_error`, `error_log` calls, audit/operational logging |
 | Browser output | All public page templates, JSON endpoints, CSV and SQL stream endpoints |

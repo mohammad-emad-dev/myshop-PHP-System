@@ -1,6 +1,6 @@
 # MyShop architecture baseline
 
-Status: Phase 3G low-stock read extraction baseline
+Status: Phase 4A secure upload module extraction baseline
 
 Captured from the `security-hardening-baseline` branch at starting revision
 `70d1ad64a5c639b93897c1c1abd2ab28063cef90`.
@@ -29,7 +29,7 @@ Browser QA is intentionally separate from the dependency-free PHP test harness.
    loads `config/db.php`, and then performs request-specific work.
 4. `includes/functions.php` loads `security.php`, `pagination.php`, `audit.php`,
    `http.php`, `auth.php`, `catalog.php`, `people.php`, `inventory.php`,
-   `products.php`, and `orders.php` as a compatibility facade. Catalog and People page
+   `products.php`, `orders.php`, and `uploads.php` as a compatibility facade. Catalog and People page
    callers may use their focused read functions directly; product mutations are
    owned by `includes/products.php`, and order creation plus bounded/single-record
    order reads by `includes/orders.php`; legacy names remain available as
@@ -116,10 +116,10 @@ application service module.
 | `build_product_filter_sql()` | Catalog filter compatibility wrapper |
 | `get_all_products()` and Catalog compatibility wrappers | Legacy full product read plus delegation to `includes/catalog.php` |
 | `get_low_stock_products()`, stock movement reads, `log_stock_movement()` | Delegation-only low-stock and bounded stock-movement compatibility wrappers; the legacy unbounded movement loader remains in the facade |
-| `create_product()`, `update_product()`, `delete_product()` | Delegation-only compatibility wrappers to `includes/products.php`; upload validation remains page-owned |
+| `create_product()`, `update_product()`, `delete_product()` | Delegation-only compatibility wrappers to `includes/products.php`; upload request dispatch remains page-owned while filesystem validation/storage/cleanup is owned by `includes/uploads.php` |
 | `create_order()` | Delegation-only compatibility wrapper to `includes/orders.php`; the wrapper preserves the existing order-ID-or-false return contract |
 | `orders_count()`, `orders_get_page()`, `orders_get_summary()`, `orders_get_by_id()`, `orders_get_details()` | Focused bounded and single-record order reads; the legacy names remain delegation-only wrappers for remaining callers |
-| `get_dashboard_stats()`, `get_chart_data()`, `get_inventory_valuation()`, `get_top_selling_products()`, `get_category_sales_distribution()` | Delegation-only compatibility wrappers to `includes/dashboard.php`; uploads and remaining report functions remain in the facade |
+| `get_dashboard_stats()`, `get_chart_data()`, `get_inventory_valuation()`, `get_top_selling_products()`, `get_category_sales_distribution()` | Delegation-only compatibility wrappers to `includes/dashboard.php`; remaining report functions remain in the facade |
 | Role checks and staff administration functions | Authorization and staff administration |
 | Category read/mutation functions | Remaining category reads and category mutations |
 | Customer read/mutation functions | Remaining customer reads and customer mutations |
@@ -167,6 +167,9 @@ Focused shared modules already extracted from the facade:
   `get_dashboard_stats()`, `get_chart_data()`, `get_inventory_valuation()`,
   `get_top_selling_products()`, and `get_category_sales_distribution()` names
   remain delegation-only compatibility wrappers in `functions.php`.
+- `includes/uploads.php`: explicit secure image validation, storage, and
+  current-request cleanup under the canonical `public/uploads` boundary. The
+  legacy upload-helper names remain delegation-only wrappers in `functions.php`.
 
 ## Public pages and responsibilities
 
@@ -174,7 +177,7 @@ Focused shared modules already extracted from the facade:
 |---|---|
 | `public/login.php` | Login, logout, rate-limit interaction, session changes, authentication audit, login view |
 | `public/index.php` | Dashboard authorization, direct `dashboard_get_stats()`, `dashboard_get_chart_data()`, `dashboard_get_inventory_valuation()`, `dashboard_get_top_selling_products()`, `dashboard_get_category_sales_distribution()`, and `inventory_get_low_stock_products()` calls, remaining report data preparation, dashboard view |
-| `public/products.php` | Product CRUD request dispatch, request validation, authorization, CSRF, image upload handling, generic messages, Catalog search/pagination, product table, forms, and rendering; delegates product database mutations directly to `products_create()`, `products_update()`, and `products_delete()` |
+| `public/products.php` | Product CRUD request dispatch, request validation, authorization, CSRF, upload request handling and generic messages, Catalog search/pagination, product table, forms, and rendering; delegates filesystem validation/storage/cleanup to `uploads_handle_image()` and `uploads_delete_newly_uploaded_image()` and product database mutations to `products_create()`, `products_update()`, and `products_delete()` |
 | `public/categories.php` | Category CRUD request dispatch, admin checks, Catalog search/pagination, category view |
 | `public/stock_movements.php` | Manual stock adjustment request validation, CSRF and authorization boundary, delegation to the Inventory service, movement history filtering/pagination, and stock ledger view |
 | `public/orders.php` | POS request parsing, CSRF and page-level purchase authorization, Catalog product/category and People customer/supplier-selector reads, product revalidation, delegation to `orders_create()`, POS view and JavaScript; the legacy `create_order()` wrapper remains for other callers |

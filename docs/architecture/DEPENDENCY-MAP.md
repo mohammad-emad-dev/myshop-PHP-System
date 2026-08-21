@@ -1,7 +1,7 @@
 # MyShop dependency map
 
 This map records current call-site and dependency relationships after the
-Phase 3G low-stock Inventory service extraction. It remains a
+Phase 4A secure Uploads module extraction. It remains a
 characterization artifact; the compatibility wrappers are still required.
 
 ## Public-page to shared-function map
@@ -24,7 +24,7 @@ names are grouped only for readability; the source remains the authority.
 | `orders.php` | `start_secure_session`, `verify_login`, `is_admin`, `verify_csrf_token`, `generate_csrf_token`, `truncate_list_search`, `catalog_get_pos_products`, `catalog_get_categories_for_selector`, `people_get_customers_for_selector`, `people_get_suppliers_for_selector`, `catalog_get_product_by_id`, `orders_create`, `audit_log_current_actor`, `audit_log_denied` |
 | `pos_product_lookup.php` | `start_secure_session`, `verify_login`, `truncate_list_search`, `catalog_get_pos_product_by_barcode` |
 | `print_invoice.php` | `start_secure_session`, `send_security_headers`, `verify_login`, `is_admin`, `sanitize_id`, `orders_get_by_id`, `orders_get_details`, `audit_log_current_actor` |
-| `products.php` | `start_secure_session`, `verify_login`, `is_admin`, `verify_csrf_token`, `generate_csrf_token`, `sanitize_input`, `normalize_page_number`, `normalize_page_size`, `truncate_list_search`, `catalog_get_categories_for_selector`, `catalog_get_products_page`, `catalog_count_products`, `products_create`, `products_update`, `products_delete`, `handle_image_upload`, `delete_newly_uploaded_image`, `audit_log_current_actor`, `audit_log_denied` |
+| `products.php` | `start_secure_session`, `verify_login`, `is_admin`, `verify_csrf_token`, `generate_csrf_token`, `sanitize_input`, `normalize_page_number`, `normalize_page_size`, `truncate_list_search`, `catalog_get_categories_for_selector`, `catalog_get_products_page`, `catalog_count_products`, `products_create`, `products_update`, `products_delete`, `uploads_handle_image`, `uploads_delete_newly_uploaded_image`, `audit_log_current_actor`, `audit_log_denied` |
 | `ready.php` | `initialize_request_context`, `log_application_error`; `config/db.php` performs the connection and readiness failure contract |
 | `settings.php` | `start_secure_session`, `verify_login`, `is_admin`, `require_admin`, `verify_csrf_token`, `generate_csrf_token`, `sanitize_input`, `password_meets_policy`, `create_staff_member`, `update_staff_member`, `delete_staff_member`, `set_staff_active`, `get_staff_members`, `audit_log_current_actor` |
 | `stock_movements.php` | `start_secure_session`, `verify_login`, `is_admin`, `verify_csrf_token`, `sanitize_input`, `normalize_page_number`, `normalize_page_size`, `get_pos_products`, `get_product_by_id`, `inventory_adjust_stock`, `inventory_get_stock_movements_page`, `inventory_count_stock_movements`, `audit_log_current_actor`, `audit_log_denied` |
@@ -40,7 +40,7 @@ names are grouped only for readability; the source remains the authority.
 | `$GLOBALS['request_correlation_id']` | `initialize_request_context()` owns it and shutdown logging reads it. |
 | `$GLOBALS['csp_nonce']` | `get_csp_nonce()` and layouts use it for inline CSP nonces. |
 | `$_SERVER` | Request method, URI, peer address, HTTPS state, and forwarded protocol are used by security and page controllers. |
-| Filesystem | `handle_image_upload()` and `delete_newly_uploaded_image()` use `public/uploads`; backup and export use output streams. |
+| Filesystem | `uploads_handle_image()` and `uploads_delete_newly_uploaded_image()` use only the canonical `public/uploads` boundary; backup and export use output streams. |
 | Process environment | `config/db.php`, HSTS/proxy handling, production scripts, tests, and Compose provide configuration through environment variables. |
 | Headers/termination | `http_redirect()`, `auth_require_admin()`, their legacy wrappers, database failure handlers, CSV failure handling, and backup failure handling can send headers or terminate execution. |
 
@@ -108,12 +108,31 @@ The focused functions depend on `inventory_log_stock_movement()` and
 prepared statements, transaction ordering, rollback cleanup, audit metadata,
 and generic failure behavior.
 
+## Uploads module boundary
+
+`includes/uploads.php` has no dependency on `includes/functions.php`, session
+state, or global state. It accepts the upload value or relative path explicitly
+and owns the existing filesystem security boundary under `public/uploads`.
+
+| Focused function | Contract and security behavior |
+|---|---|
+| `uploads_handle_image` | Validates upload errors, `is_uploaded_file`, MIME/content consistency, image structure, size, dimensions, pixel count, canonical destination, and random filename; returns a relative `uploads/<random-name>.<extension>` path or `false`. |
+| `uploads_delete_newly_uploaded_image` | Accepts only the generated relative upload-path shape, resolves the canonical uploads root, rejects traversal, absolute paths, symlinks, and outside-root files, and returns `true` for a missing or successfully deleted safe path and `false` for unsafe or failed cleanup. |
+
+`public/products.php` calls both focused functions directly after its existing
+authorization, CSRF, and request-validation gates. The legacy
+`handle_image_upload()` and `delete_newly_uploaded_image()` names remain in
+`functions.php` as delegation-only compatibility wrappers for remaining
+callers and tests. The page remains responsible for deciding when to upload,
+when to clean up a newly generated path, and which generic response to show.
+
 The legacy names `create_product()`, `update_product()`, and
 `delete_product()` remain in `functions.php` as delegation-only
 compatibility wrappers for tests, CLI utilities, and other un-migrated callers.
 `public/products.php` now calls the focused services directly while retaining
-ownership of request validation, authorization, CSRF checks, upload handling,
-generic messages, HTTP responses, and page rendering.
+ownership of request validation, authorization, CSRF checks, upload request
+handling and messages, generic HTTP responses, and page rendering. The focused
+Uploads module owns filesystem validation, storage, and cleanup.
 
 The legacy `create_order()` name remains in `functions.php` as a
 delegation-only compatibility wrapper for remaining callers. `public/orders.php`
@@ -315,8 +334,9 @@ errors and may depend on `$conn` or session scope.
 | `create_category`, `update_category`, `delete_category` | Mutate category/reference data. |
 | `create_customer`, `update_customer`, `delete_customer` | Mutate customer data. |
 | `create_supplier`, `update_supplier`, `delete_supplier` | Mutate supplier data. |
-| `handle_image_upload` | Writes a validated image to `public/uploads`. |
-| `delete_newly_uploaded_image` | Deletes a validated current-request upload path. |
+| `uploads_handle_image` | Validates and writes a safe image to the canonical `public/uploads` directory. |
+| `uploads_delete_newly_uploaded_image` | Deletes a safe current-request upload path and preserves the outside-root/traversal protections. |
+| `handle_image_upload`, `delete_newly_uploaded_image` | Delegation-only compatibility wrappers for the focused Uploads module. |
 | `audit_log`, `audit_log_current_actor`, `audit_log_denied` | Write audit events. |
 | `stream_database_backup` | Reads a consistent snapshot and writes SQL to the caller's output stream; it does not mutate application data but has operational side effects. |
 
@@ -331,7 +351,7 @@ errors and may depend on `$conn` or session scope.
 - Authorization: `auth_is_admin`, `auth_require_admin` (through legacy
   wrappers), scoped order lookups, and
   staff-integrity mutation functions.
-- Data protection: `handle_image_upload`, `delete_newly_uploaded_image`,
+- Data protection: `uploads_handle_image`, `uploads_delete_newly_uploaded_image`,
   `export_csv_text`, `export_validate_entity`, `quote_backup_table`,
   `stream_database_backup`.
 - Audit: all functions in `includes/audit.php`.
@@ -382,8 +402,10 @@ request handling, staff writes, or any business mutation.
 
 - Staff deletion/status functions because they protect the last active admin
   and self-deactivation invariants.
-- `handle_image_upload()` because its path, MIME, dimension, and filesystem
-  guarantees are security boundaries.
+- Upload helpers now live in `includes/uploads.php`; changes to
+  `uploads_handle_image()` or `uploads_delete_newly_uploaded_image()` must
+  preserve their path, MIME, dimension, canonical-root, and cleanup security
+  contracts. The legacy names are wrappers only.
 - `stream_database_backup()` because snapshot consistency, table allow-listing,
   sensitive data handling, and completion markers are operational guarantees.
 - Login credential verification and rate-limit functions until their request,
