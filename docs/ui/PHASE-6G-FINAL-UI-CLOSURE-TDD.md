@@ -81,14 +81,16 @@ export, upload, invoice, or thermal-print rule was removed or changed.
   covered journeys. Automated axe results are regression signals, not proof
   of full WCAG conformance.
 
-### Limitation
+### Limitations
 
 Both settings modals explicitly retain Bootstrap's
 `data-bs-keyboard="true"` and `data-bs-focus="true"` policy and their existing
-close controls. The browser harness verified opening and deterministic close
-through the labelled close button. Direct Escape dismissal was not treated as
-browser-proven because the Bootstrap focus trap was nondeterministic under the
-disposable Chromium runner; this remains a manual follow-up for operators.
+close controls. The final local Chromium audit opened the modal, waited for
+Bootstrap's opening transition to settle, pressed Escape, verified dismissal,
+and verified focus returned to the Add Staff trigger. The browser contract now
+waits for that real settled state before exercising Escape, so the earlier
+transition-timing false negative is not reported as an application defect.
+
 No claim of full WCAG conformance is made. Manual contrast review, screen
 reader behavior, browser/OS zoom combinations, and full RTL rendering remain
 outside this phase's executable coverage.
@@ -132,6 +134,7 @@ does not overflow horizontally.
 | RED extension | `c6f97d6`, `bad577b` | Added executable contracts for the audit scroll region and modal keyboard policy before each corresponding fix. |
 | GREEN | `4356839`, `6d72ca6`, `650a1dd` | Migrated login/settings/audit presentation, restored the keyboardable audit region, and made Bootstrap modal keyboard/focus policy explicit. |
 | Final test GREEN | `13d41df` | Kept the browser contract deterministic by checking the existing modal close control; no temporary custom Escape handler remains. |
+| Audit follow-up | `4817069`, `40f026f` | Proved the initial Escape failure was caused by testing during Bootstrap's opening transition, then added a settled-transition Escape and focus-return browser contract without changing production code. |
 | Documentation | this checkpoint | Records the final audit, retention decisions, accessibility limitation, and sanitized evidence. |
 
 Focused command:
@@ -140,7 +143,7 @@ Focused command:
 docker compose --env-file .env exec -T app php -r "require 'tests/Unit/final_ui_closure_test.php'; echo 'FOCUSED_ASSERTIONS=' . run_final_ui_closure_unit_tests() . PHP_EOL;"
 ```
 
-Result: **95 focused assertions passed**.
+Result: **97 focused assertions passed**.
 
 Final verification:
 
@@ -163,8 +166,7 @@ merge was performed.
 
 ## Remaining risk
 
-The only material Phase 6G limitation is manual confirmation of Escape-key
-modal dismissal outside the disposable Chromium harness. This does not change
-the existing backend/security behavior or block the visual closure work, but
-it should be checked in the target operator browser before a future full
-accessibility claim.
+Escape-key modal dismissal and focus return are now verified in the actual local
+Chromium run. The remaining accessibility risk is the normal limitation of
+automated and targeted manual checks: full screen-reader, contrast, zoom, RTL,
+and WCAG conformance review still require a broader operator-led audit.
