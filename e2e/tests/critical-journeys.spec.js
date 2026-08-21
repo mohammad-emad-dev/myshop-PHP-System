@@ -323,6 +323,9 @@ test('admin can load critical pages, search and paginate products, and access ex
   ];
   for (const [route, heading] of pages) {
     await loadPage(page, route, heading);
+    if (route === '/stock_movements.php') {
+      await captureSanitizedScreenshot(page, 'admin-stock-ledger');
+    }
   }
   await captureSanitizedScreenshot(page, 'admin-settings');
 
@@ -340,6 +343,55 @@ test('admin can load critical pages, search and paginate products, and access ex
   expect(exportResult.status).toBe(200);
   expect(exportResult.type).toContain('text/csv');
   expect(exportResult.disposition).toContain('products.csv');
+});
+
+test('admin Products and Stock Ledger surfaces support dense-data workflows', async ({ page }) => {
+  await login(page, adminCredentials);
+
+  await loadPage(page, '/products.php?page_size=10', 'Inventory Catalog');
+  await expect(page.locator('.products-page')).toBeVisible();
+  await expect(page.locator('.data-table-shell')).toBeVisible();
+  await expect(page.locator('#productsTable')).toHaveClass(/data-table/);
+  await expect(page.getByRole('link', { name: /Export CSV/ })).toHaveAttribute('href', 'export_report.php?entity=products');
+  await expect(page.locator('#image')).toHaveAttribute('accept', 'image/*');
+
+  await page.getByLabel('Search products').fill(`${dataPrefix}_PRODUCT_`);
+  await page.getByRole('button', { name: 'Apply' }).click();
+  await expect(page).toHaveURL(/search=/);
+  await expect(page.locator('.product-row')).toHaveCount(10);
+  await page.locator('#pageSize').selectOption('50');
+  await page.getByRole('button', { name: 'Apply' }).click();
+  await expect(page.locator('.product-row')).toHaveCount(12);
+
+  await page.getByRole('button', { name: /Add Product/ }).click();
+  await expect(page.locator('#addProductModal')).toBeVisible();
+  await expect(page.locator('#addProductModal form')).toHaveAttribute('enctype', 'multipart/form-data');
+  await page.locator('#addProductModal [data-bs-dismiss="modal"]').click();
+  await page.getByRole('button', { name: 'Edit product' }).first().click();
+  await expect(page.locator('#editProductModal')).toBeVisible();
+  await expect(page.locator('#edit_name')).not.toHaveValue('');
+  await expect(page.locator('#edit_image')).toHaveAttribute('accept', 'image/*');
+  await page.locator('#editProductModal [data-bs-dismiss="modal"]').click();
+  await captureSanitizedScreenshot(page, 'admin-products-after');
+
+  await loadPage(page, '/stock_movements.php?page_size=10', /Stock Ledger/);
+  await expect(page.locator('.inventory-page')).toBeVisible();
+  await expect(page.locator('#stockMovementsTable')).toHaveClass(/data-table/);
+  await expect(page.getByRole('link', { name: /Export CSV/ })).toHaveAttribute('href', 'export_report.php?entity=stock');
+  await expect(page.locator('#addMovementModal')).toHaveCount(1);
+  await page.getByLabel('Filter by Product').selectOption({ label: new RegExp(`${dataPrefix}_PRODUCT_07`) });
+  await page.getByRole('button', { name: /Filter Ledger/ }).click();
+  await expect(page).toHaveURL(/product_id=/);
+  await expect(page.locator('.movement-row')).toHaveCount(1);
+  await expect(page.locator('.movement-product')).toContainText(`${dataPrefix}_PRODUCT_07`);
+  await expect(page.locator('.movement-quantity')).toBeVisible();
+  await expect(page.locator('.movement-type')).toContainText('Purchase');
+  await expect(page.locator('.movement-reason')).toBeVisible();
+  await expect(page.locator('.movement-staff')).toBeVisible();
+  await expect(page.locator('.movement-date')).toBeVisible();
+  await page.getByRole('link', { name: 'Clear' }).click();
+  await expect(page).toHaveURL(/stock_movements.php$/);
+  await captureSanitizedScreenshot(page, 'admin-stock-ledger-after');
 });
 
 test('authenticated POS barcode lookup returns the disposable catalog product', async ({ page }) => {
