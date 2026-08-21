@@ -29,7 +29,9 @@ legacy name also remains a delegation-only compatibility wrapper.
 Phase 4B places category creation and update implementations in
 `includes/categories.php`; Phase 4C places category deletion there as well.
 Phase 4D places customer creation, update, and deletion implementations in
-`includes/customers.php`. Their legacy names remain delegation-only wrappers.
+`includes/customers.php`. Phase 4E places supplier creation, update, and
+deletion implementations in `includes/suppliers.php`. Their legacy names
+remain delegation-only wrappers.
 
 ## Focused Dashboard statistics contract
 
@@ -149,6 +151,34 @@ administrator authorization, input handling, audit metadata, messages,
 redirects, pagination, and rendering. The legacy `create_customer()`,
 `update_customer()`, and `delete_customer()` names remain delegation-only
 compatibility wrappers in `includes/functions.php`.
+
+## Focused Supplier mutation contracts
+
+`suppliers_create($conn, $name, $phone, $email, $address)` preserves the
+existing sanitization helpers, rejects an empty name, uses prepared bindings,
+and returns `true` only when the insert affects exactly one row. Statement,
+connection, and SQL failures return `false` after the existing diagnostic is
+logged. `suppliers_update($conn, $id, $name, $phone, $email, $address)` rejects
+IDs `<= 1` and empty names, preserves the existing sanitization and bindings,
+and returns the result of successful statement execution without checking
+affected rows; therefore a missing ID retains the legacy `true` result when
+the update executes successfully. `suppliers_delete($conn, $id)` rejects IDs
+`<= 1` and returns `true` only when exactly one row is deleted.
+
+ID `1` is the protected General Supplier. Supplier deletion retains the
+existing foreign-key behavior for historical purchase orders:
+`Order.supplier_id` is set to `NULL` by the database rather than deleting the
+order. The focused services require an explicit connection, use prepared
+statements, close every statement on success and failure, do not require
+`functions.php`, and do not read session or global state. They preserve safe
+boolean failure results and existing error logging.
+
+`public/suppliers.php` calls `suppliers_create()`, `suppliers_update()`, and
+`suppliers_delete()` directly while retaining authentication, CSRF ordering,
+administrator authorization, input normalization, validation rules, audit
+metadata, messages, redirects, pagination, and rendering. The legacy
+`create_supplier()`, `update_supplier()`, and `delete_supplier()` names remain
+delegation-only compatibility wrappers in `includes/functions.php`.
 
 ## Focused Product mutation contracts
 

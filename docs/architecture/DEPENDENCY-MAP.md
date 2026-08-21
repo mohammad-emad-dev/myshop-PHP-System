@@ -1,7 +1,7 @@
 # MyShop dependency map
 
 This map records current call-site and dependency relationships after the
-Phase 4D customer mutation service extraction. It remains a
+Phase 4E supplier mutation service extraction. It remains a
 characterization artifact; the compatibility wrappers are still required.
 
 ## Public-page to shared-function map
@@ -28,7 +28,7 @@ names are grouped only for readability; the source remains the authority.
 | `ready.php` | `initialize_request_context`, `log_application_error`; `config/db.php` performs the connection and readiness failure contract |
 | `settings.php` | `start_secure_session`, `verify_login`, `is_admin`, `require_admin`, `verify_csrf_token`, `generate_csrf_token`, `sanitize_input`, `password_meets_policy`, `create_staff_member`, `update_staff_member`, `delete_staff_member`, `set_staff_active`, `get_staff_members`, `audit_log_current_actor` |
 | `stock_movements.php` | `start_secure_session`, `verify_login`, `is_admin`, `verify_csrf_token`, `sanitize_input`, `normalize_page_number`, `normalize_page_size`, `get_pos_products`, `get_product_by_id`, `inventory_adjust_stock`, `inventory_get_stock_movements_page`, `inventory_count_stock_movements`, `audit_log_current_actor`, `audit_log_denied` |
-| `suppliers.php` | `start_secure_session`, `verify_login`, `is_admin`, `verify_csrf_token`, `generate_csrf_token`, `sanitize_input`, `normalize_page_number`, `normalize_page_size`, `truncate_list_search`, `create_supplier`, `update_supplier`, `delete_supplier`, `people_count_suppliers`, `people_get_suppliers_page`, `audit_log_current_actor`, `audit_log_denied` |
+| `suppliers.php` | `start_secure_session`, `verify_login`, `is_admin`, `verify_csrf_token`, `generate_csrf_token`, `sanitize_input`, `normalize_page_number`, `normalize_page_size`, `truncate_list_search`, `suppliers_create`, `suppliers_update`, `suppliers_delete`, `people_count_suppliers`, `people_get_suppliers_page`, `audit_log_current_actor`, `audit_log_denied` |
 
 ## Global and implicit dependencies
 
@@ -156,11 +156,11 @@ delegation-only compatibility wrapper for remaining callers. `public/orders.php`
 calls `orders_create()` directly and continues to own request parsing, CSRF,
 page-level purchase authorization, POS validation, generic messages, and
 rendering.
-Staff administration, supplier writes, and other not-yet-extracted workflows
-remain in `includes/functions.php` or their existing page controllers. Customer
-writes are now owned by `includes/customers.php`; `create_customer()`,
-`update_customer()`, and `delete_customer()` remain in the facade only as
-delegation-only compatibility wrappers.
+Staff administration and other not-yet-extracted workflows remain in
+`includes/functions.php` or their existing page controllers. Customer writes
+are owned by `includes/customers.php`, and supplier writes are now owned by
+`includes/suppliers.php`; the legacy customer and supplier mutation names
+remain in the facade only as delegation-only compatibility wrappers.
 
 ## Orders module boundary
 
@@ -291,6 +291,28 @@ CSRF and administrator gates. The legacy customer names remain
 delegation-only wrappers in `functions.php`. `includes/people.php` remains
 read-only.
 
+## Supplier mutation module boundary
+
+`includes/suppliers.php` has no dependency on `includes/functions.php`, session
+state, or global state. It requires only `validation.php`, accepts the database
+connection and supplier inputs explicitly, and uses prepared statements with
+statement cleanup on every success and failure path.
+
+| Focused function | Mutation and return contract |
+|---|---|
+| `suppliers_create` | Sanitizes the supplied fields, rejects an empty name, inserts one supplier, and returns `true` only when `affected_rows === 1`; prepared-statement, connection, and SQL failures return `false`. |
+| `suppliers_update` | Sanitizes the supplied fields, rejects IDs `<= 1` and empty names, and preserves the legacy execute-success contract, including `true` for a missing ID when the update executes successfully. |
+| `suppliers_delete` | Rejects IDs `<= 1`, deletes one supplier, and returns `true` only when `affected_rows === 1`; the existing foreign key leaves historical purchase orders intact and sets `Order.supplier_id` to `NULL`. |
+
+The protected ID `1` is the General Supplier and cannot be updated or deleted.
+The focused services preserve the legacy error logging, boolean failure
+contract, prepared bindings, sanitization, and closed-connection behavior.
+`public/suppliers.php` calls the focused services directly after its existing
+CSRF and administrator gates. The legacy supplier names remain
+delegation-only wrappers in `functions.php`. `includes/people.php` remains
+read-only, and `get_supplier_by_id()` remains in the facade because no verified
+focused caller requires moving it.
+
 ## Read-only functions
 
 These functions are intended to read or normalize data. They still may log
@@ -379,7 +401,10 @@ errors and may depend on `$conn` or session scope.
 | `customers_update` | Focused customer update service with protected-ID/name validation and preserved execute-success behavior. |
 | `customers_delete` | Focused customer deletion service with protected-ID validation and exact affected-row success contract. |
 | `create_customer`, `update_customer`, `delete_customer` | Delegation-only compatibility wrappers for the focused Customer module. |
-| `create_supplier`, `update_supplier`, `delete_supplier` | Mutate supplier data. |
+| `suppliers_create` | Focused supplier creation service with sanitization, prepared insert, and exact affected-row success contract. |
+| `suppliers_update` | Focused supplier update service with protected-ID/name validation and preserved execute-success behavior. |
+| `suppliers_delete` | Focused supplier deletion service with protected-ID validation and exact affected-row success contract. |
+| `create_supplier`, `update_supplier`, `delete_supplier` | Delegation-only compatibility wrappers for the focused Supplier module. |
 | `uploads_handle_image` | Validates and writes a safe image to the canonical `public/uploads` directory. |
 | `uploads_delete_newly_uploaded_image` | Deletes a safe current-request upload path and preserves the outside-root/traversal protections. |
 | `handle_image_upload`, `delete_newly_uploaded_image` | Delegation-only compatibility wrappers for the focused Uploads module. |
