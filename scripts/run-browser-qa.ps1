@@ -9,6 +9,7 @@ $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) "myshop-browser-qa-$runT
 $envFile = Join-Path $tempRoot 'compose.env'
 $seedEnvFile = Join-Path $tempRoot 'seed.env'
 $outputDirectory = Join-Path $tempRoot 'playwright-output'
+$preserveOutputDirectory = $env:E2E_PRESERVE_OUTPUT_DIR
 $appPort = $null
 $mysqlPort = $null
 $composeStarted = $false
@@ -201,6 +202,18 @@ try {
     $exitCode = 1
 } finally {
     Remove-Item Env:BASE_URL, Env:QA_ADMIN_USERNAME, Env:QA_ADMIN_PASSWORD, Env:QA_CASHIER_USERNAME, Env:QA_CASHIER_PASSWORD, Env:QA_DATA_PREFIX, Env:E2E_OUTPUT_DIR -ErrorAction SilentlyContinue
+    if (-not [string]::IsNullOrWhiteSpace($preserveOutputDirectory) -and (Test-Path -LiteralPath $outputDirectory)) {
+        $resolvedTarget = [System.IO.Path]::GetFullPath($preserveOutputDirectory)
+        $allowedRoot = [System.IO.Path]::GetFullPath((Join-Path $repoRoot 'docs/ui/baselines'))
+        $allowedPrefix = $allowedRoot.TrimEnd('\') + [System.IO.Path]::DirectorySeparatorChar
+        if (-not $resolvedTarget.StartsWith($allowedPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+            Write-Error 'E2E_PRESERVE_OUTPUT_DIR must remain under docs/ui/baselines.'
+            $exitCode = 1
+        } else {
+            New-Item -ItemType Directory -Path $resolvedTarget -Force | Out-Null
+            Get-ChildItem -LiteralPath $outputDirectory -Filter '*.png' -File | Copy-Item -Destination $resolvedTarget -Force
+        }
+    }
     if ($composeStarted) {
         try {
             Invoke-Compose -CommandArguments @('down', '--rmi', 'local', '--volumes', '--remove-orphans') -AllowFailure | Out-Null

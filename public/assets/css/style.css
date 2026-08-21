@@ -1410,3 +1410,509 @@ a { text-decoration: none; }
     color: #4a5568;
 }
 #invoicePrintContainer .invoice-item-subtotal { font-weight: bold; color: #2d3748; }
+
+/* ========================================================================
+   Phase 6A: shared design foundation
+   Ownership: this layer is the visual contract for the shared shell and
+   reusable Bootstrap-backed controls. Page-specific migrations stay below
+   the component inventory documented in docs/ui/PHASE-6A-UI-REDESIGN-SPEC.md.
+   ======================================================================== */
+:root {
+    --color-canvas: #f2f6f5;
+    --color-surface: #ffffff;
+    --color-surface-muted: #e8f0ef;
+    --color-ink: #173139;
+    --color-ink-strong: #10252c;
+    --color-ink-muted: #4b6268;
+    --color-border: #d9e5e3;
+    --color-brand-50: #eefbf8;
+    --color-brand-100: #ccfbf1;
+    --color-brand-600: #0f766e;
+    --color-brand-700: #0b5f59;
+    --color-brand-900: #113e42;
+    --color-focus: #0f766e;
+    --space-1: 0.25rem;
+    --space-2: 0.5rem;
+    --space-3: 0.75rem;
+    --space-4: 1rem;
+    --space-5: 1.25rem;
+    --space-6: 1.5rem;
+    --space-8: 2rem;
+    --space-10: 2.5rem;
+    --radius-control: 0.65rem;
+    --radius-panel: 1rem;
+    --radius-pill: 999px;
+    --shadow-panel: 0 8px 24px rgba(22, 54, 59, 0.08), 0 2px 5px rgba(22, 54, 59, 0.04);
+    --shadow-panel-hover: 0 14px 30px rgba(22, 54, 59, 0.12), 0 3px 8px rgba(22, 54, 59, 0.06);
+    --focus-ring: 0 0 0 0.22rem rgba(15, 118, 110, 0.24);
+    --motion-fast: 160ms;
+    --motion-normal: 220ms;
+
+    --primary: var(--color-brand-600);
+    --primary-hover: var(--color-brand-700);
+    --primary-light: var(--color-brand-100);
+    --primary-bg-subtle: rgba(15, 118, 110, 0.1);
+    --body-bg: var(--color-canvas);
+    --card-bg: var(--color-surface);
+    --text-main: var(--color-ink);
+    --text-muted: var(--color-ink-muted);
+    --border-color: var(--color-border);
+    --radius-sm: 0.5rem;
+    --radius-md: var(--radius-control);
+    --radius-lg: var(--radius-panel);
+    --radius-xl: 1.25rem;
+    --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --font-heading: 'Outfit', var(--font-sans);
+}
+
+body {
+    background-color: var(--color-canvas) !important;
+    color: var(--color-ink);
+}
+
+body:not(.login-page) {
+    min-height: 100dvh;
+}
+
+h1, h2, h3, h4, h5, h6, .fs-1, .fs-2, .fs-3, .fs-4, .fs-5, .fs-6 {
+    color: var(--color-ink-strong);
+}
+
+a {
+    color: var(--color-brand-700);
+}
+
+:focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+    box-shadow: var(--focus-ring);
+}
+
+/* Shared shell. Existing IDs remain stable for the current toggle script. */
+#wrapper {
+    background: var(--color-canvas);
+    min-height: 100dvh;
+}
+
+#sidebar-wrapper.app-sidebar {
+    width: 15.5rem;
+    min-height: 100dvh;
+    margin-left: 0;
+    margin-inline-start: -15.5rem;
+    background: var(--color-brand-900);
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 8px 0 24px rgba(9, 32, 36, 0.08);
+}
+
+#sidebar-wrapper.app-sidebar::before {
+    width: 15rem;
+    height: 15rem;
+    top: -8rem;
+    left: -7rem;
+    background: radial-gradient(circle, rgba(45, 212, 191, 0.14) 0%, transparent 68%);
+}
+
+#sidebar-wrapper.app-sidebar .sidebar-heading {
+    min-height: 4.5rem;
+    padding: var(--space-6);
+    justify-content: flex-start;
+    color: #f3fffd;
+    background: transparent;
+    border-bottom-color: rgba(255, 255, 255, 0.1);
+    -webkit-text-fill-color: currentColor;
+}
+
+#sidebar-wrapper.app-sidebar .sidebar-heading i {
+    color: #5eead4;
+    -webkit-text-fill-color: currentColor;
+}
+
+#sidebar-wrapper.app-sidebar .list-group {
+    width: 100%;
+    padding: var(--space-4);
+    gap: var(--space-1);
+}
+
+#sidebar-wrapper.app-sidebar .sidebar-section-label {
+    padding: var(--space-5) var(--space-3) var(--space-2);
+    color: rgba(203, 251, 241, 0.58);
+    letter-spacing: 0.12em;
+}
+
+#sidebar-wrapper.app-sidebar .list-group-item {
+    min-height: 2.75rem;
+    padding: var(--space-3) var(--space-4) !important;
+    border-radius: var(--radius-control) !important;
+    color: rgba(237, 255, 252, 0.72) !important;
+}
+
+#sidebar-wrapper.app-sidebar .list-group-item i {
+    margin-inline-end: var(--space-3);
+    margin-right: 0;
+    color: rgba(204, 251, 241, 0.64);
+}
+
+#sidebar-wrapper.app-sidebar .list-group-item:hover {
+    color: #ffffff !important;
+    background: rgba(255, 255, 255, 0.09) !important;
+    transform: none;
+}
+
+#sidebar-wrapper.app-sidebar .list-group-item.active,
+#sidebar-wrapper.app-sidebar .list-group-item.active:hover {
+    color: #ffffff !important;
+    background: var(--color-brand-600) !important;
+    box-shadow: 0 7px 16px rgba(4, 69, 65, 0.3);
+}
+
+#sidebar-wrapper.app-sidebar .list-group-item.active i,
+#sidebar-wrapper.app-sidebar .list-group-item:hover i {
+    color: #ffffff !important;
+}
+
+#sidebar-wrapper.app-sidebar .sidebar-logout {
+    color: #fda4af !important;
+    background: rgba(190, 24, 93, 0.08) !important;
+    border-color: rgba(251, 113, 133, 0.16) !important;
+}
+
+#sidebar-wrapper.app-sidebar .sidebar-logout:hover {
+    background: rgba(190, 24, 93, 0.2) !important;
+    border-color: rgba(251, 113, 133, 0.3) !important;
+    box-shadow: none !important;
+}
+
+#page-content-wrapper {
+    background: var(--color-canvas);
+}
+
+.app-topbar {
+    min-height: 4.5rem;
+    padding-inline: var(--space-8) !important;
+    background: rgba(255, 255, 255, 0.94) !important;
+    border-bottom: 1px solid var(--color-border);
+    box-shadow: 0 1px 0 rgba(22, 54, 59, 0.02) !important;
+    backdrop-filter: blur(10px) saturate(130%);
+    -webkit-backdrop-filter: blur(10px) saturate(130%);
+}
+
+.app-topbar h1,
+.app-topbar h2 {
+    color: var(--color-ink-strong) !important;
+    font-size: 1.2rem !important;
+    letter-spacing: -0.02em;
+}
+
+.app-topbar #menu-toggle {
+    color: var(--color-ink-muted);
+    border-radius: var(--radius-control);
+}
+
+.app-topbar #menu-toggle:hover {
+    color: var(--color-brand-700);
+    background: var(--color-brand-50);
+}
+
+.app-topbar .ui-avatar {
+    background: var(--color-brand-600);
+    box-shadow: none !important;
+}
+
+.app-main {
+    display: block;
+    min-width: 0;
+    outline: none;
+}
+
+.app-main > .container-fluid {
+    width: 100%;
+    max-width: 1440px;
+    margin-inline: auto;
+    padding: var(--space-8) !important;
+}
+
+/* Shared component language. Bootstrap continues to own structure/utilities. */
+.card,
+.settings-section {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-panel);
+    background: var(--color-surface);
+    box-shadow: var(--shadow-panel);
+}
+
+.card:hover {
+    box-shadow: var(--shadow-panel-hover);
+}
+
+.card-header {
+    border-bottom-color: var(--color-border);
+    background: var(--color-surface);
+}
+
+.btn {
+    min-height: 2.5rem;
+    border-radius: var(--radius-control);
+    transition: transform var(--motion-fast) ease, box-shadow var(--motion-fast) ease, background-color var(--motion-fast) ease;
+}
+
+.btn:hover {
+    transform: translateY(-1px);
+}
+
+.btn:active {
+    transform: translateY(0);
+}
+
+.btn-primary,
+.btn-success,
+.btn-danger {
+    box-shadow: 0 4px 10px rgba(22, 54, 59, 0.12);
+}
+
+.btn-primary,
+.btn-primary:hover,
+.btn-primary:focus {
+    background: var(--color-brand-600);
+    border-color: var(--color-brand-600);
+}
+
+.btn-primary:hover,
+.btn-primary:focus {
+    background: var(--color-brand-700);
+    border-color: var(--color-brand-700);
+    box-shadow: 0 7px 16px rgba(15, 118, 110, 0.22);
+}
+
+.btn-success,
+.btn-success:hover,
+.btn-success:focus {
+    background: #16836f;
+    border-color: #16836f;
+}
+
+.form-control,
+.form-select,
+.input-group-text {
+    min-height: 2.5rem;
+    border-color: var(--color-border);
+    border-radius: var(--radius-control);
+    color: var(--color-ink);
+}
+
+.form-control:focus,
+.form-select:focus {
+    border-color: var(--color-brand-600);
+    box-shadow: var(--focus-ring);
+}
+
+.form-label {
+    color: var(--color-ink);
+    font-weight: 600;
+}
+
+.table {
+    --bs-table-color: var(--color-ink);
+    --bs-table-hover-bg: var(--color-brand-50);
+    color: var(--color-ink);
+}
+
+.table thead th {
+    background: var(--color-surface-muted);
+    color: var(--color-ink-muted);
+    border-bottom-color: var(--color-border);
+}
+
+.table tbody td {
+    border-bottom-color: var(--color-border);
+}
+
+.badge {
+    border-radius: var(--radius-pill);
+    font-weight: 700;
+}
+
+.alert {
+    border-radius: var(--radius-control);
+    border-width: 1px;
+}
+
+.modal-content {
+    border: 1px solid var(--color-border) !important;
+    border-radius: var(--radius-panel) !important;
+    box-shadow: 0 24px 60px rgba(16, 37, 44, 0.2) !important;
+}
+
+.modal-header,
+.modal-footer {
+    border-color: var(--color-border);
+}
+
+.dropdown-menu {
+    border: 1px solid var(--color-border) !important;
+    border-radius: var(--radius-control) !important;
+    box-shadow: var(--shadow-panel-hover) !important;
+}
+
+.dropdown-item:focus,
+.dropdown-item:hover {
+    color: var(--color-brand-900);
+    background: var(--color-brand-50);
+}
+
+/* Shared state primitives for the staged page migrations. */
+.ui-state {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-panel);
+    padding: var(--space-10) var(--space-6);
+    text-align: center;
+}
+
+.ui-state-empty {
+    color: var(--color-ink-muted);
+    background: var(--color-surface-muted);
+}
+
+.ui-state-error {
+    color: #9f1239;
+    background: #fff1f2;
+    border-color: #fecdd3;
+}
+
+.ui-state-success {
+    color: #166534;
+    background: #f0fdf4;
+    border-color: #bbf7d0;
+}
+
+.ui-skeleton {
+    min-height: 1rem;
+    border-radius: var(--radius-control);
+    background: linear-gradient(90deg, var(--color-surface-muted), #f7fbfa, var(--color-surface-muted));
+    background-size: 200% 100%;
+    animation: ui-skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes ui-skeleton-shimmer {
+    from { background-position: 200% 0; }
+    to { background-position: -200% 0; }
+}
+
+/* Login remains a separate dark context while sharing the same brand token. */
+.login-page {
+    background: #102a30 !important;
+}
+
+.login-page::before {
+    width: 620px;
+    height: 620px;
+    background: radial-gradient(circle, rgba(45, 212, 191, 0.14) 0%, transparent 68%);
+}
+
+.login-page::after {
+    width: 480px;
+    height: 480px;
+    background: radial-gradient(circle, rgba(20, 184, 166, 0.1) 0%, transparent 70%);
+}
+
+.login-page .card {
+    border-color: rgba(204, 251, 241, 0.16) !important;
+    background: rgba(17, 62, 66, 0.72) !important;
+    box-shadow: 0 24px 60px rgba(4, 25, 29, 0.36) !important;
+}
+
+.login-page .card-header h1 {
+    background: none;
+    color: #d5fffa;
+    -webkit-text-fill-color: currentColor;
+}
+
+.login-page .form-control:focus {
+    border-color: #5eead4 !important;
+    box-shadow: 0 0 0 4px rgba(94, 234, 212, 0.18) !important;
+}
+
+.login-page .btn-primary,
+.login-page .btn-primary:hover {
+    background: #14b8a6 !important;
+    border-color: #14b8a6 !important;
+    box-shadow: 0 8px 18px rgba(20, 184, 166, 0.24) !important;
+}
+
+/* Responsive shell: preserve the existing toggle behavior at every width. */
+@media (min-width: 768px) {
+    #sidebar-wrapper.app-sidebar {
+        margin-inline-start: 0;
+    }
+
+    #wrapper.toggled #sidebar-wrapper.app-sidebar {
+        margin-inline-start: -15.5rem;
+    }
+}
+
+@media (max-width: 991.98px) {
+    .app-topbar {
+        padding-inline: var(--space-6) !important;
+    }
+
+    .app-main > .container-fluid {
+        padding: var(--space-6) !important;
+    }
+}
+
+@media (max-width: 767.98px) {
+    #sidebar-wrapper.app-sidebar {
+        position: fixed;
+        inset-block: 0;
+        inset-inline-start: 0;
+        z-index: 1100;
+        margin-inline-start: -15.5rem;
+        box-shadow: 12px 0 32px rgba(9, 32, 36, 0.22);
+    }
+
+    #wrapper.toggled #sidebar-wrapper.app-sidebar {
+        margin-inline-start: 0;
+    }
+
+    .app-topbar {
+        min-height: 4rem;
+    }
+
+    .app-main > .container-fluid {
+        padding: var(--space-4) !important;
+    }
+
+    .table-responsive {
+        border-radius: var(--radius-control);
+    }
+}
+
+@media (max-width: 575.98px) {
+    .app-topbar {
+        padding-inline: var(--space-4) !important;
+    }
+
+    .app-topbar h1,
+    .app-topbar h2 {
+        font-size: 1.05rem !important;
+    }
+
+    .app-main > .container-fluid {
+        padding: var(--space-3) !important;
+    }
+
+    .card,
+    .settings-section {
+        border-radius: var(--radius-control);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        scroll-behavior: auto !important;
+        transition-duration: 0.01ms !important;
+    }
+}

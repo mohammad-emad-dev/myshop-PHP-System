@@ -21,8 +21,9 @@ function run_ui_redesign_unit_tests(): int
     $sidebar = file_get_contents($repository . '/includes/layouts/sidebar.php');
     $footer = file_get_contents($repository . '/includes/layouts/footer.php');
     $script = file_get_contents($repository . '/public/assets/js/script.js');
+    $ordersPage = file_get_contents($repository . '/public/orders.php');
 
-    foreach ([$stylesheet, $header, $navbar, $sidebar, $footer, $script] as $fixture) {
+    foreach ([$stylesheet, $header, $navbar, $sidebar, $footer, $script, $ordersPage] as $fixture) {
         $tests->assertTrue(is_string($fixture), 'Phase 6A UI source fixture could not be read.');
     }
 
@@ -32,6 +33,7 @@ function run_ui_redesign_unit_tests(): int
         '--color-canvas:',
         '--color-surface:',
         '--color-ink:',
+        '--color-ink-muted: #4b6268;',
         '--color-brand-600:',
         '--space-1:',
         '--space-2:',
@@ -41,7 +43,7 @@ function run_ui_redesign_unit_tests(): int
         '--radius-panel:',
         '--shadow-panel:',
         '--focus-ring:',
-        '/* Phase 6A: shared design foundation */',
+        'Phase 6A: shared design foundation',
     ] as $token) {
         $tests->assertContains($token, $stylesheet, 'Shared Phase 6A design token is missing: ' . $token);
     }
@@ -76,7 +78,7 @@ function run_ui_redesign_unit_tests(): int
         'data-confirm-logout',
         'id="main-content"',
     ] as $behaviorHook) {
-        $tests->assertContains($behaviorHook, $header . $navbar . $sidebar . $footer . $script, 'Existing UI behavior hook disappeared: ' . $behaviorHook);
+        $tests->assertContains($behaviorHook, $header . $navbar . $sidebar . $footer . $script . $ordersPage, 'Existing UI behavior hook disappeared: ' . $behaviorHook);
     }
 
     $baselineDirectory = $repository . '/docs/ui/baselines/phase-6a-before';

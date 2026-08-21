@@ -1,6 +1,6 @@
 <!-- Page Content Wrapper -->
 <div id="page-content-wrapper">
-    <nav class="navbar navbar-expand-lg navbar-light px-4 ui-navbar" aria-label="Top navigation">
+    <nav class="navbar navbar-expand-lg navbar-light px-4 ui-navbar app-topbar" aria-label="Top navigation">
         <a class="visually-hidden-focusable ui-skip-link" href="#main-content">Skip to main content</a>
         <div class="d-flex align-items-center">
             <button type="button" class="btn btn-link p-0 me-3" id="menu-toggle"
@@ -84,9 +84,8 @@
                 </li>
 
                 <li class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle d-flex align-items-center py-1 px-2 rounded-3 border-0" href="#" id="navbarDropdown"
-                        role="button" data-bs-toggle="dropdown" aria-expanded="false"
-                        class="ui-navbar-account-link">
+                    <a class="nav-link dropdown-toggle d-flex align-items-center py-1 px-2 rounded-3 border-0 ui-navbar-account-link" href="#" id="navbarDropdown"
+                        role="button" data-bs-toggle="dropdown" aria-expanded="false">
                         <div class="d-flex align-items-center justify-content-center rounded-circle me-2 shadow-sm ui-avatar">
                             <?php echo strtoupper(substr($_SESSION['full_name'] ?? 'U', 0, 1)); ?>
                         </div>
@@ -126,4 +125,4 @@
             </ul>
         </div>
     </nav>
-    <main id="main-content" tabindex="-1">
+    <main id="main-content" class="app-main" tabindex="-1">
