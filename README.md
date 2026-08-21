@@ -139,7 +139,8 @@ Do not use down --volumes unless the local database is disposable.
 ~~~powershell
 Copy-Item .env.example .env.production
 # Edit .env.production using the production secret manager. Replace the
-# PRODUCTION_APP_IMAGE sentinel with the reviewed immutable image digest.
+# example's mutable PRODUCTION_APP_IMAGE value with the reviewed immutable
+# image digest.
 docker compose --env-file .env.production -f docker-compose.production.yml config --quiet
 php scripts/production-preflight.php --env-file .env.production --compose-file docker-compose.production.yml
 docker compose --env-file .env.production -f docker-compose.production.yml up -d

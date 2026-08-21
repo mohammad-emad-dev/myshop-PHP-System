@@ -29,8 +29,9 @@ high-impact rollback and recovery controls are not locally verifiable.
   digest resolution before deployment and a deploy-only protected environment.
 - A concise response path is now documented for Database outage, Failed
   application deployment, and Restore incident scenarios.
-- The example application image is now a fail-closed sentinel instead of a
-  mutable deployable-looking tag.
+- The local environment example remains a development template; production
+  documentation now requires replacing its mutable image value and passing the
+  fail-closed preflight before deployment.
 
 ### Medium priority
 

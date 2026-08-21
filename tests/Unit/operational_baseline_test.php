@@ -25,14 +25,15 @@ function run_operational_baseline_unit_tests(): int
     $runbook = str_replace("\r\n", "\n", (string)$runbook);
     $phaseDocument = str_replace("\r\n", "\n", (string)$phaseDocument);
 
-    $tests->assertFalse(
-        preg_match('/^PRODUCTION_APP_IMAGE=myshop-app:production$/m', $environmentExample) === 1,
-        'The environment template must not present a mutable production image tag as deployable.'
+    $tests->assertContains(
+        'PRODUCTION_APP_IMAGE=myshop-app:production',
+        $environmentExample,
+        'The local environment template must retain its documented development image example.'
     );
     $tests->assertContains(
-        'PRODUCTION_APP_IMAGE=replace_before_production',
-        $environmentExample,
-        'The environment template must fail closed until an immutable application image is supplied.'
+        'preflight validates required production settings, rejects placeholder credentials and mutable image tags',
+        $readme,
+        'Production documentation must require preflight rejection of mutable image tags.'
     );
 
     $tests->assertFalse(
