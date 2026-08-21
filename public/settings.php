@@ -586,13 +586,15 @@ require_once '../includes/layouts/header.php';
             });
         });
 
-        document.querySelectorAll('.modal[data-bs-keyboard="true"]').forEach(function(modalElement) {
-            modalElement.addEventListener('keydown', function(event) {
-                if (event.key === 'Escape') {
-                    var modal = bootstrap.Modal.getOrCreateInstance(modalElement);
-                    modal.hide();
-                }
-            });
+        document.addEventListener('keydown', function(event) {
+            if (event.key !== 'Escape') {
+                return;
+            }
+            var modalElement = document.querySelector('.modal.show[data-bs-keyboard="true"]');
+            if (modalElement) {
+                var modal = bootstrap.Modal.getOrCreateInstance(modalElement);
+                modal.hide();
+            }
         });
 
 </script>
