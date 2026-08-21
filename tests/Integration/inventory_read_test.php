@@ -71,6 +71,18 @@ function run_inventory_read_integration_tests(): int
             'An unsupported low-stock limit must normalize to the default page size.'
         );
 
+        test_execute(
+            $conn,
+            'UPDATE Product SET stock = alert_threshold + 1 WHERE name LIKE ?',
+            's',
+            [$prefix . '%']
+        );
+        $tests->assertSame(
+            [],
+            inventory_get_low_stock_products($conn),
+            'A valid query with no matching products must return an empty array.'
+        );
+
         $closedConnection = new mysqli(
             $database->hostForTests(),
             $database->runtimeUsername,
