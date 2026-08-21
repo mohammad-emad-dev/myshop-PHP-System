@@ -75,7 +75,7 @@ function run_architecture_baseline_unit_tests(): int
         $tests->assertTrue(is_file($repository . '/' . $route), 'Documented public route is missing: ' . $route);
     }
 
-    foreach (['security.php', 'pagination.php', 'audit.php', 'http.php', 'auth.php', 'catalog.php', 'people.php', 'inventory.php', 'uploads.php'] as $module) {
+    foreach (['security.php', 'validation.php', 'pagination.php', 'audit.php', 'http.php', 'auth.php', 'catalog.php', 'people.php', 'inventory.php', 'uploads.php', 'customers.php'] as $module) {
         $tests->assertContains(
             "require_once __DIR__ . '/{$module}'",
             $facade,
