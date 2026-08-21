@@ -222,6 +222,30 @@ async function captureSanitizedScreenshot(page, name) {
   });
 }
 
+async function captureSanitizedPosScreenshot(page, name) {
+  const mask = page.locator([
+    'input',
+    'textarea',
+    'select',
+    'td',
+    '.pos-product-title',
+    '.pos-product-price',
+    '.pos-product-stock',
+    '.ui-account-name',
+    '.ui-account-role',
+    '.ui-avatar',
+    '.ui-notification-menu',
+    '[data-qa-sensitive]',
+  ].join(', '));
+  await page.screenshot({
+    path: path.join(process.env.E2E_OUTPUT_DIR || path.join(os.tmpdir(), 'myshop-browser-qa-output'), `${test.info().project.name}-${name}.png`),
+    fullPage: true,
+    animations: 'disabled',
+    mask: await mask.all(),
+    maskColor: '#000000',
+  });
+}
+
 test.beforeEach(async ({ page }) => {
   page.__myshopDiagnostics = diagnosticsFor(page);
 });
@@ -334,6 +358,76 @@ test('authenticated POS barcode lookup returns the disposable catalog product', 
 
   expect(result.status).toBe(200);
   expect(result.payload.product.name).toBe(`${dataPrefix}_PRODUCT_07`);
+});
+
+test('cashier POS workspace supports search, categories, barcode, cart controls, and safe checkout validation', async ({ page }) => {
+  await login(page, adminCredentials);
+  await loadPage(page, '/orders.php', /POS Terminal/);
+
+  await expect(page.locator('.pos-page-header')).toBeVisible();
+  await expect(page.locator('.pos-catalog-zone')).toBeVisible();
+  await expect(page.locator('.pos-checkout-zone')).toBeVisible();
+
+  const firstProduct = page.locator('.product-card[data-product-id]').first();
+  await expect(firstProduct).toHaveAttribute('role', 'button');
+  await firstProduct.focus();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#cartTableBody .cart-item-row')).toHaveCount(1);
+  await expect(page.locator('#cartCount')).toHaveText('1 Items');
+
+  await firstProduct.click();
+  await expect(page.locator('#cartCount')).toHaveText('2 Items');
+  await page.locator('#cartTableBody .cart-qty-btn').last().click();
+  await expect(page.locator('#cartCount')).toHaveText('3 Items');
+  await page.locator('#cartTableBody .cart-qty-btn').first().click();
+  await expect(page.locator('#cartCount')).toHaveText('2 Items');
+
+  const category = page.locator('.category-pill').nth(1);
+  await category.click();
+  await expect(category).toHaveClass(/btn-primary/);
+  await page.locator('.category-pill').first().click();
+
+  await page.getByLabel('Search products by name or barcode').fill(`${dataPrefix}_PRODUCT_07`);
+  await expect(page.locator('.product-item:not(.product-filter-hidden)')).toHaveCount(1);
+  await page.getByLabel('Search products by name or barcode').fill('no-match-for-pos');
+  await expect(page.locator('#productEmptyState')).toBeVisible();
+  await page.getByLabel('Search products by name or barcode').fill('');
+
+  await page.locator('#barcodeInput').fill(`${dataPrefix}_BARCODE_07`);
+  await page.locator('#barcodeInput').press('Enter');
+  await expect(page.locator('#cartTableBody .cart-item-row')).toHaveCount(2);
+
+  await page.locator('#cartTableBody .btn.text-danger').last().click();
+  await expect(page.locator('#cartTableBody .cart-item-row')).toHaveCount(1);
+
+  await page.locator('#typePurchase').check();
+  await expect(page.locator('#orderTypeInput')).toHaveValue('purchase');
+  await expect(page.locator('#formCustomerGroup')).toBeHidden();
+  await expect(page.locator('#formSupplierGroup')).toBeVisible();
+  await page.locator('#typeSale').check();
+  await expect(page.locator('#orderTypeInput')).toHaveValue('sale');
+  await expect(page.locator('#formCustomerGroup')).toBeVisible();
+  await expect(page.locator('#formSupplierGroup')).toBeHidden();
+  await expect(page.locator('#completeOrderBtn')).toBeDisabled();
+
+  allowExpectedForbidden(page, '/orders.php');
+  const csrfStatus = await page.evaluate(async () => {
+    const body = new URLSearchParams({
+      csrf_token: 'invalid-pos-token',
+      cart_data: '[]',
+      complete_order: '1',
+      order_type: 'sale',
+    });
+    const response = await fetch('/orders.php', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body,
+    });
+    return response.status;
+  });
+  expect(csrfStatus).toBe(403);
+  await captureSanitizedPosScreenshot(page, 'cashier-orders-cart');
 });
 
 test('cashier can use sales and history but cannot access administrative or purchase controls', async ({ page }) => {

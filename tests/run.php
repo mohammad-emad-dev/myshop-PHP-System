@@ -28,6 +28,7 @@ require_once __DIR__ . '/Unit/dead_code_retirement_test.php';
 require_once __DIR__ . '/Unit/css_cleanup_test.php';
 require_once __DIR__ . '/Unit/ui_redesign_test.php';
 require_once __DIR__ . '/Unit/dashboard_ui_test.php';
+require_once __DIR__ . '/Unit/pos_ui_test.php';
 require_once __DIR__ . '/Unit/operational_baseline_test.php';
 require_once __DIR__ . '/Unit/localhost_readiness_test.php';
 require_once __DIR__ . '/Unit/data_volume_readiness_test.php';
@@ -73,6 +74,7 @@ try {
     $cssCleanupAssertions = run_css_cleanup_unit_tests();
     $uiRedesignAssertions = run_ui_redesign_unit_tests();
     $dashboardUiAssertions = run_dashboard_ui_unit_tests();
+    $posUiAssertions = run_pos_ui_unit_tests();
     $operationalBaselineAssertions = run_operational_baseline_unit_tests();
     $localhostReadinessAssertions = run_localhost_readiness_unit_tests();
     $dataVolumeReadinessAssertions = run_data_volume_readiness_unit_tests();
