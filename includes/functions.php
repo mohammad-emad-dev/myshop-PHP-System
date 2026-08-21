@@ -1,7 +1,7 @@
 <?php
 
-// Compatibility facade: legacy pages continue to require this file while
-// cohesive shared services live in dedicated modules.
+// Keep this entry point for older pages and CLI tools. New business rules live
+// in the focused services under includes/.
 require_once __DIR__ . '/security.php';
 require_once __DIR__ . '/validation.php';
 require_once __DIR__ . '/pagination.php';

@@ -1086,12 +1086,7 @@ a { text-decoration: none; }
 }
 #invoicePrintContainer .invoice-item-subtotal { font-weight: bold; color: #2d3748; }
 
-/* ========================================================================
-   Phase 6A: shared design foundation
-   Ownership: this layer is the visual contract for the shared shell and
-   reusable Bootstrap-backed controls. Page-specific migrations stay below
-   the component inventory documented in docs/ui/PHASE-6A-UI-REDESIGN-SPEC.md.
-   ======================================================================== */
+/* Phase 6A: shared design foundation — tokens, shell, and reusable controls. */
 :root {
     --color-canvas: #f2f6f5;
     --color-surface: #ffffff;
@@ -1434,7 +1429,7 @@ a {
     background: var(--color-brand-50);
 }
 
-/* Shared state primitives for the staged page migrations. */
+/* Shared loading, empty, and error states. */
 .ui-state {
     border: 1px solid var(--color-border);
     border-radius: var(--radius-panel);
