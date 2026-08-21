@@ -103,7 +103,7 @@ function run_architecture_baseline_unit_tests(): int
     foreach (['catalog_get_pos_products', 'catalog_get_categories_for_selector', 'catalog_get_product_by_id', 'orders_create'] as $orderFunction) {
         $tests->assertContains($orderFunction . '(', $orders, 'Orders page dependency contract changed: ' . $orderFunction);
     }
-    foreach (['catalog_count_categories', 'catalog_get_categories_page', 'create_category', 'update_category', 'delete_category'] as $categoryFunction) {
+    foreach (['catalog_count_categories', 'catalog_get_categories_page', 'categories_create', 'categories_update', 'delete_category'] as $categoryFunction) {
         $tests->assertContains($categoryFunction . '(', $categories, 'Categories page dependency contract changed: ' . $categoryFunction);
     }
     foreach (['people_count_customers', 'people_get_customers_page', 'create_customer', 'update_customer', 'delete_customer'] as $customerFunction) {
