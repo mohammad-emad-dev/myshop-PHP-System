@@ -226,6 +226,8 @@ async function captureSanitizedScreenshot(page, name) {
     '#printInvoiceTotal',
     '.product-grid-container',
     '.pos-product-title',
+    '.settings-staff-table td',
+    '.audit-log-table td',
     '[data-qa-sensitive]',
   ].join(', '));
   await page.screenshot({
@@ -296,6 +298,7 @@ test.afterEach(async ({ page }, testInfo) => {
 test('admin authentication, invalid login, protected redirect, and logout', async ({ page }) => {
   await page.goto('/login.php');
   await expect(page.getByRole('heading', { name: 'myshop' })).toBeVisible();
+  await captureSanitizedScreenshot(page, 'login-final');
   await assertKeyboardFocusIsVisible(page, '#username', 2);
   await page.getByLabel('Username').fill('not-a-real-user');
   await page.getByLabel('Password').fill('not-a-real-password');
@@ -354,8 +357,25 @@ test('admin can load critical pages, search and paginate products, and access ex
   ];
   for (const [route, heading] of pages) {
     await loadPage(page, route, heading);
+    if (route === '/audit_log.php') {
+      await expect(page.locator('#sidebar-wrapper a[aria-current="page"]')).toHaveAttribute('href', 'audit_log.php');
+      await page.getByLabel('Action').fill(`${dataPrefix}_AUDIT`);
+      await page.getByRole('button', { name: 'Filter' }).click();
+      await expect(page).toHaveURL(/action=/);
+      await captureSanitizedScreenshot(page, 'admin-audit-log-final');
+      await page.getByRole('link', { name: 'Clear' }).click();
+      await expect(page).toHaveURL(/audit_log\.php$/);
+    }
     if (route === '/stock_movements.php') {
       await captureSanitizedScreenshot(page, 'admin-stock-ledger');
+    }
+    if (route === '/settings.php') {
+      await expect(page.locator('#sidebar-wrapper a[aria-current="page"]')).toHaveAttribute('href', 'settings.php');
+      await page.getByRole('button', { name: /Add Staff/ }).click();
+      await expect(page.locator('#addStaffModal')).toBeVisible();
+      await page.keyboard.press('Escape');
+      await expect(page.locator('#addStaffModal')).toBeHidden();
+      await captureSanitizedScreenshot(page, 'admin-settings-final');
     }
   }
   await captureSanitizedScreenshot(page, 'admin-settings');
@@ -830,15 +850,19 @@ test('responsive critical surfaces have no horizontal overflow at the configured
 
 test('automated accessibility checks and keyboard smoke coverage report findings without claiming WCAG compliance', async ({ page }) => {
   await page.goto('/login.php');
+  // Verify the stylesheet's prefers-reduced-motion path through the browser.
+  await page.emulateMedia({ reducedMotion: 'reduce' });
   await runAccessibilityChecks(page, 'login');
   await assertKeyboardFocusIsVisible(page, '#username', 2);
+  await page.emulateMedia({ reducedMotion: null });
 
   await login(page, adminCredentials);
   for (const [route, label] of [
     ['/index.php', 'dashboard'],
     ['/products.php', 'products'],
     ['/orders.php', 'orders'],
-    ['/settings.php', 'settings'],
+    ['/settings.php', 'settings-final'],
+    ['/audit_log.php', 'audit-log'],
   ]) {
     await page.goto(route);
     await runAccessibilityChecks(page, label);

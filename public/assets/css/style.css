@@ -650,130 +650,6 @@ a { text-decoration: none; }
 /* ============================
    LOGIN PAGE — Stunning Dark Glass
    ============================ */
-.login-page {
-    background: linear-gradient(135deg, #0c1222 0%, #0f172a 50%, #1a1040 100%) !important;
-    position: relative;
-    overflow: hidden;
-}
-
-.login-page::before {
-    content: '';
-    position: absolute;
-    width: 700px;
-    height: 700px;
-    background: radial-gradient(circle, rgba(99,102,241,0.15) 0%, transparent 65%);
-    top: -200px;
-    left: -200px;
-    border-radius: 50%;
-    pointer-events: none;
-    animation: floatOrb 8s ease-in-out infinite;
-}
-
-.login-page::after {
-    content: '';
-    position: absolute;
-    width: 500px;
-    height: 500px;
-    background: radial-gradient(circle, rgba(139,92,246,0.08) 0%, transparent 70%);
-    bottom: -150px;
-    right: -150px;
-    border-radius: 50%;
-    pointer-events: none;
-    animation: floatOrb 10s ease-in-out infinite reverse;
-}
-
-@keyframes floatOrb {
-    0%, 100% { transform: translate(0, 0); }
-    50% { transform: translate(30px, 20px); }
-}
-
-.login-page .card {
-    background: rgba(255,255,255,0.04) !important;
-    backdrop-filter: blur(20px) saturate(130%);
-    -webkit-backdrop-filter: blur(20px) saturate(130%);
-    border: 1px solid rgba(255,255,255,0.08) !important;
-    border-radius: var(--radius-xl) !important;
-    box-shadow: 0 8px 40px rgba(0,0,0,0.35) !important;
-}
-
-.login-page .card-header {
-    background: transparent !important;
-    border-bottom: none !important;
-}
-
-.login-page .card-header h1 {
-    font-family: var(--font-heading);
-    background: linear-gradient(135deg, #ffffff 0%, var(--primary-light) 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    font-size: 2.5rem;
-    letter-spacing: -1px;
-    font-weight: 800;
-}
-
-.login-page .card-header p {
-    color: var(--slate-300) !important;
-}
-
-.login-page .form-control {
-    background: rgba(255,255,255,0.06) !important;
-    border: 1px solid rgba(255,255,255,0.1) !important;
-    color: #ffffff !important;
-    border-radius: var(--radius-md) !important;
-    transition: all 0.3s ease;
-    padding: 0.75rem 0.85rem;
-}
-
-.login-page .form-control:focus {
-    background: rgba(255,255,255,0.08) !important;
-    border-color: var(--primary-light) !important;
-    box-shadow: 0 0 0 4px rgba(99,102,241,0.2) !important;
-}
-
-.login-page .form-floating label {
-    color: var(--slate-400) !important;
-}
-
-.login-page .form-floating input:focus ~ label,
-.login-page .form-floating input:not(:placeholder-shown) ~ label {
-    color: var(--primary-light) !important;
-}
-
-.login-page .btn-primary {
-    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-hover) 100%) !important;
-    border: none !important;
-    border-radius: var(--radius-md) !important;
-    padding: 0.8rem 1rem !important;
-    font-weight: 700;
-    font-size: 1rem;
-    transition: all 0.3s ease !important;
-    box-shadow: 0 4px 15px rgba(99,102,241,0.35) !important;
-}
-
-.login-page .btn-primary:hover {
-    box-shadow: 0 6px 25px rgba(99,102,241,0.5) !important;
-    transform: translateY(-2px);
-}
-
-.login-page .card-footer {
-    background: rgba(255,255,255,0.02) !important;
-    border-top: 1px solid rgba(255,255,255,0.05) !important;
-}
-
-.login-page .card-footer strong {
-    color: var(--primary-light) !important;
-}
-
-.login-page .text-muted,
-.login-page .card-footer .text-muted {
-    color: var(--slate-300) !important;
-}
-
-.login-page .form-control::placeholder {
-    color: var(--slate-300);
-}
-
 /* ============================
    CONTENT PAGE SPACING
    ============================ */
@@ -1596,45 +1472,228 @@ a {
     to { background-position: -200% 0; }
 }
 
-/* Login remains a separate dark context while sharing the same brand token. */
+/* Phase 6G: Final UI closure for authentication and remaining admin surfaces */
 .login-page {
-    background: #102a30 !important;
+    position: relative;
+    overflow-x: hidden;
+    background: var(--color-brand-900) !important;
+}
+
+.login-page::before,
+.login-page::after {
+    content: '';
+    position: absolute;
+    border-radius: 50%;
+    pointer-events: none;
 }
 
 .login-page::before {
-    width: 620px;
-    height: 620px;
+    width: 34rem;
+    height: 34rem;
+    top: -15rem;
+    inset-inline-start: -12rem;
     background: radial-gradient(circle, rgba(45, 212, 191, 0.14) 0%, transparent 68%);
 }
 
 .login-page::after {
-    width: 480px;
-    height: 480px;
+    width: 28rem;
+    height: 28rem;
+    right: -12rem;
+    bottom: -14rem;
     background: radial-gradient(circle, rgba(20, 184, 166, 0.1) 0%, transparent 70%);
 }
 
-.login-page .card {
-    border-color: rgba(204, 251, 241, 0.16) !important;
-    background: rgba(17, 62, 66, 0.72) !important;
+.login-shell__main {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    padding-block: var(--space-8);
+}
+
+.login-card {
+    overflow: hidden;
+    border: 1px solid rgba(204, 251, 241, 0.16) !important;
+    border-radius: var(--radius-panel) !important;
+    background: rgba(17, 62, 66, 0.84) !important;
     box-shadow: 0 24px 60px rgba(4, 25, 29, 0.36) !important;
 }
 
-.login-page .card-header h1 {
-    background: none;
-    color: #d5fffa;
-    -webkit-text-fill-color: currentColor;
+.login-card__header,
+.login-card__footer {
+    border-color: rgba(204, 251, 241, 0.12) !important;
+    background: transparent !important;
 }
 
-.login-page .form-control:focus {
+.login-card__header {
+    padding: var(--space-8) var(--space-8) var(--space-4);
+}
+
+.login-brand-mark {
+    display: grid;
+    width: 3rem;
+    height: 3rem;
+    margin: 0 auto var(--space-4);
+    place-items: center;
+    border: 1px solid rgba(153, 246, 228, 0.26);
+    border-radius: 0.9rem;
+    color: #99f6e4;
+    background: rgba(20, 184, 166, 0.14);
+}
+
+.login-brand-title {
+    margin: 0;
+    color: #d5fffa;
+    font-family: var(--font-heading);
+    font-size: clamp(2rem, 4vw, 2.5rem);
+    font-weight: 800;
+    letter-spacing: -0.04em;
+}
+
+.login-card__header p,
+.login-card__footer .text-muted {
+    color: rgba(226, 252, 247, 0.68) !important;
+}
+
+.login-card__body {
+    padding: var(--space-6) var(--space-8) var(--space-7);
+}
+
+.login-card .form-control {
+    color: #f3fffd !important;
+    border-color: rgba(204, 251, 241, 0.18) !important;
+    background: rgba(4, 25, 29, 0.22) !important;
+}
+
+.login-card .form-control::placeholder {
+    color: rgba(226, 252, 247, 0.56);
+}
+
+.login-card .form-floating label {
+    color: rgba(226, 252, 247, 0.68) !important;
+}
+
+.login-card .form-control:focus {
     border-color: #5eead4 !important;
     box-shadow: 0 0 0 4px rgba(94, 234, 212, 0.18) !important;
 }
 
-.login-page .btn-primary,
-.login-page .btn-primary:hover {
-    background: #14b8a6 !important;
-    border-color: #14b8a6 !important;
+.login-card .form-floating input:focus ~ label,
+.login-card .form-floating input:not(:placeholder-shown) ~ label {
+    color: #99f6e4 !important;
+}
+
+.login-submit,
+.login-submit:hover {
+    min-height: 3rem;
+    background: var(--color-brand-600) !important;
+    border-color: var(--color-brand-600) !important;
     box-shadow: 0 8px 18px rgba(20, 184, 166, 0.24) !important;
+}
+
+.login-card__footer {
+    padding: var(--space-5) var(--space-8);
+}
+
+.settings-page {
+    max-width: 1440px;
+}
+
+.settings-page-header {
+    margin-bottom: var(--space-6);
+}
+
+.settings-section {
+    overflow: hidden;
+    padding: 0;
+}
+
+.settings-section__header {
+    display: flex;
+    align-items: center;
+    min-height: 4rem;
+    padding: var(--space-5) var(--space-6);
+}
+
+.settings-security-callout {
+    padding: var(--space-4);
+    border: 1px solid rgba(217, 119, 6, 0.28);
+    border-inline-start: 0.25rem solid var(--warning);
+    border-radius: var(--radius-control);
+    background: var(--warning-bg-subtle);
+}
+
+.settings-backup-panel {
+    border-color: rgba(190, 24, 93, 0.22);
+}
+
+.settings-backup-panel__body {
+    background: var(--danger-bg-subtle);
+}
+
+.settings-staff-table {
+    min-width: 42rem;
+}
+
+.settings-staff-table td,
+.settings-staff-table th {
+    white-space: nowrap;
+}
+
+.audit-log-page {
+    max-width: 1440px;
+}
+
+.audit-log-page__header {
+    margin-bottom: var(--space-6);
+}
+
+.audit-log-surface {
+    overflow: hidden;
+}
+
+.audit-log-toolbar {
+    margin-bottom: var(--space-5) !important;
+}
+
+.audit-log-table-shell {
+    margin-inline: calc(var(--space-6) * -1);
+    padding-inline: var(--space-6);
+}
+
+.audit-log-table {
+    min-width: 56rem;
+}
+
+.audit-log-table td,
+.audit-log-table th {
+    white-space: nowrap;
+}
+
+.audit-log-empty {
+    min-height: 13rem;
+}
+
+.audit-log-pagination {
+    margin-top: var(--space-6);
+}
+
+@media (max-width: 767.98px) {
+    .login-card__header,
+    .login-card__body,
+    .login-card__footer {
+        padding-inline: var(--space-5);
+    }
+
+    .settings-section__header {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: var(--space-3);
+    }
+
+    .audit-log-table-shell {
+        margin-inline: calc(var(--space-4) * -1);
+        padding-inline: var(--space-4);
+    }
 }
 
 /* Responsive shell: preserve the existing toggle behavior at every width. */

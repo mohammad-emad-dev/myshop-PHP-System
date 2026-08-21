@@ -90,14 +90,19 @@ require_once '../includes/layouts/header.php';
     <?php require_once '../includes/layouts/sidebar.php'; ?>
     <?php require_once '../includes/layouts/navbar.php'; ?>
 
-    <div class="container-fluid px-4 py-4">
-        <div class="card shadow-sm border-0 rounded-4">
-            <div class="card-header bg-white border-0 py-3">
-                <h2 class="h4 mb-0 fw-bold ui-page-heading"><i class="fas fa-shield-halved me-2 text-primary"></i>Security Audit Log</h2>
-                <p class="text-muted small mb-0 mt-1">Administrative view of bounded security and business-critical events.</p>
+    <div class="container-fluid px-4 py-4 data-page audit-log-page">
+        <header class="data-page-header audit-log-page__header">
+            <div class="data-page-header__content">
+                <div class="data-page-kicker">System / Governance</div>
+                <div class="data-page-header__title-row">
+                    <h2 class="data-page-header__title"><i class="fas fa-shield-halved me-2" aria-hidden="true"></i>Security Audit Log</h2>
+                </div>
+                <p class="data-page-context">Administrative view of bounded security and business-critical events.</p>
             </div>
-            <div class="card-body">
-                <form method="GET" action="audit_log.php" class="row g-2 align-items-end mb-4">
+        </header>
+        <section class="data-surface audit-log-surface">
+            <div class="data-surface__body">
+                <form method="GET" action="audit_log.php" class="row g-3 align-items-end data-toolbar audit-log-toolbar">
                     <div class="col-md-2">
                         <label for="audit_action" class="form-label">Action</label>
                         <input type="text" class="form-control" id="audit_action" name="action" value="<?php echo htmlspecialchars($action, ENT_QUOTES, 'UTF-8'); ?>" maxlength="80">
@@ -135,23 +140,24 @@ require_once '../includes/layouts/header.php';
                         </select>
                     </div>
                     <div class="col-md-10 d-flex gap-2">
-                        <button type="submit" class="btn btn-primary"><i class="fas fa-filter me-1"></i>Filter</button>
-                        <a href="audit_log.php" class="btn btn-outline-secondary">Clear</a>
+                        <button type="submit" class="btn btn-primary data-toolbar__submit"><i class="fas fa-filter me-1"></i>Filter</button>
+                        <a href="audit_log.php" class="btn btn-outline-secondary data-toolbar__clear">Clear</a>
                     </div>
                 </form>
 
-                <p class="text-muted small">Showing <?php echo $range_start; ?>-<?php echo $range_end; ?> of <?php echo $total_events; ?> events.</p>
-                <div class="table-responsive">
-                    <table class="table table-hover align-middle">
+                <p class="text-muted small data-table-summary audit-log-summary">Showing <?php echo $range_start; ?>-<?php echo $range_end; ?> of <?php echo $total_events; ?> events.</p>
+                <div class="data-table-shell audit-log-table-shell">
+                    <table class="table data-table audit-log-table">
+                        <caption class="visually-hidden">Security audit events</caption>
                         <thead class="bg-light text-secondary">
                             <tr>
-                                <th>Timestamp</th>
-                                <th>Actor</th>
-                                <th>Action</th>
-                                <th>Entity</th>
-                                <th>Outcome</th>
-                                <th>Source IP</th>
-                                <th>Metadata</th>
+                                <th scope="col">Timestamp</th>
+                                <th scope="col">Actor</th>
+                                <th scope="col">Action</th>
+                                <th scope="col">Entity</th>
+                                <th scope="col">Outcome</th>
+                                <th scope="col">Source IP</th>
+                                <th scope="col">Metadata</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -167,14 +173,14 @@ require_once '../includes/layouts/header.php';
                                 </tr>
                             <?php endforeach; ?>
                             <?php if ($events === []): ?>
-                                <tr><td colspan="7" class="text-center text-muted py-4">No audit events matched the selected filters.</td></tr>
+                                <tr><td colspan="7"><div class="data-empty-state audit-log-empty"><span class="data-empty-state__icon" aria-hidden="true"><i class="fas fa-shield-halved"></i></span><strong>No audit events matched the selected filters.</strong><span>Try broadening the selected filters.</span></div></td></tr>
                             <?php endif; ?>
                         </tbody>
                     </table>
                 </div>
 
                 <?php if ($total_pages > 1): ?>
-                    <nav aria-label="Audit log pagination">
+                    <nav class="data-pagination audit-log-pagination" aria-label="Audit log pagination">
                         <ul class="pagination justify-content-center flex-wrap gap-1">
                             <li class="page-item<?php echo $page <= 1 ? ' disabled' : ''; ?>">
                                 <a class="page-link" href="<?php echo htmlspecialchars($page_url($page - 1), ENT_QUOTES, 'UTF-8'); ?>" aria-label="Previous page">Previous</a>
@@ -195,7 +201,7 @@ require_once '../includes/layouts/header.php';
                     </nav>
                 <?php endif; ?>
             </div>
-        </div>
+        </section>
     </div>
 </div>
 

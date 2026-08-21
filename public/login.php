@@ -168,17 +168,18 @@ if (!$is_logout_request && $_SERVER['REQUEST_METHOD'] === 'POST') {
     <!-- Custom CSS -->
     <link rel="stylesheet" href="assets/css/style.css">
 </head>
-<body class="bg-gradient-primary login-page d-flex align-items-center justify-content-center min-vh-100">
+<body class="login-page login-shell d-flex align-items-center justify-content-center min-vh-100">
 
-    <main class="container" id="main-content">
+    <main class="login-shell__main container" id="main-content">
         <div class="row justify-content-center">
-            <div class="col-md-6 col-lg-4">
-                <div class="card shadow-lg border-0 rounded-lg mt-5">
-                    <div class="card-header bg-white border-0 text-center pt-4 pb-0">
-                        <h1 class="font-weight-light my-2 text-primary fw-bold">myshop</h1>
+            <div class="col-12 col-sm-10 col-md-7 col-lg-5 col-xl-4">
+                <div class="card login-card">
+                    <div class="card-header login-card__header text-center">
+                        <div class="login-brand-mark" aria-hidden="true"><i class="fas fa-store"></i></div>
+                        <h1 class="login-brand-title">myshop</h1>
                         <p class="text-muted small">Inventory & Order Management</p>
                     </div>
-                    <div class="card-body px-5 py-4">
+                    <div class="card-body login-card__body">
                         <?php if ($error): ?>
                             <div class="alert alert-danger alert-dismissible fade show" role="alert">
                                 <i class="fas fa-exclamation-circle me-2"></i> <?php echo htmlspecialchars($error); ?>
@@ -186,11 +187,11 @@ if (!$is_logout_request && $_SERVER['REQUEST_METHOD'] === 'POST') {
                             </div>
                         <?php endif; ?>
 
-                        <form method="POST" action="">
+                        <form method="POST" action="" class="login-form">
                             <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(generate_csrf_token()); ?>">
                             <div class="form-floating mb-3">
                                 <input class="form-control" id="username" name="username" type="text"
-                                    placeholder="Username" required autofocus />
+                                    placeholder="Username" autocomplete="username" required autofocus />
                                 <label for="username">Username</label>
                             </div>
                             <div class="form-floating mb-3">
@@ -199,11 +200,11 @@ if (!$is_logout_request && $_SERVER['REQUEST_METHOD'] === 'POST') {
                                 <label for="password">Password</label>
                             </div>
                             <div class="d-grid gap-2 mt-4 mb-3">
-                                <button class="btn btn-primary btn-lg" type="submit">Log In</button>
+                                <button class="btn btn-primary btn-lg login-submit" type="submit">Log In</button>
                             </div>
                         </form>
                     </div>
-                    <div class="card-footer text-center py-3 bg-light border-0 rounded-bottom">
+                    <div class="card-footer login-card__footer text-center">
                         <div class="small text-muted">Use the administrator account created during installation.</div>
                     </div>
                 </div>

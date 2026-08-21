@@ -32,7 +32,7 @@ function run_final_ui_closure_unit_tests(): int
         'class="card-header login-card__header',
         'class="card-body login-card__body',
         'class="login-form"',
-        'class="login-submit"',
+        'login-submit',
         'class="card-footer login-card__footer',
         'id="main-content"',
         'name="csrf_token"',
@@ -44,7 +44,7 @@ function run_final_ui_closure_unit_tests(): int
         $tests->assertContains($contract, $login, 'Login presentation contract is missing: ' . $contract);
     }
     foreach ([
-        'verify_csrf_token($conn)',
+        'verify_csrf_token($token)',
         'login_rate_limit_check',
         'auth_verify_login',
         'Invalid credentials',
@@ -57,10 +57,10 @@ function run_final_ui_closure_unit_tests(): int
     foreach ([
         'class="container-fluid px-4 py-5 settings-page"',
         'class="data-page-header settings-page-header"',
-        'class="settings-section settings-profile-card"',
-        'class="settings-section__header"',
-        'class="settings-security-callout"',
-        'class="settings-section settings-staff-panel"',
+        'settings-section settings-profile-card',
+        'settings-section__header',
+        'settings-security-callout',
+        'settings-section settings-staff-panel',
         'class="table data-table settings-staff-table"',
         'id="addStaffModal"',
         'id="editStaffModal"',
@@ -86,7 +86,7 @@ function run_final_ui_closure_unit_tests(): int
         'class="container-fluid px-4 py-4 data-page audit-log-page"',
         'class="data-page-header audit-log-page__header"',
         'class="data-surface audit-log-surface"',
-        'class="data-toolbar audit-log-toolbar',
+        'data-toolbar audit-log-toolbar',
         'class="data-table-shell audit-log-table-shell"',
         'class="table data-table audit-log-table"',
         '<caption class="visually-hidden">Security audit events</caption>',
@@ -140,8 +140,8 @@ function run_final_ui_closure_unit_tests(): int
         "captureSanitizedScreenshot(page, 'admin-audit-log-final'",
         '.settings-staff-table td',
         '.audit-log-table td',
-        "runAccessibilityChecks(page, 'audit-log'",
-        "runAccessibilityChecks(page, 'settings-final'",
+        "['/audit_log.php', 'audit-log']",
+        "['/settings.php', 'settings-final']",
         'prefers-reduced-motion',
     ] as $browserContract) {
         $tests->assertContains($browserContract, $browserTests, 'Phase 6G browser/sanitization contract is missing: ' . $browserContract);

@@ -273,12 +273,22 @@ require_once '../includes/layouts/header.php';
     <?php require_once '../includes/layouts/sidebar.php'; ?>
     <?php require_once '../includes/layouts/navbar.php'; ?>
 
-    <div class="container-fluid px-4 py-5">
+    <div class="container-fluid px-4 py-5 settings-page">
+
+        <header class="data-page-header settings-page-header">
+            <div class="data-page-header__content">
+                <div class="data-page-kicker">Workspace / Account</div>
+                <div class="data-page-header__title-row">
+                    <h2 class="data-page-header__title">Profile &amp; access</h2>
+                </div>
+                <p class="data-page-context">Manage your operator profile and, when authorized, local staff access and backups.</p>
+            </div>
+        </header>
 
         <div class="row my-2 justify-content-center">
             <div class="col-lg-6 col-md-8">
-                <div class="card shadow-sm border-0 rounded-4">
-                    <div class="card-header bg-white border-0 py-3">
+                <section class="card settings-section settings-profile-card">
+                    <div class="card-header settings-section__header">
                         <h2 class="h4 mb-0 text-secondary fw-bold"><i class="fas fa-user-edit me-2 text-primary"></i>My Profile Settings</h2>
                     </div>
                     <div class="card-body p-4">
@@ -312,7 +322,7 @@ require_once '../includes/layouts/header.php';
 
                             <hr class="my-4">
                             
-                            <div class="mb-4 bg-light p-3 rounded-3 border-start border-warning border-3">
+                            <div class="mb-4 settings-security-callout">
                                 <label for="current_password" class="form-label fw-bold text-warning mb-1"><i class="fas fa-shield-alt me-1"></i>Security Verification</label>
                                 <p class="small text-muted mb-2">You must provide your current password to save changes.</p>
                                 <input type="password" class="form-control" id="current_password" name="current_password" placeholder="Enter current password to verify" required>
@@ -323,7 +333,7 @@ require_once '../includes/layouts/header.php';
                             </div>
                         </form>
                     </div>
-                </div>
+                </section>
             </div>
         </div>
 
@@ -333,11 +343,11 @@ require_once '../includes/layouts/header.php';
             <div class="col-lg-10 col-md-12">
                 
                 <!-- System Backups (Admin Only) -->
-                <div class="card shadow-sm border-0 rounded-4 mb-4 border-start border-danger border-4">
-                    <div class="card-header bg-white border-0 py-3">
+                <section class="card settings-section settings-backup-panel mb-4">
+                    <div class="card-header settings-section__header">
                         <h2 class="h4 mb-0 text-secondary fw-bold"><i class="fas fa-server me-2 text-danger"></i>System Administration & Backups</h2>
                     </div>
-                    <div class="card-body p-4 bg-danger-subtle bg-opacity-10 rounded-bottom-4">
+                    <div class="card-body p-4 settings-backup-panel__body">
                         <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
                             <div>
                                 <h3 class="h5 fw-bold text-dark mb-1">Database Backup (.sql)</h3>
@@ -348,32 +358,33 @@ require_once '../includes/layouts/header.php';
                                 <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(generate_csrf_token(), ENT_QUOTES, 'UTF-8'); ?>">
                                 <label class="visually-hidden" for="backup_current_password">Current password</label>
                                 <input type="password" class="form-control" id="backup_current_password" name="current_password" placeholder="Current password" autocomplete="current-password" required>
-                                <button type="submit" class="btn btn-danger btn-lg shadow-sm fw-bold px-4 pulse-btn rounded-3">
+                                <button type="submit" class="btn btn-danger btn-lg shadow-sm fw-bold px-4 rounded-3">
                                     <i class="fas fa-download me-2"></i>Download Backup
                                 </button>
                             </form>
                         </div>
                     </div>
-                </div>
+                </section>
 
-                <div class="card shadow-sm border-0 rounded-4">
-                    <div class="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center">
+                <section class="card settings-section settings-staff-panel">
+                    <div class="card-header settings-section__header d-flex justify-content-between align-items-center">
                         <h2 class="h4 mb-0 text-secondary fw-bold"><i class="fas fa-users me-2 text-primary"></i>Manage Staff Accounts</h2>
-                        <button class="btn btn-primary btn-sm shadow-sm px-3 rounded-pill pulse-btn ui-transition" data-bs-toggle="modal" data-bs-target="#addStaffModal">
+                        <button class="btn btn-primary btn-sm shadow-sm px-3 rounded-pill ui-transition" data-bs-toggle="modal" data-bs-target="#addStaffModal">
                             <i class="fas fa-user-plus me-1"></i> Add Staff
                         </button>
                     </div>
                     <div class="card-body p-4">
                         <div class="table-responsive">
-                            <table class="table table-hover align-middle">
+                            <table class="table data-table settings-staff-table">
+                                <caption class="visually-hidden">Staff account access and status</caption>
                                 <thead class="bg-light text-secondary">
                                     <tr>
-                                        <th>Full Name</th>
-                                        <th>Username</th>
-                                        <th>Role</th>
-                                        <th>Status</th>
-                                        <th>Created At</th>
-                                        <th class="text-end">Actions</th>
+                                        <th scope="col">Full Name</th>
+                                        <th scope="col">Username</th>
+                                        <th scope="col">Role</th>
+                                        <th scope="col">Status</th>
+                                        <th scope="col">Created At</th>
+                                        <th scope="col" class="text-end">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -430,7 +441,7 @@ require_once '../includes/layouts/header.php';
                             </table>
                         </div>
                     </div>
-                </div>
+                </section>
             </div>
         </div>
 
