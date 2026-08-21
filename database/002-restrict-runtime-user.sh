@@ -1,6 +1,9 @@
 #!/bin/sh
 
-set -eu
+# MySQL sources init hooks into its entrypoint shell. Do not enable nounset
+# here: it changes the caller's shell options and can break later entrypoint
+# checks for optional MySQL variables.
+set -e
 
 : "${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required}"
 : "${MYSQL_DATABASE:?MYSQL_DATABASE is required}"
