@@ -456,6 +456,9 @@ follow-up work includes:
   orders, categories, customers, suppliers, selectors, dashboard reports, and
   exports. Interactive reads are bounded; complete-array facade loaders remain
   documented compatibility behavior.
+- Phase 5D completed the final localhost release gate: clean Compose startup,
+  readiness failure/recovery, disposable regression, backup/restore,
+  production smoke, security/release checks, and 18/18 Browser QA journeys.
 - Continue bounded-query review for any new POS, report, history, or selector
   dataset added after Phase 5C.
 - Keeping the implemented CI Quality Gate, disposable runtime smoke, Browser QA, and accessibility checks green for each release candidate.
@@ -464,6 +467,10 @@ follow-up work includes:
 See [Phase 5C local performance and data-volume readiness](docs/architecture/PHASE-5C-LOCAL-PERFORMANCE-TDD.md)
 for the audited caller map, disposable fixture, EXPLAIN checks, and the
 intentional export/compatibility boundaries.
+
+See [Phase 5D final localhost release gate](docs/architecture/PHASE-5D-LOCALHOST-RELEASE-GATE.md)
+for the exact gate results, local timing evidence, cleanup checks, and the
+remaining localhost release-identity limitation.
 
 Cloud deployment controls such as TLS, WAFs, secret managers, and external
 monitoring are intentionally out of scope rather than hidden behind a

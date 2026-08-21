@@ -1,6 +1,6 @@
 # MyShop architecture baseline
 
-Status: Phase 5C localhost data-volume readiness baseline
+Status: Phase 5D final localhost release-gate baseline
 
 This baseline preserves the completed Phase 4F closure review and records the
 controlled Phase 4G retirement result.
@@ -380,3 +380,15 @@ clipping, ordering, staff/product scoping, and representative `EXPLAIN` plans.
 No index or schema migration was added; the current schema indexes were
 adequate for the verified local access paths. See
 `PHASE-5C-LOCAL-PERFORMANCE-TDD.md` for the full evidence record.
+
+## Phase 5D final localhost release gate
+
+The current checkout passed the final local gate: clean Docker Compose startup,
+loopback bindings, liveness/readiness failure and recovery, disposable
+production smoke, full regression, backup/restore, preflight, lint, security,
+supply-chain, release-integrity, and 18/18 Browser QA journeys at 375px,
+768px, and 1440px. A duplicated local-operator sentence in the runbook was
+removed and its current source contract now verifies the statement occurs once.
+The remaining release-identity limitation is documented in
+`PHASE-5D-LOCALHOST-RELEASE-GATE.md`; localhost does not publish a remotely
+attested image artifact.
