@@ -379,6 +379,21 @@ test('admin can review scoped order history, details, and invoice access while c
   expect(invoiceResult.status).toBe(200);
   expect(invoiceResult.body).toContain('Invoice #');
 
+  const invoicePage = await page.context().newPage();
+  await invoicePage.addInitScript(() => {
+    window.__myshopPrintInvoked = false;
+    window.print = () => {
+      window.__myshopPrintInvoked = true;
+    };
+  });
+  const invoicePageResponse = await invoicePage.goto(`/print_invoice.php?id=${encodeURIComponent(orderId)}`);
+  expect(invoicePageResponse).not.toBeNull();
+  expect(invoicePageResponse.status()).toBe(200);
+  await expect(invoicePage.locator('body.invoice-print-page')).toBeVisible();
+  await expect(invoicePage.locator('.invoice-document .invoice-items-table')).toBeVisible();
+  expect(await invoicePage.evaluate(() => window.__myshopPrintInvoked)).toBe(true);
+  await invoicePage.close();
+
   await logout(page);
   await login(page, cashierCredentials);
   const crossStaffResponse = await page.request.get(`/get_order_details.php?id=${encodeURIComponent(orderId)}`);
