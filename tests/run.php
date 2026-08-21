@@ -28,6 +28,7 @@ require_once __DIR__ . '/Unit/dead_code_retirement_test.php';
 require_once __DIR__ . '/Unit/css_cleanup_test.php';
 require_once __DIR__ . '/Unit/operational_baseline_test.php';
 require_once __DIR__ . '/Unit/localhost_readiness_test.php';
+require_once __DIR__ . '/Unit/data_volume_readiness_test.php';
 require_once __DIR__ . '/Integration/database_test.php';
 require_once __DIR__ . '/Integration/backup_restore_test.php';
 require_once __DIR__ . '/Integration/operational_test.php';
@@ -39,6 +40,7 @@ require_once __DIR__ . '/Integration/category_write_test.php';
 require_once __DIR__ . '/Integration/category_delete_test.php';
 require_once __DIR__ . '/Integration/customer_mutation_test.php';
 require_once __DIR__ . '/Integration/supplier_mutation_test.php';
+require_once __DIR__ . '/Integration/data_volume_test.php';
 
 $started = microtime(true);
 
@@ -69,6 +71,7 @@ try {
     $cssCleanupAssertions = run_css_cleanup_unit_tests();
     $operationalBaselineAssertions = run_operational_baseline_unit_tests();
     $localhostReadinessAssertions = run_localhost_readiness_unit_tests();
+    $dataVolumeReadinessAssertions = run_data_volume_readiness_unit_tests();
     $integrationAssertions = run_integration_tests();
     $backupAssertions = run_backup_restore_tests();
     $operationalAssertions = run_operational_tests();
@@ -80,10 +83,11 @@ try {
     $categoryDeleteIntegrationAssertions = run_category_delete_integration_tests();
     $customerMutationIntegrationAssertions = run_customer_mutation_integration_tests();
     $supplierMutationIntegrationAssertions = run_supplier_mutation_integration_tests();
-    $totalAssertions = $unitAssertions + $architectureAssertions + $catalogAssertions + $productWriteAssertions + $orderWriteAssertions + $orderReadAssertions + $dashboardAssertions + $peopleAssertions + $inventoryAssertions + $inventoryAdjustmentAssertions + $authAssertions + $deploymentAssertions + $httpHarnessAssertions + $securityScanAssertions + $supplyChainAssertions + $releaseIntegrityAssertions + $uploadAssertions + $categoryWriteAssertions + $categoryDeleteAssertions + $customerMutationAssertions + $supplierMutationAssertions + $facadeClosureAssertions + $deadCodeRetirementAssertions + $cssCleanupAssertions + $operationalBaselineAssertions + $localhostReadinessAssertions + $integrationAssertions + $backupAssertions + $operationalAssertions + $exportAssertions + $dashboardIntegrationAssertions + $inventoryReadIntegrationAssertions + $uploadIntegrationAssertions + $categoryWriteIntegrationAssertions + $categoryDeleteIntegrationAssertions + $customerMutationIntegrationAssertions + $supplierMutationIntegrationAssertions;
+    $dataVolumeAssertions = run_data_volume_integration_tests();
+    $totalAssertions = $unitAssertions + $architectureAssertions + $catalogAssertions + $productWriteAssertions + $orderWriteAssertions + $orderReadAssertions + $dashboardAssertions + $peopleAssertions + $inventoryAssertions + $inventoryAdjustmentAssertions + $authAssertions + $deploymentAssertions + $httpHarnessAssertions + $securityScanAssertions + $supplyChainAssertions + $releaseIntegrityAssertions + $uploadAssertions + $categoryWriteAssertions + $categoryDeleteAssertions + $customerMutationAssertions + $supplierMutationAssertions + $facadeClosureAssertions + $deadCodeRetirementAssertions + $cssCleanupAssertions + $operationalBaselineAssertions + $localhostReadinessAssertions + $dataVolumeReadinessAssertions + $integrationAssertions + $backupAssertions + $operationalAssertions + $exportAssertions + $dashboardIntegrationAssertions + $inventoryReadIntegrationAssertions + $uploadIntegrationAssertions + $categoryWriteIntegrationAssertions + $categoryDeleteIntegrationAssertions + $customerMutationIntegrationAssertions + $supplierMutationIntegrationAssertions + $dataVolumeAssertions;
     $duration = number_format(microtime(true) - $started, 2);
-    echo "PASS: {$totalAssertions} assertions (" . ($unitAssertions + $architectureAssertions + $catalogAssertions + $productWriteAssertions + $orderWriteAssertions + $orderReadAssertions + $dashboardAssertions + $peopleAssertions + $inventoryAssertions + $inventoryAdjustmentAssertions + $authAssertions + $deploymentAssertions + $httpHarnessAssertions + $securityScanAssertions + $supplyChainAssertions + $releaseIntegrityAssertions + $uploadAssertions + $categoryWriteAssertions + $categoryDeleteAssertions + $customerMutationAssertions + $supplierMutationAssertions + $facadeClosureAssertions + $deadCodeRetirementAssertions + $cssCleanupAssertions + $operationalBaselineAssertions + $localhostReadinessAssertions) . " unit, " .
-        ($integrationAssertions + $backupAssertions + $operationalAssertions + $exportAssertions + $dashboardIntegrationAssertions + $inventoryReadIntegrationAssertions + $uploadIntegrationAssertions + $categoryWriteIntegrationAssertions + $categoryDeleteIntegrationAssertions + $customerMutationIntegrationAssertions + $supplierMutationIntegrationAssertions) . " integration) in {$duration}s\n";
+    echo "PASS: {$totalAssertions} assertions (" . ($unitAssertions + $architectureAssertions + $catalogAssertions + $productWriteAssertions + $orderWriteAssertions + $orderReadAssertions + $dashboardAssertions + $peopleAssertions + $inventoryAssertions + $inventoryAdjustmentAssertions + $authAssertions + $deploymentAssertions + $httpHarnessAssertions + $securityScanAssertions + $supplyChainAssertions + $releaseIntegrityAssertions + $uploadAssertions + $categoryWriteAssertions + $categoryDeleteAssertions + $customerMutationAssertions + $supplierMutationAssertions + $facadeClosureAssertions + $deadCodeRetirementAssertions + $cssCleanupAssertions + $operationalBaselineAssertions + $localhostReadinessAssertions + $dataVolumeReadinessAssertions) . " unit, " .
+        ($integrationAssertions + $backupAssertions + $operationalAssertions + $exportAssertions + $dashboardIntegrationAssertions + $inventoryReadIntegrationAssertions + $uploadIntegrationAssertions + $categoryWriteIntegrationAssertions + $categoryDeleteIntegrationAssertions + $customerMutationIntegrationAssertions + $supplierMutationIntegrationAssertions + $dataVolumeAssertions) . " integration) in {$duration}s\n";
     exit(0);
 } catch (Throwable $exception) {
     fwrite(STDERR, 'FAIL: ' . $exception->getMessage() . PHP_EOL);
