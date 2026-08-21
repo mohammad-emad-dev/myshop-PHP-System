@@ -76,8 +76,8 @@ high-impact rollback and recovery controls are not locally verifiable.
 ## Concrete follow-up and TDD evidence
 
 The RED contract in `tests/Unit/operational_baseline_test.php` verifies the
-fail-closed image template, digest-first release instructions, incident
-runbook headings, and the audit classification. It failed before the
+preflight rejection of the mutable local image template, digest-first release
+instructions, incident runbook headings, and the audit classification. It failed before the
 Phase 5A document and documentation/configuration corrections existed.
 
 The GREEN checkpoint and final verification are recorded in the commit history
@@ -101,7 +101,8 @@ integration was changed.
 | Check | Result |
 |---|---|
 | RED operational contract | `30405fe` — failed because the Phase 5A audit/runbook artifact and corrected deployment contracts were absent |
-| GREEN operational correction | `ca1ba4e` — digest-first deployment guidance, fail-closed image template, incident runbook, audit document, and 21-assertion contract passed |
+| GREEN operational correction | `ca1ba4e` — digest-first deployment guidance, incident runbook, audit document, and 21-assertion contract passed |
+| Environment-template scope correction | `4ad6a6a` — restored `.env.example`; final changes contain no environment-file modification |
 | Focused operational assertions | PASS — 21 |
 | Full disposable PHP regression | PASS — 2,686 assertions (1,828 unit, 858 integration) |
 | PHP lint | PASS — all tracked PHP files in application, scripts, database, config, and tests |
