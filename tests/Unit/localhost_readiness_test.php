@@ -72,10 +72,16 @@ function run_localhost_readiness_unit_tests(): int
         'corrupted or replaced local database',
         'MYSHOP_BACKUP_COMPLETE',
         'not intended to be exposed directly to the public internet',
-        'local operators are responsible for protecting the machine and local backup files',
+        'local operators are responsible for protecting the machine',
+        'local backup files',
     ] as $runbookContract) {
         $tests->assertContains($runbookContract, $runbook, 'Local runbook contract is missing: ' . $runbookContract);
     }
+    $tests->assertSame(
+        1,
+        substr_count($runbook, 'local operators are responsible for protecting the machine'),
+        'The local operator responsibility statement must not be duplicated.'
+    );
 
     $tests->assertContains('"127.0.0.1:${APP_PORT:-8080}:80"', $compose, 'The Docker app must bind to loopback by default.');
     $tests->assertContains('"127.0.0.1:${MYSQL_PORT:-3307}:3306"', $compose, 'The Docker database must bind to loopback by default.');
