@@ -18,6 +18,7 @@ function run_architecture_baseline_unit_tests(): int
     $catalog = file_get_contents($repository . '/includes/catalog.php');
     $people = file_get_contents($repository . '/includes/people.php');
     $inventory = file_get_contents($repository . '/includes/inventory.php');
+    $uploads = is_file($repository . '/includes/uploads.php') ? file_get_contents($repository . '/includes/uploads.php') : null;
     $auth = file_get_contents($repository . '/includes/auth.php');
     $http = file_get_contents($repository . '/includes/http.php');
     $security = file_get_contents($repository . '/includes/security.php');
@@ -35,6 +36,7 @@ function run_architecture_baseline_unit_tests(): int
         $catalog,
         $people,
         $inventory,
+        $uploads,
         $auth,
         $http,
         $security,
@@ -73,7 +75,7 @@ function run_architecture_baseline_unit_tests(): int
         $tests->assertTrue(is_file($repository . '/' . $route), 'Documented public route is missing: ' . $route);
     }
 
-    foreach (['security.php', 'pagination.php', 'audit.php', 'http.php', 'auth.php', 'catalog.php', 'people.php', 'inventory.php'] as $module) {
+    foreach (['security.php', 'pagination.php', 'audit.php', 'http.php', 'auth.php', 'catalog.php', 'people.php', 'inventory.php', 'uploads.php'] as $module) {
         $tests->assertContains(
             "require_once __DIR__ . '/{$module}'",
             $facade,
@@ -95,7 +97,7 @@ function run_architecture_baseline_unit_tests(): int
         $tests->assertContains($functionContract, $facade, 'Legacy compatibility function disappeared: ' . $functionContract);
     }
 
-    foreach (['catalog_get_products_page', 'catalog_count_products', 'catalog_get_categories_for_selector', 'handle_image_upload', 'products_create', 'products_update', 'products_delete'] as $productFunction) {
+    foreach (['catalog_get_products_page', 'catalog_count_products', 'catalog_get_categories_for_selector', 'uploads_handle_image', 'uploads_delete_newly_uploaded_image', 'products_create', 'products_update', 'products_delete'] as $productFunction) {
         $tests->assertContains($productFunction . '(', $products, 'Products page dependency contract changed: ' . $productFunction);
     }
     foreach (['catalog_get_pos_products', 'catalog_get_categories_for_selector', 'catalog_get_product_by_id', 'orders_create'] as $orderFunction) {

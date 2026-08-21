@@ -477,7 +477,7 @@ function run_auth_extraction_unit_tests(): int
     }
 
     foreach ([
-        'public/products.php' => ['verify_csrf_token($csrf_token)', "audit_log_current_actor(\$conn, 'product_mutation'", "audit_log_denied(\$conn, 'product_mutation'", 'handle_image_upload('],
+        'public/products.php' => ['verify_csrf_token($csrf_token)', "audit_log_current_actor(\$conn, 'product_mutation'", "audit_log_denied(\$conn, 'product_mutation'", 'uploads_handle_image('],
         'public/categories.php' => ['verify_csrf_token($csrf_token)', "audit_log_current_actor(\$conn, 'category_mutation'", "audit_log_denied(\$conn, 'category_mutation'"],
         'public/customers.php' => ['verify_csrf_token($csrf_token)', "audit_log_current_actor(\$conn, 'customer_mutation'", "audit_log_denied(\$conn, 'customer_mutation'"],
         'public/suppliers.php' => ['verify_csrf_token($csrf_token)', "audit_log_current_actor(\$conn, 'supplier_mutation'", "audit_log_denied(\$conn, 'supplier_mutation'"],
