@@ -203,3 +203,40 @@ removal, or Phase 5 work is included.
 No internal production callers were migrated in Phase 4G. No facade function,
 compatibility wrapper, JavaScript asset, CSS asset, screenshot, security
 boundary, backup/export boundary, or operational file was removed.
+
+## Focused CSS dead-code cleanup (post-Phase 4G)
+
+This narrowly scoped follow-up removed only the seven CSS targets confirmed
+unused by the Phase 4G frontend inventory: four legacy root custom-property
+declarations, two obsolete movement-badge rule blocks, and one hidden cart-row
+rule. The adjacent empty compatibility comment was removed with its block.
+No other CSS was reformatted, recolored, reorganized, or redesigned.
+
+The pre-change fixed-string audit found those targets only in
+`public/assets/css/style.css`. It found no PHP, HTML, JavaScript, test,
+documentation, or dynamic class-construction references, and the explicitly
+excluded modal-lock selector was not present. The post-change audit found no
+occurrences anywhere in the repository. Shared root, modal, table, cart, and
+semantic color contracts remain present.
+
+The source-contract test constructs the audited names from fragments so the
+repository-wide absence check remains meaningful while still asserting the
+exact runtime targets. The application JavaScript, PHP source, HTML, UI
+behavior, business logic, and schema were not changed.
+
+### CSS cleanup TDD and verification record
+
+| Checkpoint | Result |
+|---|---|
+| RED CSS source contract | `c5cd08d` — focused contract failed while the legacy declarations remained |
+| GREEN CSS removal | `8f3a479` — minimal stylesheet deletion; focused contract passed |
+| Reference-audit hardening | `d7ffe9b` — exact target names are assembled at runtime in the test |
+| Focused CSS contract | PASS — 20 assertions |
+| Full disposable PHP regression | PASS — 2,665 assertions (1,807 unit, 858 integration) |
+| PHP lint | PASS — all tracked PHP files |
+| JavaScript syntax | PASS — all 4 tracked JavaScript files |
+| Repository security scan | PASS — zero findings |
+| Supply-chain scan | PASS — zero findings |
+| `git diff --check` | PASS |
+| Browser QA | PASS — 18/18 at 375px, 768px, and 1440px |
+| Disposable resources and artifacts | PASS — QA resources removed; no new secrets, environment files, generated artifacts, or dumps |
