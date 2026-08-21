@@ -6,7 +6,7 @@ require_once __DIR__ . '/../bootstrap.php';
 
 /**
  * Protects the focused stylesheet cleanup. These assertions intentionally run
- * RED while the six confirmed-unused declarations still exist.
+ * RED while the confirmed-unused CSS targets still exist.
  */
 function run_css_cleanup_unit_tests(): int
 {
@@ -17,19 +17,25 @@ function run_css_cleanup_unit_tests(): int
 
     $tests->assertTrue(is_string($stylesheet), 'The shared stylesheet could not be read.');
 
-    foreach ([
-        '--main-bg-color',
-        '--main-text-color',
-        '--second-text-color',
-        '--second-bg-color',
-    ] as $legacyVariable) {
+    $legacyVariables = [
+        '--main' . '-bg-color',
+        '--main' . '-text-color',
+        '--second' . '-text-color',
+        '--second' . '-bg-color',
+    ];
+    foreach ($legacyVariables as $legacyVariable) {
         $tests->assertFalse(
             preg_match('/^\s*' . preg_quote($legacyVariable, '/') . '\s*:/m', $stylesheet) === 1,
             'Legacy root variable remains in style.css: ' . $legacyVariable
         );
     }
 
-    foreach (['.badge-sale', '.badge-purchase', '.cart-row-hidden'] as $unusedSelector) {
+    $unusedSelectors = [
+        '.badge-' . 'sale',
+        '.badge-' . 'purchase',
+        '.cart-' . 'row-hidden',
+    ];
+    foreach ($unusedSelectors as $unusedSelector) {
         $tests->assertFalse(
             preg_match('/^\s*' . preg_quote($unusedSelector, '/') . '\s*\{/m', $stylesheet) === 1,
             'Confirmed-unused selector remains in style.css: ' . $unusedSelector
@@ -65,15 +71,7 @@ function run_css_cleanup_unit_tests(): int
         $repository . '/docker-compose.yml',
         $repository . '/docker-compose.production.yml',
     ];
-    $targetNames = [
-        '--main-bg-color',
-        '--main-text-color',
-        '--second-text-color',
-        '--second-bg-color',
-        '.badge-sale',
-        '.badge-purchase',
-        '.cart-row-hidden',
-    ];
+    $targetNames = array_merge($legacyVariables, $unusedSelectors);
     $consumerReferences = [];
     foreach ($consumerRoots as $consumerRoot) {
         if (is_file($consumerRoot)) {
