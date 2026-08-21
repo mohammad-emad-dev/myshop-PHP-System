@@ -94,3 +94,26 @@ integration was changed.
 - Production proof: not available in this repository; the operator must attach
   the image digest, backup marker, restore-drill evidence, change ID, and
   recovery-owner approval to the deployment record.
+
+## Verification record
+
+| Check | Result |
+|---|---|
+| RED operational contract | `30405fe` — failed because the Phase 5A audit/runbook artifact and corrected deployment contracts were absent |
+| GREEN operational correction | `ca1ba4e` — digest-first deployment guidance, fail-closed image template, incident runbook, audit document, and 21-assertion contract passed |
+| Focused operational assertions | PASS — 21 |
+| Full disposable PHP regression | PASS — 2,686 assertions (1,828 unit, 858 integration) |
+| PHP lint | PASS — all tracked PHP files in application, scripts, database, config, and tests |
+| JavaScript syntax | PASS — all 4 tracked JavaScript files |
+| Docker Compose config | PASS — development and production models |
+| Repository security scan | PASS — zero findings |
+| Supply-chain scan | PASS — zero findings |
+| Release-integrity check | PASS — verified commit/image/migration metadata manifest generated |
+| Disposable production runtime smoke | PASS — liveness/readiness outage and recovery, isolation, and cleanup checks |
+| Browser QA | PASS — 18/18 at 375px, 768px, and 1440px |
+| `git diff --check` | PASS |
+| Historical phase documents | PASS — unchanged |
+| Final worktree | clean; no secrets, dumps, `.env` files, generated artifacts, or disposable resources added |
+
+Documentation evidence was finalized after the GREEN run in a separate
+documentation checkpoint. No push was performed.
