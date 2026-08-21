@@ -268,9 +268,13 @@ When diagnosing a local outage, check readiness, bounded logs, database storage,
 backup generation/restore verification, upload storage, and host/container disk
 pressure. External monitoring and alerting are intentionally out of scope.
 
-### Image patching process
+### Optional image maintenance
 
-Review PHP/Apache, MySQL, Debian, and extension security advisories; select a compatible exact version; resolve and record immutable image digests; rebuild the production stage; run Compose validation, syntax checks, regression/restore tests, and a staging smoke test; then roll out with a rollback image reference retained. The example pins the reviewed PHP base and MySQL image digests for the current build architecture; release automation must re-resolve and review architecture-appropriate digests when the platform or versions change. No external registry, monitoring vendor, or production deployment was configured by this batch.
+Review PHP/Apache, MySQL, Debian, and extension advisories when maintaining a
+local image; select a compatible exact version, rebuild the optional production
+stage, and run Compose validation, syntax checks, regression/restore tests, and
+the disposable smoke. No external registry, monitoring vendor, or cloud
+deployment was configured by this batch.
 
 ### CI and release integrity
 
@@ -420,39 +424,41 @@ docker compose --env-file .env exec -T `
 
 The verifier refuses `ioms_db` and the configured `DB_NAME` as source or restore targets. It uses the root/schema account only for disposable schema setup, restore, metadata checks, grants, and cleanup. The restored application connection is tested with a temporary restricted account; it is not granted DDL or `GRANT OPTION`. The normal local database and Docker volume are not selected by this workflow.
 
-#### Production backup procedure and responsibilities
+#### Local backup procedure and responsibilities
 
-1. Configure the application `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, and `DB_PASSWORD` values from the production secret manager. Keep the runtime account CRUD-only. Keep schema/root credentials in a separate deployment secret, never in the web service environment or repository.
+1. Configure the application `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, and `DB_PASSWORD` values from the protected local machine environment. Keep the runtime account CRUD-only. Keep schema/root credentials separate from the web service environment and repository.
 2. An active administrator downloads a backup through Settings after current-password re-authentication. Save it only to a protected path outside `public/`, the repository, and Docker bind mounts that serve the application.
 3. Verify the completion marker and run the isolated restore verification before accepting the artifact into retention storage.
-4. Encrypt the verified artifact at rest using the deployment-approved KMS/key-management process before it leaves the operator workstation or enters backup storage. Encryption is an operational requirement; this PHP endpoint intentionally streams plaintext SQL to the authenticated administrator and does not hold an encryption key.
-5. Keep encryption keys outside `.env`, Git, backups, and the web container. For key rotation, re-encrypt retained artifacts with the new key and retain the old key only until all artifacts encrypted with it expire. If the encryption key or KMS is unavailable, fail the storage job and do not retain an unencrypted backup.
-6. Keep at least one independent/off-site copy in storage controlled separately from the application host. Off-site replication is not configured by this repository and must not be assumed.
+4. Protect the verified artifact as a local credential-bearing file. Keep it
+   outside the repository, document root, public upload directory, and web
+   container. Local operators are responsible for machine and backup-file
+   access control.
+Local backup paths, retention, and recovery timing are operator decisions and
+must not be committed here. Do not add cloud storage or external backup
+providers.
 
-Deployment-owned variables should be defined in the secret manager or backup scheduler, not committed here:
-
-- `BACKUP_STORAGE_PATH` — protected path outside the document root.
-- `BACKUP_ENCRYPTION_KEY_ID` — KMS/key identifier; no key material belongs in the repository.
-- `BACKUP_RETENTION_DAYS` — operator-approved retention value.
-- `BACKUP_RPO` and `BACKUP_RTO` — documented service objectives.
-
-Suggested starting values such as daily backups retained for 35 days, weekly copies for 12 weeks, and monthly copies for 12 months are policy placeholders only. Operators must choose values based on legal, business, storage, and recovery requirements. Define the actual RPO (`[deployment decision]`) and RTO (`[deployment decision]`) before production use, and schedule restore drills against the real deployment environment.
+Choose a local retention schedule appropriate for the business and periodically
+run the disposable restore verification. The repository does not promise
+off-site retention, cloud encryption, RPO/RTO targets, or external restore
+operations.
 
 For a manual restore, stop application writes, create a uniquely named target database, apply `database/schema.sql` and the documented migrations first, and use a controlled schema/deployment account—not `DB_USER`—to load only a verified file whose completion marker is present. This preserves a fresh `LoginRateLimit` table while the backup replaces the allow-listed business and audit tables. Validate the schema, constraints, indexes, row counts, and application read access before any controlled cutover. There is deliberately no browser-accessible restore route.
 
 Never place backups inside the document root, repository, or a public download directory.
 
-## Production readiness roadmap
+## Local readiness roadmap
 
-The current baseline is not independently production-ready. Remaining deployment and operational requirements include:
+The localhost baseline is the supported operating target. Remaining local
+follow-up work includes:
 
-- HTTPS, secure secret provisioning, production HSTS, firewalling, and monitoring.
+- Periodic local backup/restore drills and machine-specific host security review.
 - Continuing bounded-query review for any remaining large POS, report, history, or selector dataset that is not covered by the existing pagination/export checks.
-- Resolving and externally verifying the deployment-specific PHP base, application, and MySQL image digests, then patching Debian/Apache/PHP/MySQL through the documented release process.
-- Keeping the implemented CI Quality Gate, disposable production smoke, Browser QA, and accessibility checks green for each release candidate.
+- Keeping the implemented CI Quality Gate, disposable runtime smoke, Browser QA, and accessibility checks green for each release candidate.
 - Splitting the large shared functions module into focused application services over time.
 
-These items are tracked as follow-up engineering work rather than hidden behind a production-ready claim.
+Cloud deployment controls such as TLS, WAFs, secret managers, and external
+monitoring are intentionally out of scope rather than hidden behind a
+production-ready claim.
 
 ## Git workflow
 
