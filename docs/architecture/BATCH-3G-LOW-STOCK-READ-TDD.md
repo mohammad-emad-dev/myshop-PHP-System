@@ -59,15 +59,20 @@ GREEN commit:
 Focused GREEN evidence:
 
 - Inventory source contracts: **91 assertions**.
-- Disposable low-stock integration tests: **16 assertions**.
+- Disposable low-stock integration tests: **17 assertions**.
 - Dashboard source contracts: **136 assertions**.
 - Covered threshold equality, below-threshold inclusion, above-threshold
   exclusion, category alias/null behavior, deterministic ordering, allowed and
   invalid limits, closed-connection fallback, and wrapper equivalence.
 
+Additional empty-result coverage commit:
+
+- `7a07159d89cf503509fd3bdc6d65af3a7c72f125` —
+  `test(inventory): cover empty low-stock results`
+
 ## Final verification
 
-- Full disposable regression: **1818 assertions** — 1111 unit and 707
+- Full disposable regression: **1819 assertions** — 1111 unit and 708
   integration.
 - PHP lint: **67 files**, all passed.
 - JavaScript syntax: **4 tracked files**, all passed.
