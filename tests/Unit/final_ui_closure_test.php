@@ -88,6 +88,7 @@ function run_final_ui_closure_unit_tests(): int
         'class="data-surface audit-log-surface"',
         'data-toolbar audit-log-toolbar',
         'class="data-table-shell audit-log-table-shell"',
+        'tabindex="0"',
         'class="table data-table audit-log-table"',
         '<caption class="visually-hidden">Security audit events</caption>',
         'class="data-empty-state audit-log-empty"',
