@@ -46,8 +46,8 @@ pagination, and rendering.
 | Verification | Result |
 |---|---|
 | Focused source-contract tests | PASS — 68 assertions |
-| Focused disposable customer integration tests | PASS — 37 assertions |
-| Full disposable regression | PASS — 2,131 assertions (`1,319` unit, `812` integration) |
+| Focused disposable customer integration tests | PASS — 41 assertions |
+| Full disposable regression | PASS — 2,135 assertions (`1,319` unit, `816` integration) |
 | PHP lint | PASS — all PHP files under `includes/`, `public/`, `tests/`, `scripts/`, `database/`, and `config/` |
 | Repository security scan | PASS — tracked files |
 | CI supply-chain scan | PASS — tracked files |
