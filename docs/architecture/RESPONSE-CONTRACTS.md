@@ -24,6 +24,8 @@ Phase 3D places the inventory valuation read in `includes/dashboard.php`; the
 legacy name remains a delegation-only compatibility wrapper.
 Phase 3E places the top-selling product read in the same module; its legacy name
 also remains a delegation-only compatibility wrapper.
+Phase 3F places the category sales distribution read in the same module; its
+legacy name also remains a delegation-only compatibility wrapper.
 
 ## Focused Dashboard statistics contract
 
@@ -70,6 +72,19 @@ connection is already closed. It does not read session or global state.
 `public/index.php` calls the focused service directly;
 `get_top_selling_products()` remains a delegation-only compatibility wrapper in
 `includes/functions.php`.
+
+`dashboard_get_category_sales_distribution($conn, $staff_id = null, $limit = 100)`
+preserves the sale-only category aggregate with `category_name` and
+`total_sales` fields, the existing OrderDetail/Order/Product/Category joins,
+the `Uncategorized` fallback, `total_sales DESC` ordering, optional staff scope,
+and prepared `staff_id`/`limit` bindings. The limit is normalized through the
+existing page-size helper to the allowed values 25, 50, or 100. Global failures
+(including a closed connection) return `[]` after the existing diagnostic is
+logged; scoped statement failures return `[]`, while a closed scoped connection
+preserves the existing uncaught mysqli failure. The service has no session or
+global dependency. `public/index.php` calls it directly and
+`get_category_sales_distribution()` remains a delegation-only compatibility
+wrapper in `includes/functions.php`.
 
 ## Focused Product mutation contracts
 
@@ -183,7 +198,10 @@ callers must not assume the distinction is currently available.
   name is a compatibility wrapper.
 - `dashboard_get_top_selling_products()` / `get_top_selling_products()` —
   bounded sale-only report rows; the legacy name is a compatibility wrapper.
-- `get_category_sales_distribution()` — remaining report array.
+- `dashboard_get_category_sales_distribution()` /
+  `get_category_sales_distribution()` — bounded sale-only category report
+  rows with the existing `Uncategorized` fallback and allowed page sizes; the
+  legacy name is a compatibility wrapper.
 
 ### Staff and audit
 
@@ -263,6 +281,11 @@ extracting modules unless callers are migrated and tested together.
 - `dashboard_get_top_selling_products()` and its `get_top_selling_products()`
   compatibility wrapper return `[]` for explicit statement failures; a closed
   connection preserves the existing thrown mysqli failure.
+- `dashboard_get_category_sales_distribution()` and its
+  `get_category_sales_distribution()` compatibility wrapper return `[]` for
+  global query failures and global closed-connection failures. Scoped explicit
+  statement failures return `[]`; a closed scoped connection preserves the
+  existing thrown mysqli failure.
 - `get_order_summary()` returns default numeric summary fields on failure.
 - Paginated readers return empty arrays when the query fails.
 
