@@ -172,38 +172,38 @@ function run_data_volume_integration_tests(): int
         $tests->assertSame($fixtureCount, count($orderIds), 'Large-data order fixtures were not created.');
 
         $productPage = catalog_get_products_page($conn, $prefix, '', 50, 0);
-        $tests->assertTrue(count($productPage) <= 50, 'Product list page exceeded its configured bound.');
+        $tests->assertSame(50, count($productPage), 'Product list page must clip the 600-row fixture to its configured bound.');
         data_volume_assert_newest_first($tests, $productPage, 'created_at', 'id', 'Product page');
 
         $posProducts = catalog_get_pos_products($conn, $prefix, 100);
-        $tests->assertTrue(count($posProducts) <= 100, 'POS search exceeded its configured bound.');
+        $tests->assertSame(100, count($posProducts), 'POS search must clip the 600-row fixture to its configured bound.');
         foreach ($posProducts as $row) {
             $tests->assertTrue(strpos((string)$row['name'], $prefix) !== false, 'POS search returned a row outside its search scope.');
         }
 
         $categoryPage = catalog_get_categories_page($conn, $prefix, 50, 0);
-        $tests->assertTrue(count($categoryPage) <= 50, 'Category list page exceeded its configured bound.');
+        $tests->assertSame(50, count($categoryPage), 'Category list page must clip the 600-row fixture to its configured bound.');
         data_volume_assert_name_order($tests, $categoryPage, 'Category page');
         $categorySelector = catalog_get_categories_for_selector($conn, 100);
-        $tests->assertTrue(count($categorySelector) <= 100, 'Category selector exceeded its configured bound.');
+        $tests->assertSame(100, count($categorySelector), 'Category selector must clip the 601-row dataset to its configured bound.');
         data_volume_assert_name_order($tests, $categorySelector, 'Category selector');
 
         $customerPage = people_get_customers_page($conn, $prefix, 50, 0);
-        $tests->assertTrue(count($customerPage) <= 50, 'Customer list page exceeded its configured bound.');
+        $tests->assertSame(50, count($customerPage), 'Customer list page must clip the 600-row fixture to its configured bound.');
         data_volume_assert_name_order($tests, $customerPage, 'Customer page');
         $customerSelector = people_get_customers_for_selector($conn, 100);
-        $tests->assertTrue(count($customerSelector) <= 100, 'Customer selector exceeded its configured bound.');
+        $tests->assertSame(100, count($customerSelector), 'Customer selector must clip the 601-row dataset to its configured bound.');
         data_volume_assert_name_order($tests, $customerSelector, 'Customer selector');
 
         $supplierPage = people_get_suppliers_page($conn, $prefix, 50, 0);
-        $tests->assertTrue(count($supplierPage) <= 50, 'Supplier list page exceeded its configured bound.');
+        $tests->assertSame(50, count($supplierPage), 'Supplier list page must clip the 600-row fixture to its configured bound.');
         data_volume_assert_name_order($tests, $supplierPage, 'Supplier page');
         $supplierSelector = people_get_suppliers_for_selector($conn, 100);
-        $tests->assertTrue(count($supplierSelector) <= 100, 'Supplier selector exceeded its configured bound.');
+        $tests->assertSame(100, count($supplierSelector), 'Supplier selector must clip the 601-row dataset to its configured bound.');
         data_volume_assert_name_order($tests, $supplierSelector, 'Supplier selector');
 
         $movementPage = inventory_get_stock_movements_page($conn, null, 50, 0);
-        $tests->assertTrue(count($movementPage) <= 50, 'Stock movement page exceeded its configured bound.');
+        $tests->assertSame(50, count($movementPage), 'Stock movement page must clip the 600-row fixture to its configured bound.');
         data_volume_assert_newest_first($tests, $movementPage, 'created_at', 'id', 'Stock movement page');
         $scopedMovementPage = inventory_get_stock_movements_page($conn, $productIds[0], 50, 0);
         $tests->assertTrue(count($scopedMovementPage) <= 50, 'Scoped stock movement page exceeded its configured bound.');
@@ -212,10 +212,10 @@ function run_data_volume_integration_tests(): int
         }
 
         $orderPage = orders_get_page($conn, null, 'all', 50, 0);
-        $tests->assertTrue(count($orderPage) <= 50, 'Order history page exceeded its configured bound.');
+        $tests->assertSame(50, count($orderPage), 'Order history page must clip the 600-row fixture to its configured bound.');
         data_volume_assert_newest_first($tests, $orderPage, 'order_date', 'id', 'Order page');
         $staffOrderPage = orders_get_page($conn, $staffIds[1], 'all', 50, 0);
-        $tests->assertTrue(count($staffOrderPage) <= 50, 'Staff-scoped order page exceeded its configured bound.');
+        $tests->assertSame(50, count($staffOrderPage), 'Staff-scoped order page must clip its 300-row scope to the configured bound.');
         foreach ($staffOrderPage as $row) {
             $tests->assertSame($staffIds[1], (int)$row['staff_id'], 'Staff-scoped order page crossed authorization scope.');
         }

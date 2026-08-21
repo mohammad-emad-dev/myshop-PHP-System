@@ -64,6 +64,23 @@ function run_data_volume_readiness_unit_tests(): int
         $tests->assertContains($pageService, $integration, 'Volume test fixture must cover page service: ' . $pageService);
     }
 
+    foreach ([
+        'public/products.php' => ['catalog_get_products_page(', 'get_products_page'],
+        'public/categories.php' => ['catalog_get_categories_page(', 'get_categories_page'],
+        'public/stock_movements.php' => ['inventory_get_stock_movements_page(', 'get_stock_movements_page'],
+        'public/customers.php' => ['people_get_customers_page(', 'get_customers_page'],
+        'public/suppliers.php' => ['people_get_suppliers_page(', 'get_suppliers_page'],
+        'public/order_history.php' => ['orders_get_page(', 'get_orders_page'],
+    ] as $page => [$focusedCall, $legacyFunction]) {
+        $pageSource = file_get_contents($repository . '/' . $page);
+        $tests->assertTrue(is_string($pageSource), 'Audited public page could not be read: ' . $page);
+        $tests->assertContains($focusedCall, $pageSource, 'Public page is not owned by the focused read service: ' . $page);
+        $tests->assertFalse(
+            preg_match('/(?<![A-Za-z0-9_])' . preg_quote($legacyFunction, '/') . '\\s*\\(/', $pageSource) === 1,
+            'Public page still calls the legacy read facade: ' . $page
+        );
+    }
+
     $tests->assertContains('export_stream_batches(', $export, 'Exports must retain cursor-batched streaming.');
     $tests->assertContains('LIMIT ?', $export, 'Export batches must retain a bound batch limit.');
     $tests->assertFalse(strpos($export, 'fetch_all(') !== false, 'Streaming exports must not regress to full-array reads.');
