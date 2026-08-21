@@ -195,3 +195,55 @@ function dashboard_get_inventory_valuation($conn)
     }
     return 0.0;
 }
+
+/**
+ * Fetch top selling products sorted by total quantity sold.
+ */
+function dashboard_get_top_selling_products($conn, $limit = 5, $staff_id = null)
+{
+    $limit = max(1, min((int)$limit, 50));
+    $sql = "SELECT p.name, SUM(od.quantity) as total_qty, SUM(od.subtotal) as total_sales 
+            FROM OrderDetail od 
+            JOIN `Order` o ON od.order_id = o.id 
+            JOIN Product p ON od.product_id = p.id 
+            WHERE o.order_type = 'sale'";
+    if ($staff_id !== null) {
+        $sql .= " AND o.staff_id = ?";
+    }
+    $sql .= " GROUP BY od.product_id, p.name
+              ORDER BY total_qty DESC
+              LIMIT ?";
+    $stmt = $conn->prepare($sql);
+    if (!$stmt) {
+        error_log('Top-selling products prepare failed: ' . $conn->error);
+        return [];
+    }
+    if ($staff_id === null) {
+        if (!$stmt->bind_param('i', $limit)) {
+            error_log('Top-selling products bind failed: ' . $stmt->error);
+            $stmt->close();
+            return [];
+        }
+    } else {
+        $staff_id = (int)$staff_id;
+        if (!$stmt->bind_param('ii', $staff_id, $limit)) {
+            error_log('Scoped top-selling products bind failed: ' . $stmt->error);
+            $stmt->close();
+            return [];
+        }
+    }
+    if (!$stmt->execute()) {
+        error_log('Top-selling products execute failed: ' . $stmt->error);
+        $stmt->close();
+        return [];
+    }
+    $result = $stmt->get_result();
+    if (!$result) {
+        error_log('Top-selling products result failed: ' . $stmt->error);
+        $stmt->close();
+        return [];
+    }
+    $products = $result->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+    return $products;
+}
