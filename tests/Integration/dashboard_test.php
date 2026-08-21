@@ -237,6 +237,148 @@ function run_dashboard_integration_tests(): int
         $tests->assertSame('20.00', (string)$cashierTopSelling[0]['total_sales'], 'Cashier top-selling sales total is incorrect.');
         $tests->assertSame([], dashboard_get_top_selling_products($conn, 5, 999999), 'Unknown staff scope must return an empty top-selling result.');
 
+        $categoryAName = $prefix . ' Category A';
+        $categoryBName = $prefix . ' Category B';
+        test_execute(
+            $conn,
+            'INSERT INTO Category (name, description) VALUES (?, ?)',
+            'ss',
+            [$categoryAName, 'Category-sales fixture A']
+        );
+        test_execute(
+            $conn,
+            'INSERT INTO Category (name, description) VALUES (?, ?)',
+            'ss',
+            [$categoryBName, 'Category-sales fixture B']
+        );
+        $categoryAId = (int)test_scalar($conn, 'SELECT id FROM Category WHERE name = ?', 's', [$categoryAName]);
+        $categoryBId = (int)test_scalar($conn, 'SELECT id FROM Category WHERE name = ?', 's', [$categoryBName]);
+        $tests->assertTrue($categoryAId > 0 && $categoryBId > 0, 'Dashboard category fixtures were not created.');
+
+        $categoryABarcode = $prefix . '_CATEGORY_A_PRODUCT';
+        $categoryBBarcode = $prefix . '_CATEGORY_B_PRODUCT';
+        $uncategorizedBarcode = $prefix . '_UNCATEGORIZED_PRODUCT';
+        test_execute(
+            $conn,
+            'INSERT INTO Product (name, description, price, stock, image_path, alert_threshold, category_id, barcode) VALUES (?, ?, ?, ?, NULL, ?, ?, ?)',
+            'ssdiiis',
+            [$prefix . ' Category A Product', 'Category-sales fixture A', 2.00, 0, 10, $categoryAId, $categoryABarcode]
+        );
+        test_execute(
+            $conn,
+            'INSERT INTO Product (name, description, price, stock, image_path, alert_threshold, category_id, barcode) VALUES (?, ?, ?, ?, NULL, ?, ?, ?)',
+            'ssdiiis',
+            [$prefix . ' Category B Product', 'Category-sales fixture B', 3.00, 0, 10, $categoryBId, $categoryBBarcode]
+        );
+        test_execute(
+            $conn,
+            'INSERT INTO Product (name, description, price, stock, image_path, alert_threshold, category_id, barcode) VALUES (?, ?, ?, ?, NULL, ?, NULL, ?)',
+            'ssdiis',
+            [$prefix . ' Uncategorized Product', 'Category-sales fixture uncategorized', 4.00, 0, 10, $uncategorizedBarcode]
+        );
+        $categoryAProductId = (int)test_scalar($conn, 'SELECT id FROM Product WHERE barcode = ?', 's', [$categoryABarcode]);
+        $categoryBProductId = (int)test_scalar($conn, 'SELECT id FROM Product WHERE barcode = ?', 's', [$categoryBBarcode]);
+        $uncategorizedProductId = (int)test_scalar($conn, 'SELECT id FROM Product WHERE barcode = ?', 's', [$uncategorizedBarcode]);
+        $tests->assertTrue(
+            $categoryAProductId > 0 && $categoryBProductId > 0 && $uncategorizedProductId > 0,
+            'Dashboard category product fixtures were not created.'
+        );
+
+        test_execute(
+            $conn,
+            'INSERT INTO OrderDetail (order_id, product_id, quantity, unit_price, subtotal) VALUES (?, ?, ?, ?, ?)',
+            'iiidd',
+            [$adminSaleOrderId, $categoryAProductId, 30, 2.00, 60.00]
+        );
+        test_execute(
+            $conn,
+            'INSERT INTO OrderDetail (order_id, product_id, quantity, unit_price, subtotal) VALUES (?, ?, ?, ?, ?)',
+            'iiidd',
+            [$cashierSaleOrderId, $categoryAProductId, 10, 2.00, 20.00]
+        );
+        test_execute(
+            $conn,
+            'INSERT INTO OrderDetail (order_id, product_id, quantity, unit_price, subtotal) VALUES (?, ?, ?, ?, ?)',
+            'iiidd',
+            [$adminPurchaseOrderId, $categoryAProductId, 500, 2.00, 1000.00]
+        );
+        test_execute(
+            $conn,
+            'INSERT INTO OrderDetail (order_id, product_id, quantity, unit_price, subtotal) VALUES (?, ?, ?, ?, ?)',
+            'iiidd',
+            [$adminHistoricalSaleOrderId, $categoryBProductId, 20, 3.00, 50.00]
+        );
+        test_execute(
+            $conn,
+            'INSERT INTO OrderDetail (order_id, product_id, quantity, unit_price, subtotal) VALUES (?, ?, ?, ?, ?)',
+            'iiidd',
+            [$adminHistoricalSaleOrderId, $uncategorizedProductId, 10, 4.00, 35.00]
+        );
+
+        $globalCategorySales = dashboard_get_category_sales_distribution($conn);
+        $tests->assertCount(3, $globalCategorySales, 'Global category distribution must include categorized and uncategorized sales.');
+        $tests->assertSame($categoryAName, $globalCategorySales[0]['category_name'], 'Category distribution ordering must be by total sales descending.');
+        $tests->assertSame('80.00', (string)$globalCategorySales[0]['total_sales'], 'Category A total sales are incorrect.');
+        $tests->assertSame($categoryBName, $globalCategorySales[1]['category_name'], 'Second category distribution ordering is incorrect.');
+        $tests->assertSame('50.00', (string)$globalCategorySales[1]['total_sales'], 'Category B total sales are incorrect.');
+        $tests->assertSame('Uncategorized', $globalCategorySales[2]['category_name'], 'Missing categories must use the Uncategorized fallback.');
+        $tests->assertSame('35.00', (string)$globalCategorySales[2]['total_sales'], 'Uncategorized total sales are incorrect.');
+        $tests->assertCount(3, dashboard_get_category_sales_distribution($conn, null, 25), 'Allowed category page size 25 must remain valid.');
+        $tests->assertCount(3, dashboard_get_category_sales_distribution($conn, null, 50), 'Allowed category page size 50 must remain valid.');
+        $tests->assertCount(3, dashboard_get_category_sales_distribution($conn, null, 100), 'Allowed category page size 100 must remain valid.');
+        $tests->assertCount(3, dashboard_get_category_sales_distribution($conn, null, 10), 'Invalid category page size must normalize to the default.');
+        $tests->assertSame(
+            $globalCategorySales,
+            get_category_sales_distribution($conn),
+            'The legacy category-sales wrapper must preserve the focused service result.'
+        );
+
+        $cashierCategorySales = dashboard_get_category_sales_distribution($conn, $cashierId);
+        $tests->assertCount(1, $cashierCategorySales, 'Cashier category distribution must be staff-scoped.');
+        $tests->assertSame($categoryAName, $cashierCategorySales[0]['category_name'], 'Cashier category distribution is incorrect.');
+        $tests->assertSame('20.00', (string)$cashierCategorySales[0]['total_sales'], 'Cashier category total sales are incorrect.');
+        $tests->assertSame([], dashboard_get_category_sales_distribution($conn, 999999), 'Unknown staff scope must return an empty category distribution.');
+
+        $globalCategoryClosed = new mysqli(
+            $database->hostForTests(),
+            $database->runtimeUsername,
+            $database->runtimePassword,
+            $database->databaseName,
+            $database->portForTests()
+        );
+        $globalCategoryClosed->close();
+        $tests->assertSame(
+            [],
+            dashboard_get_category_sales_distribution($globalCategoryClosed),
+            'Global closed-connection category distribution must preserve the empty-array fallback.'
+        );
+
+        $scopedCategoryException = null;
+        try {
+            $scopedCategoryClosed = new mysqli(
+                $database->hostForTests(),
+                $database->runtimeUsername,
+                $database->runtimePassword,
+                $database->databaseName,
+                $database->portForTests()
+            );
+            $scopedCategoryClosed->close();
+            dashboard_get_category_sales_distribution($scopedCategoryClosed, $cashierId);
+        } catch (Throwable $exception) {
+            $scopedCategoryException = $exception;
+        }
+        $tests->assertTrue(
+            $scopedCategoryException instanceof Throwable,
+            'Scoped closed-connection category distribution must preserve the existing thrown failure behavior.'
+        );
+        if ($scopedCategoryException instanceof Throwable) {
+            $tests->assertContains(
+                'mysqli object is already closed',
+                $scopedCategoryException->getMessage(),
+                'Scoped closed-connection category failure must originate from the database connection.'
+            );
+        }
+
         $closedTopSellingException = null;
         try {
             $closedTopSellingConnection = new mysqli(

@@ -84,7 +84,6 @@ function run_dashboard_unit_tests(): int
         'Dashboard page must not call the legacy statistics function.'
     );
     foreach ([
-        'get_category_sales_distribution($conn, $dashboard_staff_id)',
         'get_low_stock_products($conn)',
     ] as $unchangedCaller) {
         $tests->assertContains($unchangedCaller, $index, 'Unrelated dashboard caller changed: ' . $unchangedCaller);
@@ -270,6 +269,89 @@ function run_dashboard_unit_tests(): int
         0,
         preg_match('/\bget_top_selling_products\s*\(/', $index),
         'Dashboard page must not call the legacy top-selling function.'
+    );
+
+    $tests->assertContains(
+        'function dashboard_get_category_sales_distribution($conn, $staff_id = null, $limit = 100)',
+        $module,
+        'Dashboard module must expose the explicit category-sales service.'
+    );
+    foreach ([
+        'normalize_page_size($limit, 100, [25, 50, 100])',
+        "SELECT COALESCE(c.name, 'Uncategorized') as category_name, SUM(od.subtotal) as total_sales",
+        'FROM OrderDetail od',
+        'JOIN `Order` o ON od.order_id = o.id',
+        'JOIN Product p ON od.product_id = p.id',
+        'LEFT JOIN Category c ON p.category_id = c.id',
+        "WHERE o.order_type = 'sale'",
+        'AND o.staff_id = ?',
+        'GROUP BY p.category_id, c.name',
+        'ORDER BY total_sales DESC',
+        'LIMIT ?',
+        "bind_param('i', \$limit)",
+        "bind_param('ii', \$staff_id, \$limit)",
+        "error_log('Category sales distribution prepare failed: ' . \$conn->error)",
+        "error_log('Scoped category sales distribution prepare failed: ' . \$conn->error)",
+        "error_log('Category sales distribution query failed: ' . \$exception->getMessage())",
+        "error_log('Scoped category sales distribution result failed: ' . \$stmt->error)",
+        'return [];',
+        'finally',
+        '$stmt->close();',
+    ] as $categorySalesContract) {
+        $tests->assertContains(
+            $categorySalesContract,
+            $module,
+            'Dashboard category-sales contract is missing: ' . $categorySalesContract
+        );
+    }
+
+    $categorySalesFunctionPattern = '/function dashboard_get_category_sales_distribution\s*\([^)]*\)\s*\{(?<body>.*?)\n\}/s';
+    $categorySalesFunctionMatched = preg_match($categorySalesFunctionPattern, $module, $categorySalesFunctionMatches) === 1;
+    $tests->assertTrue($categorySalesFunctionMatched, 'Dashboard category-sales service body is missing.');
+    if ($categorySalesFunctionMatched) {
+        $tests->assertContains(
+            'if ($staff_id === null)',
+            $categorySalesFunctionMatches['body'],
+            'Category-sales service must preserve separate global and scoped branches.'
+        );
+        $tests->assertContains(
+            'catch (Throwable $exception)',
+            $categorySalesFunctionMatches['body'],
+            'Global category-sales failures must remain caught and converted to an empty array.'
+        );
+    }
+
+    $categorySalesWrapperPattern = '/function get_category_sales_distribution\s*\([^)]*\)\s*\{(?<body>.*?)\n\}/s';
+    $categorySalesWrapperMatched = preg_match($categorySalesWrapperPattern, $facade, $categorySalesWrapperMatches) === 1;
+    $tests->assertTrue($categorySalesWrapperMatched, 'Category-sales compatibility wrapper is missing.');
+    if ($categorySalesWrapperMatched) {
+        $tests->assertContains(
+            'return dashboard_get_category_sales_distribution($conn, $staff_id, $limit);',
+            $categorySalesWrapperMatches['body'],
+            'Category-sales compatibility wrapper must delegate exactly once.'
+        );
+        $tests->assertSame(
+            1,
+            substr_count($categorySalesWrapperMatches['body'], 'dashboard_get_category_sales_distribution('),
+            'Category-sales compatibility wrapper must contain one delegation.'
+        );
+        foreach (['SELECT ', 'query(', 'prepare(', 'bind_param', 'fetch_assoc', 'fetch_all'] as $implementationDetail) {
+            $tests->assertFalse(
+                strpos($categorySalesWrapperMatches['body'], $implementationDetail) !== false,
+                'Category-sales compatibility wrapper still contains implementation detail: ' . $implementationDetail
+            );
+        }
+    }
+
+    $tests->assertContains(
+        'dashboard_get_category_sales_distribution($conn, $dashboard_staff_id)',
+        $index,
+        'Dashboard page must call the focused category-sales service directly.'
+    );
+    $tests->assertSame(
+        0,
+        preg_match('/\bget_category_sales_distribution\s*\(/', $index),
+        'Dashboard page must not call the legacy category-sales function.'
     );
 
     return $tests->assertions();
