@@ -104,7 +104,7 @@ async function login(page, credentials) {
   await page.getByLabel('Password').fill(credentials.password);
   await page.getByRole('button', { name: 'Log In' }).click();
   await expect(page).toHaveURL(/\/index\.php$/);
-  await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
+  await expect(page.locator('#main-content').getByRole('heading', { name: 'Dashboard' })).toBeVisible();
   const authenticatedSession = await currentPhpSessionId(page);
   expect(
     anonymousSession !== null && authenticatedSession !== null && anonymousSession !== authenticatedSession,
@@ -264,7 +264,7 @@ test('admin authentication, invalid login, protected redirect, and logout', asyn
   await expect(page).toHaveURL(/\/login\.php$/);
   await expect(page.getByRole('alert')).toContainText('Security check failed. Invalid request token.');
   await page.goto('/index.php');
-  await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
+  await expect(page.locator('#main-content').getByRole('heading', { name: 'Dashboard' })).toBeVisible();
   await captureSanitizedScreenshot(page, 'login-dashboard');
   await logout(page);
   await page.goto('/settings.php');

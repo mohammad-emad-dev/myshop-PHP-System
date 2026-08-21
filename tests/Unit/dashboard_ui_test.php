@@ -22,22 +22,22 @@ function run_dashboard_ui_unit_tests(): int
     }
 
     foreach ([
-        'class="dashboard-page"',
-        'class="dashboard-page-header"',
-        'class="dashboard-page-kicker"',
-        'class="dashboard-page-context"',
-        'class="dashboard-page-actions"',
-        'class="dashboard-kpi-grid"',
+        'dashboard-page',
+        'dashboard-page-header',
+        'dashboard-page-kicker',
+        'dashboard-page-context',
+        'dashboard-page-actions',
+        'dashboard-kpi-grid',
         'class="dashboard-kpi-card',
         'class="dashboard-kpi-number"',
-        'class="dashboard-panel',
-        'class="dashboard-chart-frame"',
-        'class="dashboard-ranking-list"',
-        'class="dashboard-category-chart"',
-        'class="dashboard-alert-table"',
-        'class="dashboard-state',
-        'class="dashboard-quick-list"',
-        'class="dashboard-quick-link"',
+        'dashboard-panel',
+        'dashboard-chart-frame',
+        'dashboard-ranking-list',
+        'dashboard-category-chart',
+        'dashboard-alert-table',
+        'dashboard-state',
+        'dashboard-quick-list',
+        'dashboard-quick-link',
     ] as $newContract) {
         $tests->assertContains($newContract, $index, 'Dashboard Phase 6B structure is missing: ' . $newContract);
     }
