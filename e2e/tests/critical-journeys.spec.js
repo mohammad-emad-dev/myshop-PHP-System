@@ -374,6 +374,11 @@ test('admin can load critical pages, search and paginate products, and access ex
       await page.getByRole('button', { name: /Add Staff/ }).click();
       await expect(page.locator('#addStaffModal')).toBeVisible();
       await expect(page.locator('#addStaffModal .modal-title')).toBeVisible();
+      await page.waitForFunction(() => {
+        const modalElement = document.querySelector('#addStaffModal');
+        const modal = window.bootstrap?.Modal.getInstance(modalElement);
+        return modalElement?.classList.contains('show') && modal && modal._isTransitioning === false;
+      });
       await page.keyboard.press('Escape');
       await expect(page.locator('#addStaffModal')).toBeHidden();
       await page.getByRole('button', { name: /Add Staff/ }).click();
