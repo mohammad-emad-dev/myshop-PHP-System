@@ -2,9 +2,9 @@
 
 MyShop is a localhost-first inventory and point-of-sale system built with native PHP and MySQL. It is designed for a small shop that needs a clear sales workflow, reliable stock updates, customer and supplier records, reports, and printable invoices.
 
-[![Quality Gate](https://github.com/mohammad-emad-dev/myshop-PHP-System/actions/workflows/quality.yml/badge.svg?branch=security-hardening-baseline)](https://github.com/mohammad-emad-dev/myshop-PHP-System/actions/workflows/quality.yml?query=branch%3Asecurity-hardening-baseline)
+[![Quality Gate](https://github.com/mohammad-emad-dev/myshop-PHP-System/actions/workflows/quality.yml/badge.svg?branch=main)](https://github.com/mohammad-emad-dev/myshop-PHP-System/actions/workflows/quality.yml?query=branch%3Amain)
 
-> The reviewed work is currently published on [security-hardening-baseline](https://github.com/mohammad-emad-dev/myshop-PHP-System/tree/security-hardening-baseline). The application is intended for a protected local computer through Docker or XAMPP. It is not configured as a public internet service.
+> The reviewed baseline is published on [main](https://github.com/mohammad-emad-dev/myshop-PHP-System/tree/main) and mirrored on [security-hardening-baseline](https://github.com/mohammad-emad-dev/myshop-PHP-System/tree/security-hardening-baseline) for traceability. The application is intended for a protected local computer through Docker or XAMPP. It is not configured as a public internet service.
 
 ## What it does
 
@@ -86,10 +86,10 @@ screenshots/            Curated README screenshots
 
 XAMPP is supported as a manual alternative; see [the local deployment runbook](docs/PRODUCTION-DEPLOYMENT.md).
 
-### 1. Clone the reviewed branch
+### 1. Clone the reviewed baseline
 
 ~~~powershell
-git clone -b security-hardening-baseline https://github.com/mohammad-emad-dev/myshop-PHP-System.git
+git clone https://github.com/mohammad-emad-dev/myshop-PHP-System.git
 cd myshop-PHP-System
 ~~~
 
@@ -197,7 +197,7 @@ The architecture and UI history is intentionally kept in docs/ so a reviewer can
 
 ## Git workflow
 
-The project follows GitHub Flow: make a focused branch, run the relevant checks, commit with a descriptive Conventional Commit message, and open a pull request when the change is ready for review. The localhost branch is kept separate from main until it is reviewed and merged.
+The project follows GitHub Flow: make a focused branch, run the relevant checks, commit with a descriptive Conventional Commit message, and open a pull request when the change is ready for review. `main` is the published baseline; `security-hardening-baseline` is kept as a mirrored traceability branch.
 
 ## License
 
