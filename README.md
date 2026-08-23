@@ -1,8 +1,13 @@
 # MyShop
 
-MyShop is a localhost-first inventory and point-of-sale system built with native PHP and MySQL. It is designed for a small shop that needs a clear sales workflow, reliable stock updates, customer and supplier records, reports, and printable invoices.
+**A secure, localhost-first inventory, point-of-sale, and order management system for small retail operations.**
 
 [![Quality Gate](https://github.com/mohammad-emad-dev/myshop-PHP-System/actions/workflows/quality.yml/badge.svg?branch=main)](https://github.com/mohammad-emad-dev/myshop-PHP-System/actions/workflows/quality.yml?query=branch%3Amain)
+![PHP 8.3](https://img.shields.io/badge/PHP-8.3-777BB4?logo=php&logoColor=white)
+![MySQL 8.4](https://img.shields.io/badge/MySQL-8.4-4479A1?logo=mysql&logoColor=white)
+![Docker Compose](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)
+
+MyShop is a server-rendered PHP and MySQL application for running day-to-day shop operations from one responsive interface. It combines sales and purchase processing, stock control, customer and supplier records, reporting, audit history, and printable invoices without requiring a PHP framework or frontend build system.
 
 > The reviewed baseline is published on [main](https://github.com/mohammad-emad-dev/myshop-PHP-System/tree/main) and mirrored on [security-hardening-baseline](https://github.com/mohammad-emad-dev/myshop-PHP-System/tree/security-hardening-baseline) for traceability. The application is intended for a protected local computer through Docker or XAMPP. It is not configured as a public internet service.
 
@@ -33,35 +38,141 @@ These are sanitized screenshots from the current UI baseline. They contain no re
 
 The full responsive evidence set is kept in [docs/ui/baselines/](docs/ui/baselines/), including 375px, 768px, and 1440px captures.
 
-## Architecture at a glance
+## Architecture
 
-The application keeps the web boundary thin. Page controllers handle HTTP concerns, focused services own business rules, and the compatibility facade protects older callers while the codebase is refactored.
+MyShop keeps HTTP handling at the web boundary and business rules in focused service modules. `includes/functions.php` remains a compatibility facade for older callers while new work is assigned to the smallest domain module that owns the behavior.
 
-~~~text
-Browser
-  │
-  ▼
-public/  ── page controllers, forms, routes, assets
-  │
-  ├── includes/security.php, auth.php, http.php
-  ├── includes/catalog.php, products.php, inventory.php
-  ├── includes/people.php, customers.php, suppliers.php
-  ├── includes/orders.php, dashboard.php, audit.php, backup.php
-  │
-  ▼
-config/db.php  ── restricted runtime connection  ──  MySQL
+### Component model
 
-Legacy pages and CLI tools ──► includes/functions.php
-                               compatibility facade
-~~~
+```mermaid
+flowchart LR
+    User["Administrator / Cashier"] --> Browser["Browser"]
+    Browser --> Controller["public/<br/>Page controllers, forms, and assets"]
+    Controller --> Boundary["Security, authentication,<br/>authorization, and HTTP"]
+    Controller --> Domain["Focused domain services"]
+    Legacy["Legacy pages and CLI tools"] --> Facade["includes/functions.php<br/>Compatibility facade"]
+    Facade --> Domain
+    Boundary --> Domain
+    Domain --> Connection["config/db.php<br/>Restricted runtime connection"]
+    Connection --> Database[(MySQL)]
+    Controller --> Uploads["public/uploads/<br/>Protected media boundary"]
+```
 
-The three detailed diagrams are in [docs/architecture/DIAGRAMS.md](docs/architecture/DIAGRAMS.md):
+### Transactional order and stock lifecycle
 
-1. Request and service ownership.
-2. The transactional order and stock lifecycle.
-3. Authentication, authorization, and database privilege boundaries.
+The browser submits intent, not authoritative totals. The server validates the request, re-reads products inside a transaction, and commits the order, inventory change, stock ledger, and audit event as one unit.
 
-Only public/ should be exposed as the web document root. The repository root, config/, database/, backup files, and local environment files must stay outside the document root.
+```mermaid
+flowchart TD
+    A["POS submits an order"] --> B["Authenticate and authorize"]
+    B --> C["Validate CSRF token, items,<br/>prices, and quantities"]
+    C --> D["Begin database transaction"]
+    D --> E["Lock and re-read products"]
+    E --> F{"Stock available?"}
+    F -- No --> R["Roll back and return<br/>a generic error"]
+    F -- Yes --> G["Insert order and line items"]
+    G --> H["Update product stock"]
+    H --> I["Record stock movements"]
+    I --> J["Write audit event"]
+    J --> K["Commit transaction"]
+    K --> L["Expose order history<br/>and printable invoice"]
+```
+
+### Core data model
+
+The relational model keeps catalog, people, order, inventory, and audit concerns explicit. `ORDER_HEADER` represents the quoted MySQL `Order` table. `LoginRateLimit` is a standalone authentication-support table keyed by a normalized account hash and source IP address.
+
+```mermaid
+erDiagram
+    CATEGORY o|--o{ PRODUCT : classifies
+    STAFF ||--o{ ORDER_HEADER : processes
+    CUSTOMER o|--o{ ORDER_HEADER : places
+    SUPPLIER o|--o{ ORDER_HEADER : fulfills
+    ORDER_HEADER ||--o{ ORDER_DETAIL : contains
+    PRODUCT ||--o{ ORDER_DETAIL : references
+    PRODUCT ||--o{ STOCK_MOVEMENT : changes
+    STAFF ||--o{ STOCK_MOVEMENT : performs
+    STAFF o|--o{ AUDIT_LOG : acts_in
+
+    CATEGORY {
+        int id PK
+        string name UK
+        text description
+    }
+    PRODUCT {
+        int id PK
+        int category_id FK
+        string name
+        decimal price
+        int stock
+        int alert_threshold
+        string barcode UK
+    }
+    STAFF {
+        int id PK
+        string username UK
+        string role
+        boolean is_active
+    }
+    CUSTOMER {
+        int id PK
+        string name
+        string phone
+        string email
+    }
+    SUPPLIER {
+        int id PK
+        string name
+        string phone
+        string email
+    }
+    ORDER_HEADER {
+        int id PK
+        int staff_id FK
+        int customer_id FK
+        int supplier_id FK
+        string order_type
+        decimal total_amount
+        datetime order_date
+    }
+    ORDER_DETAIL {
+        int id PK
+        int order_id FK
+        int product_id FK
+        int quantity
+        decimal unit_price
+        decimal subtotal
+    }
+    STOCK_MOVEMENT {
+        int id PK
+        int product_id FK
+        int staff_id FK
+        int quantity
+        string movement_type
+    }
+    AUDIT_LOG {
+        bigint id PK
+        int actor_staff_id FK
+        string action
+        string entity_type
+        int entity_id
+        string outcome
+        json metadata
+    }
+```
+
+### Local deployment topology
+
+```mermaid
+flowchart LR
+    Browser["Local browser"] -->|"127.0.0.1:8080 by default"| App["Apache + PHP 8.3<br/>public/ document root"]
+    App -->|"Private Compose network<br/>db:3306"| DB["MySQL 8.4"]
+    Tools["Optional local DB tools"] -->|"127.0.0.1:3307 by default"| DB
+    App --> UploadVolume[(Upload storage)]
+    DB --> DataVolume[(MySQL data volume)]
+```
+
+Only `public/` should be exposed as the web document root. The repository root, `config/`, `database/`, backup files, and local environment files must remain outside it. See [the detailed architecture diagrams](docs/architecture/DIAGRAMS.md) for request ownership and authentication, authorization, and database trust boundaries.
 
 ## Repository layout
 
