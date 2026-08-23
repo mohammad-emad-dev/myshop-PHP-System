@@ -6,6 +6,8 @@ MyShop is a localhost-first inventory and point-of-sale system built with native
 
 > The reviewed baseline is published on [main](https://github.com/mohammad-emad-dev/myshop-PHP-System/tree/main) and mirrored on [security-hardening-baseline](https://github.com/mohammad-emad-dev/myshop-PHP-System/tree/security-hardening-baseline) for traceability. The application is intended for a protected local computer through Docker or XAMPP. It is not configured as a public internet service.
 
+> No default administrator username or password is shipped with the repository. Create the first local administrator explicitly through the CLI bootstrap described below.
+
 ## What it does
 
 - Runs sales and purchases from a split-screen POS terminal.
@@ -72,6 +74,7 @@ docker/                 Apache and PHP container configuration
 scripts/                Local QA, smoke, security, and release checks
 tests/                  Dependency-free unit and MySQL integration tests
 e2e/                    Playwright browser journeys
+.github/workflows/      Quality Gate and release-integrity workflows
 docs/architecture/      Ownership maps, contracts, and refactoring evidence
 docs/ui/                Design decisions and responsive UI baselines
 screenshots/            Curated README screenshots
@@ -114,7 +117,7 @@ Open [http://127.0.0.1:8080](http://127.0.0.1:8080). The port can be changed wit
 
 ### 4. Create the first administrator
 
-Set these local values in .env:
+There is no pre-seeded administrator account. Set the following local values in `.env`; these are examples, not credentials:
 
 ~~~text
 BOOTSTRAP_ADMIN_USERNAME=local_admin
@@ -172,9 +175,9 @@ See [docs/BROWSER-QA.md](docs/BROWSER-QA.md) for browser prerequisites and [docs
 - Database failures are logged without exposing SQL details or stack traces to users.
 - Health and readiness endpoints return generic responses and do not disclose internal diagnostics.
 
-This project intentionally does not claim to provide cloud TLS, WAF, secret-manager, internet-facing firewall, external monitoring, or off-site backup infrastructure. Those controls belong to a separate deployment environment.
+This project intentionally does not claim to provide cloud controls such as TLS termination, WAF, secret-manager integration, an internet-facing firewall, external monitoring, or off-site backup infrastructure. Those controls belong to a separate deployment environment.
 
-The baseline keeps cloud controls such as TLS termination, WAFs, secret managers, and external monitoring out of scope.
+No latency, throughput, or barcode-scan benchmark is published in this README. Performance figures should be added only with a reproducible benchmark and a stated environment.
 
 ## Local operations and release notes
 
